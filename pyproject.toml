@@ -1,0 +1,96 @@
+[tool.poetry]
+name = "expanse"
+version = "0.1.0"
+description = ""
+authors = ["Sébastien Eustace <sebastien@eustace.io>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+starlette = { version = "^0.27.0", extras = ["full"] }
+uvicorn = "^0.23.2"
+cleo = "^2.0.1"
+jinja2 = "^3.1.2"
+pydantic = "^2.3.0"
+pendulum = {git = "https://github.com/sdispater/pendulum.git", rev = "master"}
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+treat = "^0.2.0"
+pytest-asyncio = "^0.21.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+
+[tool.ruff]
+fix = true
+unfixable = [
+    "ERA", # do not autoremove commented out code
+]
+target-version = "py38"
+line-length = 88
+extend-select = [
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "ERA", # flake8-eradicate/eradicate
+    "I", # isort
+    "N", # pep8-naming
+    "PIE", # flake8-pie
+    "PGH", # pygrep
+    "RUF", # ruff checks
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "TID", # flake8-tidy-imports
+    "UP", # pyupgrade
+]
+ignore = [
+    "B904", # use 'raise ... from err'
+    "B905", # use explicit 'strict=' parameter with 'zip()'
+    "N818", #  Exception name should be named with an Error suffix
+    "RUF001",
+]
+extend-exclude = [
+    # External to the project's coding standards:
+    "docs/*",
+    # ruff disagrees with black when it comes to formatting
+    "*.pyi",
+]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.isort]
+force-single-line = true
+lines-between-types = 1
+lines-after-imports = 2
+known-first-party = ["expanse"]
+known-third-party = []
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.per-file-ignores]
+"tests/**/test_*.py" = ["I002"]
+
+[tool.mypy]
+files = "src, tests"
+mypy_path = "src"
+show_error_codes = true
+pretty = true
+warn_unused_ignores = true
+exclude = []
+
+
+[tool.coverage.run]
+omit = ["src/expanse/types/*", "src/expanse/support/_compat.py", "src/expanse/support/_utils.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:"
+]
