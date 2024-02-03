@@ -24,6 +24,10 @@ from expanse.support._compat import md5_hexdigest
 if TYPE_CHECKING:
     from os import PathLike
 
+    from expanse.types import Receive
+    from expanse.types import Scope
+    from expanse.types import Send
+
 
 class Response(BaseResponse):
     @classmethod
@@ -99,8 +103,8 @@ class FileResponse(Response):
         headers: Mapping[str, str] | None = None,
         media_type: str | None = None,
         filename: str | None = None,
-        stat_result: typing.Optional[os.stat_result] = None,
-        method: typing.Optional[str] = None,
+        stat_result: os.stat_result | None = None,
+        method: str | None = None,
         content_disposition_type: str = "attachment",
     ) -> None:
         self.path = path

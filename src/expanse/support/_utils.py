@@ -63,3 +63,15 @@ def string_matches(string: str, pattern: str | list[str]) -> bool:
             return True
 
     return False
+
+
+def class_to_name(class_: type | str) -> str:
+    if isinstance(class_, str):
+        return class_
+
+    module = class_.__module__
+    name = class_.__qualname__
+
+    full_name = f"{module}.{name}" if module else name
+
+    return full_name

@@ -5,6 +5,7 @@ import traceback
 
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Any
 from typing import Awaitable
 from typing import Callable
 from typing import ClassVar
@@ -19,6 +20,7 @@ from expanse.container.container import Container
 from expanse.foundation.bootstrap.boot_providers import BootProviders
 from expanse.foundation.bootstrap.load_configuration import LoadConfiguration
 from expanse.foundation.bootstrap.register_providers import RegisterProviders
+from expanse.foundation.helpers import PlaceholderPath
 from expanse.foundation.http.middleware._adapter import AdapterMiddleware
 from expanse.routing.routing_service_provider import RoutingServiceProvider
 from expanse.support._utils import string_to_class
@@ -84,6 +86,14 @@ class Application(Container):
     @property
     def resources_path(self) -> Path:
         return self._resources_path or self._base_path.joinpath("resources")
+
+    def resolve_placeholder_path(self, path: Any) -> Any:
+        if not isinstance(path, PlaceholderPath):
+            return path
+
+        app_path: Path = getattr(self, f"{path.app_path}_path")
+
+        return app_path.joinpath(path.relative_path)
 
     def is_booted(self) -> bool:
         return self._booted

@@ -31,15 +31,14 @@ class Config:
         parts = item.split(".")
         count = len(parts)
         for i, part in enumerate(parts):
+            if i == count - 1:
+                config[part] = value
+                return
+
             if part not in config:
-                if i == count - 1:
-                    config[item] = value
-                else:
-                    raise KeyError(item)
+                config[part] = {}
 
             config = config[part]
-
-        return config
 
     def __getitem__(self, item: Any) -> Any:
         value = self.get(item, default=_NOT_FOUND)

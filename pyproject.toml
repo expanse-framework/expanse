@@ -12,7 +12,8 @@ uvicorn = "^0.23.2"
 cleo = "^2.0.1"
 jinja2 = "^3.1.2"
 pydantic = "^2.3.0"
-pendulum = {git = "https://github.com/sdispater/pendulum.git", rev = "master"}
+pendulum = { git = "https://github.com/sdispater/pendulum.git", rev = "master" }
+pydantic-settings = "^2.1.0"
 
 
 [tool.poetry.group.test.dependencies]
@@ -51,6 +52,7 @@ extend-select = [
     "UP", # pyupgrade
 ]
 ignore = [
+    "I002",
     "B904", # use 'raise ... from err'
     "B905", # use explicit 'strict=' parameter with 'zip()'
     "N818", #  Exception name should be named with an Error suffix
@@ -72,10 +74,6 @@ lines-between-types = 1
 lines-after-imports = 2
 known-first-party = ["expanse"]
 known-third-party = []
-required-imports = ["from __future__ import annotations"]
-
-[tool.ruff.per-file-ignores]
-"tests/**/test_*.py" = ["I002"]
 
 [tool.mypy]
 files = "src, tests"

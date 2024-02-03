@@ -25,6 +25,11 @@ class ViewServiceProvider(ServiceProvider):
 
     async def _register_view_finder(self) -> None:
         async def _create_view_finder(app: Application) -> ViewFinder:
-            return ViewFinder((await app.make(Config))["view"]["paths"])
+            return ViewFinder(
+                [
+                    app.resolve_placeholder_path(path)
+                    for path in (await app.make(Config))["view"]["paths"]
+                ]
+            )
 
         self._app.singleton("view:finder", _create_view_finder)
