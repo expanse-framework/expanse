@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import re
 
@@ -8,7 +7,6 @@ from typing import TYPE_CHECKING
 from typing import Awaitable
 from typing import Callable
 
-from starlette.concurrency import run_in_threadpool
 from starlette.middleware import Middleware as BaseMiddleware
 from starlette.routing import Mount
 from starlette.routing import Route as BaseRoute
@@ -27,6 +25,9 @@ if TYPE_CHECKING:
     from expanse.foundation.application import Application
     from expanse.routing.route import Route
     from expanse.routing.route_group import RouteGroup
+    from expanse.types import Receive
+    from expanse.types import Scope
+    from expanse.types import Send
 
 
 class Router:
@@ -60,7 +61,9 @@ class Router:
             ],
             name=group.name,
             middleware=[
-                BaseMiddleware(AdapterMiddleware, middleware=self._app.make(middleware))
+                BaseMiddleware(
+                    AdapterMiddleware, middleware=middleware, container=self._app
+                )
                 for middleware in group.middlewares
                 if hasattr(middleware, "handle")
             ],
@@ -72,6 +75,9 @@ class Router:
         for group in groups:
             self.add_group(group)
 
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self._router(scope, receive, send)
+
     def _route_handler(
         self, route: Route
     ) -> Callable[[BaseRequest], Awaitable[Response] | Response]:
@@ -79,11 +85,7 @@ class Router:
         signature = self._get_typed_signature(route)
 
         async def wrapper(request: BaseRequest) -> Response:
-            container: Application | Container = self._app
-            if container.has_scoped_bindings():
-                container = container.create_scoped_container()
-
-            container.instance(Request, Request(request.scope))
+            self._app.instance(Request, Request(request.scope), scoped=True)
 
             arguments = []
 
@@ -99,12 +101,7 @@ class Router:
                 ):
                     arguments.append(parameter.annotation(params=request.query_params))
 
-            if asyncio.iscoroutinefunction(route.endpoint):
-                return await container.call_async(route.endpoint, *arguments)
-            else:
-                return await run_in_threadpool(
-                    container.call, route.endpoint, *arguments
-                )
+            return await self._app.call(route.endpoint, *arguments)
 
         return wrapper
 

@@ -5,6 +5,7 @@ import traceback
 
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Awaitable
 from typing import Callable
 from typing import ClassVar
 from typing import Self
@@ -13,6 +14,7 @@ from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware import Middleware as BaseMiddleware
 
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.foundation.bootstrap.boot_providers import BootProviders
 from expanse.foundation.bootstrap.load_configuration import LoadConfiguration
@@ -25,6 +27,7 @@ from expanse.support._utils import string_to_class
 if TYPE_CHECKING:
     from expanse.foundation.bootstrap.bootstrapper import Bootstrapper
     from expanse.foundation.http.middleware.base import Middleware
+    from expanse.routing.router import Router
     from expanse.support.service_provider import ServiceProvider
     from expanse.types import Receive
     from expanse.types import Scope
@@ -61,11 +64,12 @@ class Application(Container):
         self._default_middlewares: list[
             type[Middleware]
         ] = self.__class__._middleware.copy()
-        self._terminating_callbacks: list[Callable[..., None]] = []
+        self._terminating_callbacks: list[
+            Callable[..., None] | Awaitable[..., None]
+        ] = []
 
         self._bind_paths()
         self._register_base_bindings()
-        self._register_base_service_providers()
 
         self._app: Starlette = Starlette(debug=True)
 
@@ -87,7 +91,7 @@ class Application(Container):
     def has_been_bootstrapped(self) -> bool:
         return self._has_been_bootstrapped
 
-    def boot(self) -> None:
+    async def boot(self) -> None:
         """
         Boot the application service providers.
         """
@@ -95,7 +99,7 @@ class Application(Container):
             return
 
         for service_provider in self._service_providers:
-            self._boot_provider(service_provider)
+            await self._boot_provider(service_provider)
 
     def set_base_path(self, base_path: Path) -> Self:
         self._base_path = base_path
@@ -104,31 +108,28 @@ class Application(Container):
 
         return self
 
-    def bootstrap(self) -> None:
-        try:
-            self.bootstrap_with(self._default_bootstrappers)
-        except Exception as e:
-            print(e)
+    async def bootstrap(self) -> Self:
+        return await self.bootstrap_with(self._default_bootstrappers)
 
-            raise
-
-    def bootstrap_with(self, bootstrappers: list[type[Bootstrapper]]) -> Self:
+    async def bootstrap_with(self, bootstrappers: list[type[Bootstrapper]]) -> Self:
         if self._has_been_bootstrapped:
             return self
 
-        for bootstrapper_class in bootstrappers:
-            bootstrapper: Bootstrapper = self.make(bootstrapper_class)
-            bootstrapper.bootstrap(self)
+        await self._register_base_service_providers()
 
-        self.register_configured_providers()
-        self.boot()
+        for bootstrapper_class in bootstrappers:
+            bootstrapper: Bootstrapper = await self.make(bootstrapper_class)
+            await bootstrapper.bootstrap(self)
+
+        await self.register_configured_providers()
+        await self.boot()
 
         self._has_been_bootstrapped = True
 
         return self
 
-    def register_configured_providers(self) -> None:
-        providers = self.make("config")["app"].get("providers", [])
+    async def register_configured_providers(self) -> None:
+        providers = (await self.make(Config)).get("app.providers", [])
 
         for provider_class in providers:
             if isinstance(provider_class, str):
@@ -136,16 +137,19 @@ class Application(Container):
 
             provider = provider_class(self)
 
-            self.register(provider)
+            await self.register(provider)
 
-    def register(
+    async def register(
         self, provider: ServiceProvider, force: bool = False
     ) -> ServiceProvider:
         self._service_providers.append(provider)
 
-        provider.register()
+        await provider.register()
 
         return provider
+
+    def terminating(self, callback: Callable[..., None] | Awaitable[..., None]) -> None:
+        self._terminating_callbacks.append(callback)
 
     async def terminate(self) -> None:
         for callback in self._terminating_callbacks:
@@ -160,9 +164,6 @@ class Application(Container):
     def add_middleware(self, middleware: type[Middleware]) -> None:
         self._default_middlewares.append(middleware)
 
-    def create_scoped_container(self) -> Container:
-        return super().create_scoped_container()
-
     def _bind_paths(self) -> None:
         assert self._base_path is not None
 
@@ -170,33 +171,34 @@ class Application(Container):
         self.instance("path:config", self.config_path)
         self.instance("path:resources", self.resources_path)
 
-    def _boot_provider(self, provider: ServiceProvider) -> None:
+    async def _boot_provider(self, provider: ServiceProvider) -> None:
         if hasattr(provider, "boot"):
-            self.call(provider.boot)
+            await self.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
         self.instance("app", self)
         self.instance(self.__class__, self)
         self.instance(Container, self)
 
-    def _register_base_service_providers(self) -> None:
-        self.register(RoutingServiceProvider(self))
+    async def _register_base_service_providers(self) -> None:
+        await self.register(RoutingServiceProvider(self))
 
-    def _setup_router(self) -> None:
+    async def _setup_router(self) -> None:
         self._app.user_middleware = [
-            BaseMiddleware(AdapterMiddleware, middleware=self.make(middleware))
+            BaseMiddleware(AdapterMiddleware, middleware=middleware, container=self)
             for middleware in self._default_middlewares
             if hasattr(middleware, "handle")
         ]
-        self._app.router = self.make("router")._router
+        router: Router = await self.make("router")
+        self._app.router = router._router
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
             while True:
                 message = await receive()
                 if message["type"] == "lifespan.startup":
-                    self.bootstrap()
-                    self._setup_router()
+                    await self.bootstrap()
+                    await self._setup_router()
                     await send({"type": "lifespan.startup.complete"})
                 elif message["type"] == "lifespan.shutdown":
                     await self.terminate()

@@ -3,6 +3,7 @@ import re
 
 from typing import AsyncGenerator
 
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -211,10 +212,12 @@ class CorsMiddleware:
         """
         Handle the incoming request.
         """
-        if not self._has_matching_path(request):
+        if not (await self._has_matching_path(request)):
             yield
         else:
-            self._cors.set_options(**self._container.make("config").get("cors", {}))
+            self._cors.set_options(
+                **(await self._container.make(Config)).get("cors", {})
+            )
 
             if self._cors.is_preflight_request(request):
                 response = self._cors.handle_preflight_request(request)
@@ -232,9 +235,9 @@ class CorsMiddleware:
 
                 self._cors.add_actual_request_headers(response, request)
 
-    def _has_matching_path(self, request: Request) -> bool:
+    async def _has_matching_path(self, request: Request) -> bool:
         paths: list[str] = (
-            self._container.make("config").get("cors", {}).get("paths", [])
+            (await self._container.make(Config)).get("cors", {}).get("paths", [])
         )
 
         for path in paths:

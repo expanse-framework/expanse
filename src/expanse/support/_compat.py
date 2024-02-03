@@ -7,7 +7,10 @@ from typing import Any
 from typing import AsyncContextManager
 
 
-if sys.version_info >= (3, 10):  # pragma: no cover
+PY310 = sys.version_info >= (3, 10)
+PY311 = sys.version_info >= (3, 11)
+
+if PY310:  # pragma: no cover
     from contextlib import aclosing
 else:  # pragma: no cover
 

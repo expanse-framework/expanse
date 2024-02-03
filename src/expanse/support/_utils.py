@@ -15,11 +15,21 @@ if TYPE_CHECKING:
 
 
 def string_to_class(string: str) -> type[Any]:
-    module_name, class_name = string.rsplit(".", maxsplit=1)
+    method_name: str | None = None
+    parts = string.split(":", maxsplit=1)
+    if len(parts) > 1:
+        method_name = parts[-1]
+
+    module_name, class_name = parts[0].rsplit(".", maxsplit=1)
 
     module = import_module(module_name)
 
-    return getattr(module, class_name)
+    class_ = getattr(module, class_name)
+
+    if not method_name:
+        return class_
+
+    return getattr(class_, method_name)
 
 
 def module_from_path(path: Path) -> ModuleType | None:

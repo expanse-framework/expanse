@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from expanse.configuration.config import Config
 from expanse.foundation.application import Application
 from expanse.testing.test_client import TestClient
 
@@ -13,17 +14,18 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture()
-def app() -> Application:
+async def app() -> Application:
     application = Application()
-    application.instance("config", {"app": {}})
-    application.bootstrap_with([])
+    application.instance(Config, Config({"app": {}}))
+    application.alias(Config, "config")
+    await application.bootstrap_with([])
 
     return application
 
 
 @pytest.fixture()
-def router(app: Application) -> Router:
-    return app.make("router")
+async def router(app: Application) -> Router:
+    return await app.make("router")
 
 
 @pytest.fixture()

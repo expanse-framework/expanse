@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Any
 
+from expanse.configuration.config import Config
 from expanse.support._utils import module_from_path
 
 
@@ -14,21 +15,22 @@ if TYPE_CHECKING:
 
 class LoadConfiguration:
     @classmethod
-    def bootstrap(cls, app: Application) -> None:
-        config = {}
+    async def bootstrap(cls, app: Application) -> None:
+        config = Config({})
 
-        files = cls._get_configuration_files(app)
+        files = await cls._get_configuration_files(app)
 
         if "app" not in files:
             raise Exception('Unable to load the "app" configuration file')
 
         for identifier, filepath in files.items():
-            config[identifier] = cls._load_configuration_file(filepath)
+            config[identifier] = await cls._load_configuration_file(filepath)
 
-        app.instance("config", config)
+        app.instance(Config, config)
+        app.alias(Config, "config")
 
     @classmethod
-    def _get_configuration_files(cls, app: Application) -> dict[str, Path]:
+    async def _get_configuration_files(cls, app: Application) -> dict[str, Path]:
         files = {}
 
         for filepath in app.config_path.rglob("*.py"):
@@ -42,7 +44,7 @@ class LoadConfiguration:
         return dict(sorted(files.items()))
 
     @classmethod
-    def _load_configuration_file(cls, path: Path) -> dict[str, Any]:
+    async def _load_configuration_file(cls, path: Path) -> dict[str, Any]:
         module = module_from_path(path)
 
         if module is None:

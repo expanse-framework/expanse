@@ -5,6 +5,6 @@ from expanse.support.service_provider import ServiceProvider
 
 
 class RoutingServiceProvider(ServiceProvider):
-    def register(self) -> None:
+    async def register(self) -> None:
         self._app.singleton(Router, lambda app: Router(app))
         self._app.alias(Router, "router")

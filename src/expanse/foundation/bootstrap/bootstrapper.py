@@ -10,5 +10,5 @@ if TYPE_CHECKING:
 
 class Bootstrapper(Protocol):
     @classmethod
-    def bootstrap(cls, app: Application) -> None:
+    async def bootstrap(cls, app: Application) -> None:
         ...

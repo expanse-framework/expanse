@@ -14,11 +14,11 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def setup_app_config(app: Application) -> None:
-    config: dict[str, dict[str, Any]] = app.make("config")
+async def setup_app_config(app: Application) -> None:
+    config: dict[str, dict[str, Any]] = await app.make("config")
 
     config["view"] = {
         "paths": [Path(__file__).parent.joinpath("fixtures/resources/views")]
     }
 
-    app.register(ViewServiceProvider(app))
+    await app.register(ViewServiceProvider(app))

@@ -16,17 +16,18 @@ if TYPE_CHECKING:
     from starlette.types import Scope
     from starlette.types import Send
 
+    from expanse.container.container import Container
     from expanse.foundation.http.middleware.base import Middleware
 
 
 class AdapterMiddleware:
     def __init__(
-        self,
-        app: ASGIApp,
-        middleware: Middleware,
+        self, app: ASGIApp, middleware: type[Middleware], container: Container
     ) -> None:
-        self.app = app
-        self._middleware = middleware
+        self.app: ASGIApp = app
+        self._container: Container = container
+        self._middleware_class = middleware
+        self._middleware: Middleware | None = None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -34,6 +35,9 @@ class AdapterMiddleware:
             return
 
         request = Request(scope)
+
+        if self._middleware is None:
+            self._middleware = await self._container.make(self._middleware_class)
 
         async with aclosing(self._middleware.handle(request)) as flow:
             # Kick the flow until the first `yield`.
