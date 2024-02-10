@@ -1,24 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import traceback
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import Any
-from typing import Awaitable
-from typing import Callable
 from typing import ClassVar
 from typing import Self
 
 from starlette.applications import Starlette
-from starlette.concurrency import run_in_threadpool
 from starlette.middleware import Middleware as BaseMiddleware
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.foundation.bootstrap.boot_providers import BootProviders
 from expanse.foundation.bootstrap.load_configuration import LoadConfiguration
+from expanse.foundation.bootstrap.load_environment_variables import (
+    LoadEnvironmentVariables,
+)
 from expanse.foundation.bootstrap.register_providers import RegisterProviders
 from expanse.foundation.helpers import PlaceholderPath
 from expanse.foundation.http.middleware._adapter import AdapterMiddleware
@@ -38,6 +36,7 @@ if TYPE_CHECKING:
 
 class Application(Container):
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
+        LoadEnvironmentVariables,
         LoadConfiguration,
         RegisterProviders,
         BootProviders,
@@ -51,11 +50,13 @@ class Application(Container):
         super().__init__()
 
         if base_path is None:
-            base_path = Path(traceback.extract_stack(limit=2)[0].filename).parent
+            base_path = Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
 
         self._base_path: Path = base_path
         self._config_path: Path | None = None
         self._resources_path: Path | None = None
+        self._environment_path: Path | None = None
+        self._database_path: Path | None = None
 
         self._booted: bool = False
         self._has_been_bootstrapped: bool = False
@@ -66,9 +67,7 @@ class Application(Container):
         self._default_middlewares: list[
             type[Middleware]
         ] = self.__class__._middleware.copy()
-        self._terminating_callbacks: list[
-            Callable[..., None] | Awaitable[..., None]
-        ] = []
+        self._config: Config
 
         self._bind_paths()
         self._register_base_bindings()
@@ -87,7 +86,27 @@ class Application(Container):
     def resources_path(self) -> Path:
         return self._resources_path or self._base_path.joinpath("resources")
 
-    def resolve_placeholder_path(self, path: Any) -> Any:
+    @property
+    def database_path(self) -> Path:
+        return self._database_path or self._base_path.joinpath("database")
+
+    @property
+    def environment_path(self) -> Path:
+        return self._environment_path or self._base_path
+
+    @property
+    def environment_file(self) -> str:
+        return ".env"
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def set_config(self, config: Config) -> None:
+        self._config = config
+        self.instance(Config, config)
+
+    def resolve_placeholder_path(self, path: str | Path | PlaceholderPath) -> Path:
         if not isinstance(path, PlaceholderPath):
             return path
 
@@ -158,16 +177,6 @@ class Application(Container):
 
         return provider
 
-    def terminating(self, callback: Callable[..., None] | Awaitable[..., None]) -> None:
-        self._terminating_callbacks.append(callback)
-
-    async def terminate(self) -> None:
-        for callback in self._terminating_callbacks:
-            if asyncio.iscoroutinefunction(callback):
-                return await self.call_async(callback)
-            else:
-                return await run_in_threadpool(self.call, callback)
-
     def prepend_middleware(self, middleware: type[Middleware]) -> None:
         self._default_middlewares.insert(0, middleware)
 
@@ -189,6 +198,9 @@ class Application(Container):
         self.instance("app", self)
         self.instance(self.__class__, self)
         self.instance(Container, self)
+        self._config = Config({})
+        self.instance(Config, self._config)
+        self.alias(Config, "config")
 
     async def _register_base_service_providers(self) -> None:
         await self.register(RoutingServiceProvider(self))

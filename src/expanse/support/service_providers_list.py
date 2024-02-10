@@ -30,6 +30,7 @@ class ServiceProvidersList:
     def default(cls) -> Self:
         return cls(
             [
+                "expanse.database.database_service_provider.DatabaseServiceProvider",
                 "expanse.view.view_service_provider.ViewServiceProvider",
             ]
         )

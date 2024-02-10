@@ -29,8 +29,7 @@ class LoadConfiguration:
             for name, value in (await cls._load_configuration_file(filepath)).items():
                 config[f"{identifier}.{name}"] = value
 
-        app.instance(Config, config)
-        app.alias(Config, "config")
+        app.set_config(config)
 
     @classmethod
     async def _get_configuration_files(cls, app: Application) -> dict[str, Path]:

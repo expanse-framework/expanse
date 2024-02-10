@@ -17,4 +17,3 @@ async def test_loading_configuration_provides_default_values(app: Application) -
 
     assert config["app.name"] == "Expanse"
     assert len(config["app.providers"]) > 0
-    raise AssertionError()

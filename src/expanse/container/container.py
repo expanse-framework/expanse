@@ -5,10 +5,12 @@ import inspect
 import logging
 import types
 
+from collections import defaultdict
+from collections.abc import Awaitable
 from collections.abc import Callable
-from contextvars import ContextVar
 from inspect import Parameter
 from typing import Any
+from typing import Self
 from typing import TypeVar
 from typing import _AnnotatedAlias
 from typing import get_args
@@ -24,13 +26,6 @@ T = TypeVar("T")
 _builtins = [d for d in dir(builtins) if isinstance(getattr(builtins, d), type)]
 _EMPTY = object()
 
-_scoped_resolved: ContextVar[dict[str, bool] | None] = ContextVar(
-    "scoped_resolved", default=None
-)
-_scoped_instances: ContextVar[dict[str, Any] | None] = ContextVar(
-    "scoped_instances", default=None
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +40,20 @@ class Container:
         self._instances: dict[str | type, Any] = {}
         self._aliases: dict[str, str | type] = {}
 
+        self._scoped_bindings: dict[str, Any] = {}
+
+        self._after_resolving_callbacks: dict[
+            str | type, list[Callable[..., None] | Callable[..., Awaitable[None]]]
+        ] = defaultdict(list)
+
+        self._terminating_callbacks: list[
+            Callable[..., None] | Callable[..., Awaitable[None]]
+        ] = []
+
+        self._scoped_terminating_callbacks: list[
+            Callable[..., None] | Callable[..., Awaitable[None]]
+        ] = []
+
     def bind(
         self,
         abstract: type | str,
@@ -56,7 +65,7 @@ class Container:
         if concrete is None:
             concrete = abstract
 
-        if not isinstance(concrete, (types.FunctionType, types.MethodType)):
+        if not isinstance(concrete, types.FunctionType | types.MethodType):
             original_concrete = concrete
 
             async def _container_concrete(container: Container) -> Any:
@@ -67,11 +76,10 @@ class Container:
 
             concrete = _container_concrete
 
-        self._bindings[abstract] = {
-            "concrete": concrete,
-            "cached": cached,
-            "scoped": scoped,
-        }
+        if scoped:
+            self._scoped_bindings[abstract] = {"concrete": concrete, "cached": cached}
+        else:
+            self._bindings[abstract] = {"concrete": concrete, "cached": cached}
 
     def singleton(
         self, abstract: type | str, concrete: Any = None, *, scoped: bool = False
@@ -84,9 +92,7 @@ class Container:
     def instance(
         self, abstract: type | str, instance: Any, scoped: bool = False
     ) -> None:
-        instances = self._get_instances(scoped)
-
-        instances[abstract] = instance
+        self._instances[abstract] = instance
 
     async def build(self, concrete: type | str, args: tuple | None = None) -> Any:
         if args is None:
@@ -163,6 +169,61 @@ class Container:
     def bound(self, abstract: str | type) -> bool:
         return abstract in self._bindings or abstract in self._instances
 
+    def terminating(
+        self,
+        callback: Callable[..., None] | Callable[..., Awaitable[None]],
+        scoped: bool = False,
+    ) -> None:
+        if scoped:
+            self._scoped_terminating_callbacks.append(callback)
+        else:
+            self._terminating_callbacks.append(callback)
+
+    async def terminate(self) -> None:
+        for callback in self._terminating_callbacks:
+            await self.call(callback)
+
+    def create_scoped_container(self) -> Self:
+        container = ScopedContainer(self)
+
+        return container
+
+    def has_scoped_bindings(self) -> bool:
+        return bool(self._scoped_bindings)
+
+    def resolved(self, abstract: str | type) -> bool:
+        abstract = self._get_alias(abstract)
+
+        return self._resolved.get(abstract, False)
+
+    def on_resolved(
+        self,
+        abstract: str | type,
+        callback: Callable[..., None] | Callable[..., Awaitable[None]],
+    ) -> None:
+        if self.resolved(abstract):
+            callback(self.make(abstract))
+
+        self.after_resolving(abstract, callback)
+
+    def after_resolving(
+        self,
+        abstract: str | type,
+        callback: Callable[..., None] | Callable[..., Awaitable[None]],
+    ) -> None:
+        abstract = self._get_alias(abstract)
+
+        actual_abstract: str | type[T] = abstract
+        if isinstance(abstract, _AnnotatedAlias):
+            actual_abstract, *_ = get_args(abstract)
+
+        if abstract in self._bindings:
+            self._after_resolving_callbacks[abstract].append(callback)
+        elif actual_abstract in self._bindings:
+            self._after_resolving_callbacks[actual_abstract].append(callback)
+        else:
+            self._after_resolving_callbacks[abstract].append(callback)
+
     @overload
     async def _resolve(self, abstract: type[T]) -> T:
         ...
@@ -177,13 +238,13 @@ class Container:
         if abstract in self._instances:
             return self._instances[abstract]
 
-        if abstract in self._get_instances(True):
-            return self._get_instances(True)[abstract]
+        metadata: tuple = ()
+        actual_abstract: str | type[T] = abstract
+        if isinstance(abstract, _AnnotatedAlias):
+            actual_abstract, *metadata = get_args(abstract)
 
-        scoped: bool = False
-        if abstract in self._bindings:
-            concrete = self._bindings[abstract]["concrete"]
-            scoped = self._bindings[abstract].get("scoped", False)
+        if actual_abstract in self._bindings:
+            concrete = self._bindings[actual_abstract]["concrete"]
         elif isinstance(abstract, str):
             # Unbound strings cannot be resolved
             raise UnboundAbstractError(
@@ -192,14 +253,7 @@ class Container:
         else:
             concrete = abstract
 
-        metadata: tuple = ()
-        if isinstance(abstract, _AnnotatedAlias):
-            actual_abstract, *metadata = get_args(abstract)
-
-            if concrete == abstract:
-                concrete = actual_abstract
-
-        if self._is_buildable(abstract, concrete):
+        if self._is_buildable(actual_abstract, concrete):
             try:
                 obj = await self.build(concrete, metadata)
             except Exception:
@@ -209,12 +263,12 @@ class Container:
         else:
             obj = await self.make(concrete)
 
-        instances = self._get_instances(scoped)
+        if self._is_cached(actual_abstract):
+            self._instances[abstract] = obj
 
-        if self._is_cached(abstract):
-            instances[abstract] = obj
+        self._mark_as_resolved(actual_abstract)
 
-        self._mark_as_resolved(abstract, scoped)
+        await self._execute_after_resolving_callbacks(abstract, obj)
 
         return obj
 
@@ -228,24 +282,7 @@ class Container:
             "cached", False
         )
 
-    def _get_instances(self, scoped: bool) -> dict[str, Any]:
-        if scoped:
-            if _scoped_instances.get() is None:
-                _scoped_instances.set({})
-
-            return _scoped_instances.get()
-
-        return self._instances
-
-    def _mark_as_resolved(self, abstract: str, scoped: bool) -> None:
-        if scoped:
-            if _scoped_resolved.get() is None:
-                _scoped_resolved.set({})
-
-            _scoped_resolved.get()[abstract] = True
-
-            return
-
+    def _mark_as_resolved(self, abstract: str) -> None:
         self._resolved[abstract] = True
 
     async def _resolve_callable_dependencies(
@@ -314,6 +351,10 @@ class Container:
         if type_ is Parameter.empty:
             return None
 
+        if isinstance(type_, types.UnionType):
+            # Get the first type of the type union
+            type_ = get_args(type_)[0]
+
         if inspect.getmodule(type_) == builtins:
             return None
 
@@ -321,3 +362,80 @@ class Container:
 
     def _get_alias(self, abstract: str | type) -> str:
         return self._aliases.get(abstract, abstract)
+
+    async def _execute_after_resolving_callbacks(
+        self, abstract: str | type, instance: Any
+    ) -> None:
+        callbacks: list[Callable[..., Awaitable[None]]] = []
+        abstract = self._get_alias(abstract)
+
+        actual_abstract: str | type[T] = abstract
+        if isinstance(abstract, _AnnotatedAlias):
+            actual_abstract, *_ = get_args(abstract)
+
+        if abstract in self._after_resolving_callbacks:
+            callbacks += self._after_resolving_callbacks[abstract]
+
+        if actual_abstract in self._after_resolving_callbacks[actual_abstract]:
+            callbacks += self._after_resolving_callbacks[actual_abstract]
+
+        for callback in callbacks:
+            if self._is_lambda(callback):
+                callback(instance)
+
+                continue
+
+            await self.call(callback)
+
+    def _is_lambda(
+        self, callable: Callable[..., None] | Callable[..., Awaitable[None]]
+    ) -> None:
+        return (
+            isinstance(callable, types.FunctionType) and callable.__name__ == "<lambda>"
+        )
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        await self.terminate()
+
+
+class ScopedContainer(Container):
+    def __init__(self, base_container: Container):
+        super().__init__()
+
+        self._base_container = base_container
+
+        # Bind scoped bindings from the base container
+        self._bindings.update(
+            {k: {**v} for k, v in self._base_container._scoped_bindings.items()}
+        )
+
+        # Setup terminating callbacks
+        self._terminating_callbacks = [
+            *self._base_container._scoped_terminating_callbacks
+        ]
+
+        self.instance(Container, self)
+
+    def bound(self, abstract: str | type) -> bool:
+        return self._base_container.bound(abstract) or super().bound(abstract)
+
+    def _directly_bound(self, abstract: str | type) -> bool:
+        return super().bound(abstract)
+
+    async def _resolve(self, abstract: str | type[T]) -> Any | T:
+        actual_abstract: str | type[T] = abstract
+        if isinstance(abstract, _AnnotatedAlias):
+            actual_abstract, *_ = get_args(abstract)
+
+        if not self._directly_bound(actual_abstract):
+            return await self._base_container._resolve(abstract)
+
+        return await super()._resolve(abstract)

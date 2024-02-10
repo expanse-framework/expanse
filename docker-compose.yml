@@ -1,0 +1,29 @@
+version: '3'
+services:
+  mysql:
+    image: mysql/mysql-server:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_DATABASE: "expanse"
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "3306:3306"
+    restart: always
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "expanse"
+    ports:
+      - "5432:5432"
+    restart: always
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: "password"
+      MARIADB_DATABASE: "expanse"
+      MYSQL_TCP_PORT: "3307"
+      MARIADB_ROOT_HOST: "%"
+    ports:
+      - "3307:3307"
+    restart: always

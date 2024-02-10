@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 @pytest.fixture()
 async def app() -> Application:
     application = Application()
-    application.instance(Config, Config({"app": {}}))
+    application.set_config(Config({"app": {}}))
     application.alias(Config, "config")
     await application.bootstrap_with([])
 

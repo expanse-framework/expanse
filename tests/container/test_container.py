@@ -1,16 +1,11 @@
 # ruff: noqa: I002
-import asyncio
 import uuid
 
 from abc import ABC
 from abc import abstractmethod
-from contextvars import Context
 from typing import Any
 
-import pytest
-
 from expanse.container.container import Container
-from expanse.support._compat import PY311
 
 
 class Abstract(ABC):
@@ -91,9 +86,6 @@ def test_bound() -> None:
     assert container.bound(Abstract)
 
 
-@pytest.mark.skipif(
-    not PY311, reason="Passing contexts to asyncio tasks only available for Python 3.11"
-)
 async def test_scoped_dependencies() -> None:
     async def foo(container: Container) -> str:
         return await container.make("scoped")
@@ -102,9 +94,29 @@ async def test_scoped_dependencies() -> None:
     container.instance(Container, container)
     container.scoped("scoped", lambda _: str(uuid.uuid4()))
 
-    task1 = asyncio.create_task(container.call(foo), context=Context())
-    task2 = asyncio.create_task(container.call(foo), context=Context())
-    result1 = await task1
-    result2 = await task2
+    assert container.has_scoped_bindings()
 
-    assert result1 != result2
+    async with container.create_scoped_container() as c1:
+        result1 = await c1.make("scoped")
+        result2 = await c1.make("scoped")
+
+    async with container.create_scoped_container() as c2:
+        result3 = await c2.make("scoped")
+
+    assert result1 == result2
+    assert result1 != result3
+
+
+async def test_scoped_container_can_resolve_base_container_dependencies() -> None:
+    container = Container()
+    container.instance(Container, container)
+    container.bind(Abstract, Concrete)
+    container.scoped(uuid.UUID, uuid.uuid4)
+
+    scoped = container.create_scoped_container()
+    print(scoped._bindings)
+
+    result = await scoped.make(Abstract)
+    print(result)
+
+    assert isinstance(result, Concrete)

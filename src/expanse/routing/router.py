@@ -4,8 +4,6 @@ import inspect
 import re
 
 from typing import TYPE_CHECKING
-from typing import Awaitable
-from typing import Callable
 
 from starlette.middleware import Middleware as BaseMiddleware
 from starlette.routing import Mount
@@ -19,6 +17,9 @@ from expanse.http.request import Request
 
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+    from collections.abc import Callable
+
     from starlette.requests import Request as BaseRequest
     from starlette.responses import Response
 
@@ -85,23 +86,28 @@ class Router:
         signature = self._get_typed_signature(route)
 
         async def wrapper(request: BaseRequest) -> Response:
-            self._app.instance(Request, Request(request.scope), scoped=True)
+            async with self._app.create_scoped_container() as container:
+                container.instance(Request, Request(request.scope), scoped=True)
 
-            arguments = []
+                arguments = []
 
-            for name, parameter in signature.parameters.items():
-                if name in path_params:
-                    arguments.append(request.path_params[name])
-                elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, Form
-                ):
-                    arguments.append(parameter.annotation(data=await request.form()))
-                elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, Query
-                ):
-                    arguments.append(parameter.annotation(params=request.query_params))
+                for name, parameter in signature.parameters.items():
+                    if name in path_params:
+                        arguments.append(request.path_params[name])
+                    elif isinstance(parameter.annotation, type) and issubclass(
+                        parameter.annotation, Form
+                    ):
+                        arguments.append(
+                            parameter.annotation(data=await request.form())
+                        )
+                    elif isinstance(parameter.annotation, type) and issubclass(
+                        parameter.annotation, Query
+                    ):
+                        arguments.append(
+                            parameter.annotation(params=request.query_params)
+                        )
 
-            return await self._app.call(route.endpoint, *arguments)
+                return await container.call(route.endpoint, *arguments)
 
         return wrapper
 
