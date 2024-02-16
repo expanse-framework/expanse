@@ -1,12 +1,11 @@
 # ruff: noqa: I002
 import re
 
-from typing import AsyncGenerator
-
-from expanse.configuration.config import Config
+from expanse.common.configuration.config import Config
 from expanse.container.container import Container
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.types.http.middleware import RequestHandler
 
 
 class Cors:
@@ -206,39 +205,33 @@ class CorsMiddleware:
         self._container: Container = container
         self._cors: Cors = Cors()
 
-    async def handle(
-        self, request: Request
-    ) -> AsyncGenerator[Response | None, Response]:
+    def handle(self, request: Request, next_call: RequestHandler) -> Response:
         """
         Handle the incoming request.
         """
-        if not (await self._has_matching_path(request)):
-            yield
-        else:
-            self._cors.set_options(
-                **(await self._container.make(Config)).get("cors", {})
-            )
+        if not self._has_matching_path(request):
+            return next_call(request)
 
-            if self._cors.is_preflight_request(request):
-                response = self._cors.handle_preflight_request(request)
+        self._cors.set_options(**self._container.make(Config).get("cors", {}))
 
-                self._cors.vary_header(response, "Access-Control-Request-Method")
+        if self._cors.is_preflight_request(request):
+            response = self._cors.handle_preflight_request(request)
 
-                yield response
+            self._cors.vary_header(response, "Access-Control-Request-Method")
 
-                return
-            else:
-                response = yield
+            return response
 
-                if request.method == "OPTIONS":
-                    self._cors.vary_header(response, "Access-Control-Request-Method")
+        response = next_call(request)
 
-                self._cors.add_actual_request_headers(response, request)
+        if request.method == "OPTIONS":
+            self._cors.vary_header(response, "Access-Control-Request-Method")
 
-    async def _has_matching_path(self, request: Request) -> bool:
-        paths: list[str] = (
-            (await self._container.make(Config)).get("cors", {}).get("paths", [])
-        )
+        self._cors.add_actual_request_headers(response, request)
+
+        return response
+
+    def _has_matching_path(self, request: Request) -> bool:
+        paths: list[str] = self._container.make(Config).get("cors.paths", [])
 
         for path in paths:
             if path != "/":

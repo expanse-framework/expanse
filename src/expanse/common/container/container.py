@@ -1,0 +1,177 @@
+# ruff: noqa: I002
+import builtins
+import collections
+import inspect
+import logging
+import types
+import typing
+
+from abc import ABC
+from abc import abstractmethod
+from collections import defaultdict
+from collections.abc import Callable
+from inspect import Parameter
+from typing import Any
+from typing import Self
+from typing import TypeVar
+from typing import _AnnotatedAlias
+from typing import get_args
+
+
+T = TypeVar("T")
+
+_builtins = [d for d in dir(builtins) if isinstance(getattr(builtins, d), type)]
+_EMPTY = object()
+
+logger = logging.getLogger(__name__)
+
+_Callback = Callable[..., ...]
+
+
+class UnboundAbstractError(Exception):
+    ...
+
+
+class Container(ABC):
+    def __init__(self) -> None:
+        self._bindings: dict[str | type, Any] = {}
+        self._resolved: dict[str | type, bool] = {}
+        self._instances: dict[str | type, Any] = {}
+        self._aliases: dict[str, str | type] = {}
+
+        self._scoped_bindings: dict[str, Any] = {}
+
+        self._after_resolving_callbacks: dict[
+            str | type, list[_Callback]
+        ] = defaultdict(list)
+
+        self._terminating_callbacks: list[_Callback] = []
+
+        self._scoped_terminating_callbacks: list[_Callback] = []
+
+    def bind(
+        self,
+        abstract: type | str,
+        concrete: Any = None,
+        *,
+        cached: bool = False,
+        scoped: bool = False,
+    ) -> None:
+        if concrete is None:
+            concrete = abstract
+
+        if not isinstance(concrete, types.FunctionType | types.MethodType):
+            concrete = self._concrete_closure(abstract, concrete)
+
+        if scoped:
+            self._scoped_bindings[abstract] = {"concrete": concrete, "cached": cached}
+        else:
+            self._bindings[abstract] = {"concrete": concrete, "cached": cached}
+
+    def singleton(
+        self, abstract: type | str, concrete: Any = None, *, scoped: bool = False
+    ) -> None:
+        self.bind(abstract, concrete, cached=True, scoped=scoped)
+
+    def scoped(self, abstract: type | str, concrete: Any = None) -> None:
+        self.singleton(abstract, concrete, scoped=True)
+
+    def instance(
+        self, abstract: type | str, instance: Any, scoped: bool = False
+    ) -> None:
+        self._instances[abstract] = instance
+
+    def alias(self, abstract: str | type, alias: str) -> None:
+        self._aliases[alias] = abstract
+
+    def bound(self, abstract: str | type) -> bool:
+        return abstract in self._bindings or abstract in self._instances
+
+    def terminating(self, callback: _Callback, scoped: bool = False) -> None:
+        if scoped:
+            self._scoped_terminating_callbacks.append(callback)
+        else:
+            self._terminating_callbacks.append(callback)
+
+    @abstractmethod
+    def create_scoped_container(self) -> Self:
+        ...
+
+    def has_scoped_bindings(self) -> bool:
+        return bool(self._scoped_bindings)
+
+    def resolved(self, abstract: str | type) -> bool:
+        abstract = self._get_alias(abstract)
+
+        return self._resolved.get(abstract, False)
+
+    def after_resolving(self, abstract: str | type, callback: _Callback) -> None:
+        abstract = self._get_alias(abstract)
+
+        actual_abstract: str | type[T] = abstract
+        if isinstance(abstract, _AnnotatedAlias):
+            actual_abstract, *_ = get_args(abstract)
+
+        if abstract in self._bindings:
+            self._after_resolving_callbacks[abstract].append(callback)
+        elif actual_abstract in self._bindings:
+            self._after_resolving_callbacks[actual_abstract].append(callback)
+        else:
+            self._after_resolving_callbacks[abstract].append(callback)
+
+    @abstractmethod
+    def _concrete_closure(
+        self, abstract: str | type, concrete: Any
+    ) -> Callable[[Self], ...]:
+        ...
+
+    def _is_buildable(self, abstract: str, concrete: Any) -> bool:
+        return abstract == concrete or isinstance(
+            concrete, types.FunctionType | types.MethodType
+        )
+
+    def _is_cached(self, abstract: str) -> bool:
+        return abstract in self._instances or self._bindings.get(abstract, {}).get(
+            "cached", False
+        )
+
+    def _mark_as_resolved(self, abstract: str) -> None:
+        self._resolved[abstract] = True
+
+    def _get_class(self, parameter: Parameter) -> type | None:
+        type_ = parameter.annotation
+
+        if type_ is Parameter.empty:
+            return None
+
+        # TODO: handle optionals
+
+        if isinstance(type_, types.UnionType):
+            # TODO: check that the union type is a single type optional
+            # Get the first type of the type union
+            type_ = get_args(type_)[0]
+
+        if self._is_builtin(type_):
+            return None
+
+        return type_
+
+    def _is_builtin(self, type_: type) -> bool:
+        module = inspect.getmodule(type_)
+        if module == builtins:
+            return True
+
+        if (
+            module == typing or module == collections.abc
+        ) and type_.__name__ == "Callable":
+            return True
+
+        return False
+
+    def _get_alias(self, abstract: str | type) -> str:
+        return self._aliases.get(abstract, abstract)
+
+    def _is_lambda(self, callable: _Callback) -> None:
+        return (
+            isinstance(callable, types.FunctionType) and callable.__name__ == "<lambda>"
+        )

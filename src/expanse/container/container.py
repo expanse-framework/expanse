@@ -1,14 +1,11 @@
 # ruff: noqa: I002
-import asyncio
 import builtins
 import inspect
 import logging
 import types
 
-from collections import defaultdict
 from collections.abc import Awaitable
 from collections.abc import Callable
-from inspect import Parameter
 from typing import Any
 from typing import Self
 from typing import TypeVar
@@ -16,94 +13,34 @@ from typing import _AnnotatedAlias
 from typing import get_args
 from typing import overload
 
-from starlette.concurrency import run_in_threadpool
-
-from expanse.support._utils import string_to_class
+from expanse.common.container.container import Container as BaseContainer
+from expanse.common.container.exceptions import ResolutionException
+from expanse.common.support._utils import string_to_class
 
 
 T = TypeVar("T")
+ReturnType = TypeVar("ReturnType")
 
 _builtins = [d for d in dir(builtins) if isinstance(getattr(builtins, d), type)]
 _EMPTY = object()
 
 logger = logging.getLogger(__name__)
 
+_Callback = Callable[..., None]
+
 
 class UnboundAbstractError(Exception):
     ...
 
 
-class Container:
-    def __init__(self) -> None:
-        self._bindings: dict[str | type, Any] = {}
-        self._resolved: dict[str | type, bool] = {}
-        self._instances: dict[str | type, Any] = {}
-        self._aliases: dict[str, str | type] = {}
-
-        self._scoped_bindings: dict[str, Any] = {}
-
-        self._after_resolving_callbacks: dict[
-            str | type, list[Callable[..., None] | Callable[..., Awaitable[None]]]
-        ] = defaultdict(list)
-
-        self._terminating_callbacks: list[
-            Callable[..., None] | Callable[..., Awaitable[None]]
-        ] = []
-
-        self._scoped_terminating_callbacks: list[
-            Callable[..., None] | Callable[..., Awaitable[None]]
-        ] = []
-
-    def bind(
-        self,
-        abstract: type | str,
-        concrete: Any = None,
-        *,
-        cached: bool = False,
-        scoped: bool = False,
-    ) -> None:
-        if concrete is None:
-            concrete = abstract
-
-        if not isinstance(concrete, types.FunctionType | types.MethodType):
-            original_concrete = concrete
-
-            async def _container_concrete(container: Container) -> Any:
-                if abstract == original_concrete:
-                    return await container.build(original_concrete)
-
-                return await container._resolve(original_concrete)
-
-            concrete = _container_concrete
-
-        if scoped:
-            self._scoped_bindings[abstract] = {"concrete": concrete, "cached": cached}
-        else:
-            self._bindings[abstract] = {"concrete": concrete, "cached": cached}
-
-    def singleton(
-        self, abstract: type | str, concrete: Any = None, *, scoped: bool = False
-    ) -> None:
-        self.bind(abstract, concrete, cached=True, scoped=scoped)
-
-    def scoped(self, abstract: type | str, concrete: Any = None) -> None:
-        self.singleton(abstract, concrete, scoped=True)
-
-    def instance(
-        self, abstract: type | str, instance: Any, scoped: bool = False
-    ) -> None:
-        self._instances[abstract] = instance
-
-    async def build(self, concrete: type | str, args: tuple | None = None) -> Any:
+class Container(BaseContainer):
+    def build(self, concrete: type | str, args: tuple | None = None) -> Any:
         if args is None:
             args = ()
 
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args)
-
-            if concrete.__name__ == "_container_concrete":
-                return await concrete(self)
 
             function = concrete
         elif isinstance(concrete, types.MethodType):
@@ -118,88 +55,49 @@ class Container:
                 function = concrete.__init__  # type: ignore[misc]
 
         (
-            resolved_positional,
             positional,
             keywords,
-        ) = await self._resolve_callable_dependencies(function)
+        ) = self._resolve_callable_dependencies(function, *args)
 
-        positional = list(args) + positional[len(args) :]
-
-        if not asyncio.iscoroutinefunction(concrete):
-            return await run_in_threadpool(
-                concrete, *resolved_positional, *positional, **keywords
-            )
-
-        return await concrete(*resolved_positional, *positional, **keywords)
+        return concrete(*positional, **keywords)
 
     @overload
-    async def make(self, abstract: type[T]) -> T:
+    def make(self, abstract: type[T]) -> T:
         ...
 
     @overload
-    async def make(self, abstract: str) -> Any:
+    def make(self, abstract: str) -> Any:
         ...
 
-    async def make(self, abstract: str | type[T]) -> Any | T:
-        return await self._resolve(abstract)
+    def make(self, abstract: str | type[T]) -> Any | T:
+        return self._resolve(abstract)
 
-    async def call(
-        self, callable: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
+    def call(
+        self, callable: Callable[..., ReturnType], *args: Any, **kwargs: Any
+    ) -> ReturnType:
         (
-            resolved_positional,
             positional,
             keywords,
-        ) = await self._resolve_callable_dependencies(callable)
+        ) = self._resolve_callable_dependencies(callable, *args, **kwargs)
 
-        positional = list(args) + positional[len(args) :]
+        return callable(*positional, **keywords)
 
-        if asyncio.iscoroutinefunction(callable):
-            return await callable(
-                *resolved_positional, *positional, **{**keywords, **kwargs}
-            )
+    def terminating(self, callback: _Callback, scoped: bool = False) -> None:
+        return super().terminating(callback)
 
-        return await run_in_threadpool(
-            callable, *resolved_positional, *positional, **{**keywords, **kwargs}
-        )
-
-    def alias(self, abstract: str | type, alias: str) -> None:
-        self._aliases[alias] = abstract
-
-    def bound(self, abstract: str | type) -> bool:
-        return abstract in self._bindings or abstract in self._instances
-
-    def terminating(
-        self,
-        callback: Callable[..., None] | Callable[..., Awaitable[None]],
-        scoped: bool = False,
-    ) -> None:
-        if scoped:
-            self._scoped_terminating_callbacks.append(callback)
-        else:
-            self._terminating_callbacks.append(callback)
-
-    async def terminate(self) -> None:
+    def terminate(self) -> None:
         for callback in self._terminating_callbacks:
-            await self.call(callback)
+            self.call(callback)
 
     def create_scoped_container(self) -> Self:
         container = ScopedContainer(self)
 
         return container
 
-    def has_scoped_bindings(self) -> bool:
-        return bool(self._scoped_bindings)
-
-    def resolved(self, abstract: str | type) -> bool:
-        abstract = self._get_alias(abstract)
-
-        return self._resolved.get(abstract, False)
-
     def on_resolved(
         self,
         abstract: str | type,
-        callback: Callable[..., None] | Callable[..., Awaitable[None]],
+        callback: _Callback,
     ) -> None:
         if self.resolved(abstract):
             callback(self.make(abstract))
@@ -209,30 +107,32 @@ class Container:
     def after_resolving(
         self,
         abstract: str | type,
-        callback: Callable[..., None] | Callable[..., Awaitable[None]],
+        callback: _Callback,
     ) -> None:
-        abstract = self._get_alias(abstract)
+        super().after_resolving(abstract, callback)
 
-        actual_abstract: str | type[T] = abstract
-        if isinstance(abstract, _AnnotatedAlias):
-            actual_abstract, *_ = get_args(abstract)
+    def _concrete_closure(
+        self, abstract: str | type, concrete: Any
+    ) -> Callable[[Self], Awaitable[Any]]:
+        original_concrete = concrete
 
-        if abstract in self._bindings:
-            self._after_resolving_callbacks[abstract].append(callback)
-        elif actual_abstract in self._bindings:
-            self._after_resolving_callbacks[actual_abstract].append(callback)
-        else:
-            self._after_resolving_callbacks[abstract].append(callback)
+        def closure(container: Container) -> Any:
+            if abstract == original_concrete:
+                return container.build(original_concrete)
+
+            return container._resolve(original_concrete)
+
+        return closure
 
     @overload
-    async def _resolve(self, abstract: type[T]) -> T:
+    def _resolve(self, abstract: type[T]) -> T:
         ...
 
     @overload
-    async def _resolve(self, abstract: str) -> Any:
+    def _resolve(self, abstract: str) -> Any:
         ...
 
-    async def _resolve(self, abstract: str | type[T]) -> Any | T:
+    def _resolve(self, abstract: str | type[T]) -> Any | T:
         abstract = self._get_alias(abstract)
 
         if abstract in self._instances:
@@ -255,118 +155,164 @@ class Container:
 
         if self._is_buildable(actual_abstract, concrete):
             try:
-                obj = await self.build(concrete, metadata)
+                obj = self.build(concrete, metadata)
             except Exception:
                 logger.exception('Unable to build the "%s" dependency', abstract)
 
                 raise
         else:
-            obj = await self.make(concrete)
+            obj = self.make(concrete)
 
         if self._is_cached(actual_abstract):
             self._instances[abstract] = obj
 
         self._mark_as_resolved(actual_abstract)
 
-        await self._execute_after_resolving_callbacks(abstract, obj)
+        self._execute_after_resolving_callbacks(abstract, obj)
 
         return obj
 
-    def _is_buildable(self, abstract: str, concrete: Any) -> bool:
-        return abstract == concrete or isinstance(
-            concrete, types.FunctionType | types.MethodType
-        )
-
-    def _is_cached(self, abstract: str) -> bool:
-        return abstract in self._instances or self._bindings.get(abstract, {}).get(
-            "cached", False
-        )
-
-    def _mark_as_resolved(self, abstract: str) -> None:
-        self._resolved[abstract] = True
-
-    async def _resolve_callable_dependencies(
-        self, callable: Callable[..., Any]
-    ) -> tuple[list[Any], list[Any], dict[str, Any]]:
-        resolved_positional = []
+    def _resolve_callable_dependencies(
+        self, callable: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> tuple[list[Any], dict[str, Any]]:
         positional = []
         keywords = {}
+        args = list(args)
 
         for name, parameter in inspect.signature(callable).parameters.items():
-            resolved = False
             klass = self._get_class(parameter)
 
             if name == "self":
                 continue
 
             if klass is None:
-                result = await self._resolve_primitive(parameter)
+                self._resolve_primitive(parameter, args, kwargs, positional, keywords)
             else:
-                try:
-                    result = await self._resolve_class(parameter)
-                except Exception:
-                    continue
+                self._resolve_class(parameter, args, kwargs, positional, keywords)
 
-                resolved = True
+        return positional, keywords
 
-            if result is _EMPTY:
-                continue
+    def _resolve_primitive(
+        self,
+        parameter: inspect.Parameter,
+        args: list[Any],
+        kwargs: dict[str, Any],
+        positional: list[Any],
+        keywords: dict[str, Any],
+    ) -> None:
+        match parameter.kind:
+            case parameter.POSITIONAL_ONLY:
+                if not args:
+                    raise ResolutionException(
+                        f'Unable to resolve dependency with name "{parameter.name}"'
+                    )
 
-            if parameter.kind in (
-                parameter.POSITIONAL_ONLY,
-                parameter.POSITIONAL_OR_KEYWORD,
-            ):
-                if resolved:
-                    resolved_positional.append(result)
-                else:
-                    positional.append(result)
-            elif parameter.kind == parameter.KEYWORD_ONLY:
-                keywords[parameter.name] = result
-            if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
-                if resolved:
-                    resolved_positional.append(result)
-                else:
-                    positional.append(result)
-            elif parameter.kind == inspect.Parameter.VAR_KEYWORD:
+                positional.append(args.pop(0))
+
+                return
+
+            case parameter.POSITIONAL_OR_KEYWORD:
+                # Check in keyword arguments first
+                if parameter.name in kwargs:
+                    keywords[parameter.name] = kwargs.pop(parameter.name)
+
+                elif args:
+                    positional.append(args.pop(0))
+
+                elif parameter.default is not parameter.empty:
+                    keywords[parameter.name] = parameter.default
+
+                return
+
+            case parameter.KEYWORD_ONLY:
+                if parameter.name in kwargs:
+                    keywords[parameter.name] = kwargs.pop(
+                        parameter.name,
+                    )
+                elif parameter.default is not parameter.empty:
+                    keywords[parameter.name] = parameter.default
+
+                return
+
+            case parameter.VAR_KEYWORD:
+                result = kwargs.copy()
+
+                kwargs.clear()
+
                 keywords.update(result)
 
-        return resolved_positional, positional, keywords
+                return
 
-    async def _resolve_primitive(self, parameter: inspect.Parameter) -> Any:
-        if parameter.default is not parameter.empty:
-            return parameter.default
+            case parameter.VAR_POSITIONAL:
+                result = args.copy()
 
-        return _EMPTY
+                args.clear()
 
-    async def _resolve_class(self, parameter: inspect.Parameter) -> Any:
+                result.extend(result)
+
+                return
+
+            case _:
+                pass
+
+        raise ResolutionException(
+            f'Unable to resolve dependency with name "{parameter.name}"'
+        )
+
+    def _resolve_class(
+        self,
+        parameter: inspect.Parameter,
+        args: list[Any],
+        kwargs: dict[str, Any],
+        positional: list[Any],
+        keywords: dict[str, Any],
+    ) -> Any:
         klass = self._get_class(parameter)
 
         assert klass is not None
 
-        return await self.make(self._get_alias(klass))
+        result = self.make(self._get_alias(klass))
 
-    def _get_class(self, parameter: Parameter) -> type | None:
-        type_ = parameter.annotation
+        match parameter.kind:
+            case parameter.POSITIONAL_ONLY:
+                positional.append(result)
+                return
 
-        if type_ is Parameter.empty:
-            return None
+            case parameter.POSITIONAL_OR_KEYWORD:
+                # Check in keyword arguments first
+                if parameter.name in kwargs:
+                    keywords[parameter.name] = kwargs.pop(parameter.name)
+                else:
+                    positional.append(result)
 
-        if isinstance(type_, types.UnionType):
-            # Get the first type of the type union
-            type_ = get_args(type_)[0]
+                return
 
-        if inspect.getmodule(type_) == builtins:
-            return None
+            case parameter.KEYWORD_ONLY:
+                if parameter.name in kwargs:
+                    keywords[parameter.name] = kwargs.pop(
+                        parameter.name,
+                    )
+                else:
+                    keywords[parameter.name] = result
+                return
 
-        return type_
+            case parameter.VAR_POSITIONAL:
+                result = [result] if not isinstance(result, tuple) else result
 
-    def _get_alias(self, abstract: str | type) -> str:
-        return self._aliases.get(abstract, abstract)
+                positional.extend(result)
+                return
 
-    async def _execute_after_resolving_callbacks(
+            case _:
+                pass
+
+        raise ResolutionException(
+            f'Unable to resolve dependency with name "{parameter.name}"'
+        )
+
+    def _execute_after_resolving_callbacks(
         self, abstract: str | type, instance: Any
     ) -> None:
-        callbacks: list[Callable[..., Awaitable[None]]] = []
+        callbacks: list[_Callback] = []
         abstract = self._get_alias(abstract)
 
         actual_abstract: str | type[T] = abstract
@@ -385,25 +331,18 @@ class Container:
 
                 continue
 
-            await self.call(callback)
+            self.call(callback)
 
-    def _is_lambda(
-        self, callable: Callable[..., None] | Callable[..., Awaitable[None]]
-    ) -> None:
-        return (
-            isinstance(callable, types.FunctionType) and callable.__name__ == "<lambda>"
-        )
-
-    async def __aenter__(self) -> Self:
+    def __enter__(self) -> Self:
         return self
 
-    async def __aexit__(
+    def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> None:
-        await self.terminate()
+        self.terminate()
 
 
 class ScopedContainer(Container):
@@ -430,12 +369,12 @@ class ScopedContainer(Container):
     def _directly_bound(self, abstract: str | type) -> bool:
         return super().bound(abstract)
 
-    async def _resolve(self, abstract: str | type[T]) -> Any | T:
+    def _resolve(self, abstract: str | type[T]) -> Any | T:
         actual_abstract: str | type[T] = abstract
         if isinstance(abstract, _AnnotatedAlias):
             actual_abstract, *_ = get_args(abstract)
 
         if not self._directly_bound(actual_abstract):
-            return await self._base_container._resolve(abstract)
+            return self._base_container._resolve(abstract)
 
-        return await super()._resolve(abstract)
+        return super()._resolve(abstract)

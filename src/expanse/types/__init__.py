@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from collections.abc import Iterable
+from collections.abc import MutableMapping
+from types import TracebackType
 from typing import Any
-from typing import Awaitable
-from typing import Callable
-from typing import MutableMapping
+from typing import Protocol
 
 
-Scope = MutableMapping[str, Any]
-Message = MutableMapping[str, Any]
+Environ = MutableMapping[str, Any]
+ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
 
-Receive = Callable[[], Awaitable[Message]]
-Send = Callable[[Message], Awaitable[None]]
+
+class StartResponse(Protocol):
+    def __call__(
+        self,
+        status: str,
+        response_headers: tuple[str, str],
+        exc_info: ExcInfo | None = None,
+    ) -> None:
+        ...
+
+
+WSGIApp = Callable[[Environ, StartResponse], Iterable[bytes]]

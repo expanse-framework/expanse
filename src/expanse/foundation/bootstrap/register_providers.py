@@ -9,5 +9,5 @@ if TYPE_CHECKING:
 
 class RegisterProviders:
     @classmethod
-    async def bootstrap(cls, app: Application) -> None:
-        await app.register_configured_providers()
+    def bootstrap(cls, app: Application) -> None:
+        app.register_configured_providers()

@@ -7,7 +7,6 @@ from expanse.routing.route_group import RouteGroup
 
 
 if TYPE_CHECKING:
-    from expanse.foundation.http.middleware.base import Middleware
     from expanse.types.routing import Endpoint
 
 
@@ -31,9 +30,5 @@ def delete(path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
     return Route.delete(path, endpoint, name=name)
 
 
-def group(
-    name: str | None = None,
-    prefix: str | None = None,
-    middlewares: list[Middleware] | None = None,
-) -> RouteGroup:
-    return RouteGroup(name=name, prefix=prefix, middlewares=middlewares)
+def group(name: str | None = None, prefix: str | None = None) -> RouteGroup:
+    return RouteGroup(name=name, prefix=prefix)

@@ -9,5 +9,5 @@ if TYPE_CHECKING:
 
 class BootProviders:
     @classmethod
-    async def bootstrap(cls, app: Application) -> None:
-        await app.boot()
+    def bootstrap(cls, app: Application) -> None:
+        app.boot()

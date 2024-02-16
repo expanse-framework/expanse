@@ -1,47 +1,34 @@
-from __future__ import annotations
+from typing import Self
 
-from typing import TYPE_CHECKING
-
+from expanse.common.routing.route_group import RouteGroup as BaseRouteGroup
+from expanse.foundation.http.middleware.middleware import Middleware
 from expanse.routing.route import Route
 
 
-if TYPE_CHECKING:
-    from expanse.foundation.http.middleware.base import Middleware
-    from expanse.types.routing import Endpoint
-
-
-class RouteGroup:
+class RouteGroup(BaseRouteGroup):
     def __init__(
         self,
         name: str | None = None,
         prefix: str | None = None,
-        middlewares: list[Middleware] | None = None,
     ) -> None:
-        self.name: str | None = name
-        self.prefix: str | None = prefix
-        self.routes: list[Route] = []
-        self.middlewares: list[type[Middleware]] = middlewares or []
+        super().__init__(name, prefix)
 
-    def get(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
-        route = Route.get(path, endpoint, name=name)
+        self._middlewares: list[type[Middleware]] = []
 
-        self.add_route(route)
+    def middleware(self, *middlewares: type[Middleware]) -> Self:
+        self._middlewares.extend(middlewares)
+
+        return self
+
+    def prepend_middleware(self, *middlewares: type[Middleware]) -> Self:
+        self._middlewares = list(middlewares) + self._middlewares
+
+        return self
+
+    def _build_route(self, route: Route) -> Route:
+        route = super()._build_route(route)
+
+        if self._middlewares:
+            route.prepend_middleware(*self._middlewares)
 
         return route
-
-    def post(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
-        route = Route.post(path, endpoint, name=name)
-
-        self.add_route(route)
-
-        return route
-
-    def add_route(self, route: Route) -> None:
-        if route.name is not None and self.name is not None:
-            route.name = f"{self.name}.{route.name}"
-
-        self.routes.append(route)
-
-    def add_routes(self, routes: list[Route]) -> None:
-        for route in routes:
-            self.add_route(route)

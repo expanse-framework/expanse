@@ -8,7 +8,7 @@ from pydantic import Field
 from pydantic import RootModel
 from pydantic_settings import SettingsConfigDict
 
-from expanse.foundation.helpers import PlaceholderPath
+from expanse.common.foundation.helpers import PlaceholderPath
 
 
 class PoolConfig(BaseModel):

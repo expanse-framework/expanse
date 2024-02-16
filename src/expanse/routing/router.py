@@ -1,118 +1,157 @@
-from __future__ import annotations
+from collections.abc import Iterable
+from typing import Any
+from typing import NoReturn
 
-import inspect
-import re
+from baize.wsgi.responses import Response as BaizeResponse
 
-from typing import TYPE_CHECKING
-
-from starlette.middleware import Middleware as BaseMiddleware
-from starlette.routing import Mount
-from starlette.routing import Route as BaseRoute
-from starlette.routing import Router as StarletteRouter
-
-from expanse.foundation.http.middleware._adapter import AdapterMiddleware
+from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.routing.route import Match
+from expanse.common.routing.route import Route
+from expanse.common.routing.route_group import RouteGroup
+from expanse.common.routing.route_matcher import RouteMatcher
+from expanse.container.container import Container
+from expanse.foundation.application import Application
+from expanse.foundation.http.middleware.middleware import Middleware
+from expanse.foundation.http.middleware.middleware_stack import MiddlewareStack
 from expanse.http.form import Form
 from expanse.http.query import Query
 from expanse.http.request import Request
-
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable
-    from collections.abc import Callable
-
-    from starlette.requests import Request as BaseRequest
-    from starlette.responses import Response
-
-    from expanse.foundation.application import Application
-    from expanse.routing.route import Route
-    from expanse.routing.route_group import RouteGroup
-    from expanse.types import Receive
-    from expanse.types import Scope
-    from expanse.types import Send
+from expanse.http.response import Response
+from expanse.types import Environ
+from expanse.types import StartResponse
+from expanse.types import WSGIApp
+from expanse.types.routing import Endpoint
 
 
 class Router:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
-        self._router: StarletteRouter = StarletteRouter()
+        self._routes: list[Route] = []
+        self._groups: list[RouteGroup] = []
 
     def add_route(self, route: Route) -> None:
-        self._router.add_route(
-            route.path,
-            self._route_handler(route),
-            methods=route.methods,
-            name=route.name,
-        )
+        self._routes.append(route)
 
     def add_routes(self, routes: list[Route]) -> None:
         for route in routes:
             self.add_route(route)
 
     def add_group(self, group: RouteGroup) -> None:
-        mount = Mount(
-            group.prefix or "/",
-            routes=[
-                BaseRoute(
-                    route.path,
-                    self._route_handler(route),
-                    methods=route.methods,
-                    name=route.name,
-                )
-                for route in group.routes
-            ],
-            name=group.name,
-            middleware=[
-                BaseMiddleware(
-                    AdapterMiddleware, middleware=middleware, container=self._app
-                )
-                for middleware in group.middlewares
-                if hasattr(middleware, "handle")
-            ],
-        )
-
-        self._router.routes.append(mount)
+        self._groups.append(group)
 
     def add_groups(self, groups: list[RouteGroup]) -> None:
         for group in groups:
             self.add_group(group)
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await self._router(scope, receive, send)
+    def _search(self, environ: Environ) -> WSGIApp:
+        matcher = self._app.make(RouteMatcher)
 
-    def _route_handler(
-        self, route: Route
-    ) -> Callable[[BaseRequest], Awaitable[Response] | Response]:
-        path_params = self._get_path_param_names(route)
-        signature = self._get_typed_signature(route)
+        partial: Route | None = None
 
-        async def wrapper(request: BaseRequest) -> Response:
-            async with self._app.create_scoped_container() as container:
-                container.instance(Request, Request(request.scope), scoped=True)
+        routes = self._routes
 
-                arguments = []
+        for group in self._groups:
+            routes.extend(group.routes)
 
-                for name, parameter in signature.parameters.items():
-                    if name in path_params:
-                        arguments.append(request.path_params[name])
-                    elif isinstance(parameter.annotation, type) and issubclass(
-                        parameter.annotation, Form
-                    ):
-                        arguments.append(
-                            parameter.annotation(data=await request.form())
-                        )
-                    elif isinstance(parameter.annotation, type) and issubclass(
-                        parameter.annotation, Query
-                    ):
-                        arguments.append(
-                            parameter.annotation(params=request.query_params)
-                        )
+        for route in routes:
+            # Determine if any route matches the incoming scope,
+            # and hand over to the matching route if found.
+            match = matcher.match(route, environ)
+            if match == Match.FULL:
+                return self._route_handler(route)
+            elif match == Match.PARTIAL and partial is None:
+                partial = route
 
-                return await container.call(route.endpoint, *arguments)
+        if partial is not None:
+            # Partial matches.
+            # These are cases where an endpoint is
+            # able to handle the request, but is not a preferred option.
+            # We use this in particular to deal with "405 Method Not Allowed".
+            return self._route_handler(partial)
+
+        # Default response
+        return self._default_handler(self._default_endpoint)
+
+    def _route_handler(self, route: Route) -> WSGIApp:
+        def wrapper(environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
+            request = Request(environ, start_response)
+            with self._app.create_scoped_container():
+                response = self._handle_routed_request(route, request)
+
+                return self._adapt_response(response)(environ, start_response)
 
         return wrapper
 
-    def _get_path_param_names(self, route: Route) -> set[str]:
-        return set(re.findall(r"{([^:]*)(?::.*)?}", route.path))
+    def _default_endpoint(self) -> NoReturn:
+        raise HTTPException(status_code=404)
 
-    def _get_typed_signature(self, route: Route) -> inspect.Signature:
-        return inspect.signature(route.endpoint)
+    def _default_handler(self, endpoint: Endpoint) -> WSGIApp:
+        def wrapper(environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
+            request = Request(environ, start_response)
+
+            response = self._handle_request(
+                request, self._app._default_middlewares, endpoint
+            )
+
+            return self._adapt_response(response)(environ, start_response)
+
+        return wrapper
+
+    def _handle_routed_request(self, route: Route, request: Request) -> Response:
+        def endpoint_wrapper(container: Container) -> Response:
+            if route.methods and request.method not in route.methods:
+                headers = {"Allow": ", ".join(route.methods)}
+
+                raise HTTPException(status_code=405, headers=headers)
+
+            arguments = []
+
+            for name, parameter in route.signature.parameters.items():
+                if name in route.param_names:
+                    arguments.append(request.path_params[name])
+                elif isinstance(parameter.annotation, type) and issubclass(
+                    parameter.annotation, Form
+                ):
+                    arguments.append(parameter.annotation(data=request.form))
+                elif isinstance(parameter.annotation, type) and issubclass(
+                    parameter.annotation, Query
+                ):
+                    arguments.append(parameter.annotation(params=request.query_params))
+
+            return container.call(route.endpoint, *arguments)
+
+        return self._handle_request(
+            request,
+            self._app._default_middlewares + route.get_middleware(),
+            endpoint_wrapper,
+        )
+
+    def _handle_request(
+        self,
+        request: Request,
+        middlewares: list[type[Middleware]],
+        endpoint: Endpoint,
+        *args: Any,
+    ) -> Response:
+        with self._app.create_scoped_container() as container:
+            container.instance(Request, request)
+
+            stack = MiddlewareStack(container, middlewares)
+
+            return stack.handle(endpoint, *args)
+
+    def _adapt_response(self, response: Any) -> WSGIApp:
+        if isinstance(response, BaizeResponse):
+            return response
+
+        if isinstance(response, Response):
+            return response.response
+
+        raise ValueError(f"Cannot adapt type {type(response)} to a valid response")
+
+    def __call__(
+        self, environ: Environ, start_response: StartResponse
+    ) -> Iterable[bytes]:
+        app = self._search(environ)
+
+        return app(environ, start_response)

@@ -7,7 +7,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-starlette = { version = "^0.27.0", extras = ["full"] }
 uvicorn = "^0.23.2"
 cleo = "^2.0.1"
 jinja2 = "^3.1.2"
@@ -15,6 +14,10 @@ pydantic = "^2.3.0"
 pendulum = { git = "https://github.com/sdispater/pendulum.git", rev = "master" }
 pydantic-settings = "^2.1.0"
 sqlalchemy = "^2.0.25"
+baize = "^0.20.8"
+crashtest = "^0.4.1"
+anyio = "^4.2.0"
+httpx = "^0.26.0"
 
 
 [tool.poetry.group.test.dependencies]
@@ -35,6 +38,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = ["asynchronous: Mark a test as asynchronous"]
 
 
 [tool.ruff]

@@ -1,14 +1,11 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
 from typing import Self
 
+from expanse.common.routing.route import Route as BaseRoute
+from expanse.foundation.http.middleware.middleware import Middleware
+from expanse.types.routing import Endpoint
 
-if TYPE_CHECKING:
-    from expanse.types.routing import Endpoint
 
-
-class Route:
+class Route(BaseRoute):
     def __init__(
         self,
         path: str,
@@ -17,27 +14,19 @@ class Route:
         methods: list[str] | None = None,
         name: str | None = None,
     ) -> None:
-        self.path: str = path
-        self.endpoint: Endpoint = endpoint
-        self.methods = methods or ["GET", "HEAD"]
-        self.name: str | None = name
+        super().__init__(path, endpoint, methods=methods, name=name)
 
-    @classmethod
-    def get(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["GET"], name=name)
+        self._middlewares: list[type[Middleware]] = []
 
-    @classmethod
-    def post(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["POST"], name=name)
+    def get_middleware(self) -> list[type[Middleware]]:
+        return self._middlewares
 
-    @classmethod
-    def put(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PUT"], name=name)
+    def middleware(self, *middlewares: type[Middleware]) -> Self:
+        self._middlewares.extend(middlewares)
 
-    @classmethod
-    def patch(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PATCH"], name=name)
+        return self
 
-    @classmethod
-    def delete(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["DELETE"], name=name)
+    def prepend_middleware(self, *middlewares: type[Middleware]) -> Self:
+        self._middlewares = list(middlewares) + self._middlewares
+
+        return self
