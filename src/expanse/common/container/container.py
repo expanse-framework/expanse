@@ -17,10 +17,14 @@ from typing import TypeVar
 from typing import _AnnotatedAlias
 from typing import get_args
 
+from expanse.common.support._utils import eval_type_lenient
+
 
 T = TypeVar("T")
 
-_builtins = [d for d in dir(builtins) if isinstance(getattr(builtins, d), type)]
+_builtins = {d for d in dir(builtins) if isinstance(getattr(builtins, d), type)}
+_typing_builtins = {Any}
+_typing_builtins_strings = {str(t) for t in _typing_builtins}
 _EMPTY = object()
 
 logger = logging.getLogger(__name__)
@@ -103,7 +107,7 @@ class Container(ABC):
     def resolved(self, abstract: str | type) -> bool:
         abstract = self._get_alias(abstract)
 
-        return self._resolved.get(abstract, False)
+        return abstract in self._resolved
 
     def after_resolving(self, abstract: str | type, callback: _Callback) -> None:
         abstract = self._get_alias(abstract)
@@ -138,7 +142,9 @@ class Container(ABC):
     def _mark_as_resolved(self, abstract: str) -> None:
         self._resolved[abstract] = True
 
-    def _get_class(self, parameter: Parameter) -> type | None:
+    def _get_class(
+        self, parameter: Parameter, *, _globals: dict[str, Any] | None = None
+    ) -> type | None:
         type_ = parameter.annotation
 
         if type_ is Parameter.empty:
@@ -151,14 +157,30 @@ class Container(ABC):
             # Get the first type of the type union
             type_ = get_args(type_)[0]
 
-        if self._is_builtin(type_):
+        if self._is_builtin(type_, _globals=_globals):
             return None
 
         return type_
 
-    def _is_builtin(self, type_: type) -> bool:
+    def _is_builtin(
+        self, type_: type, *, _globals: dict[str, Any] | None = None
+    ) -> bool:
+        if isinstance(type_, str):
+            type_ = eval_type_lenient(type_, _globals, _globals)
+
+            if isinstance(type_, typing.ForwardRef):
+                type_ = type_.__forward_arg__
+
+                if type_ in _typing_builtins_strings:
+                    return True
+
+                return False
+
         module = inspect.getmodule(type_)
         if module == builtins:
+            return True
+
+        if type_ in _typing_builtins:
             return True
 
         if (

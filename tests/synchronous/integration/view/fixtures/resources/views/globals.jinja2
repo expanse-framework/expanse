@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>View</title>
+</head>
+
+<body>
+<p>This is a view</p>
+<p>{{ url("/foo/{bar}/{baz}", bar="bim", baz=42) }}</p>
+<p>{{ route("some.route", param1="42") }}</p>
+</body>
+</html>

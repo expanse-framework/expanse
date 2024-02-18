@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 async def app() -> Application:
     application = Application()
     application.set_config(Config({"app": {}}))
-    await application.bootstrap_with([])
+    await application.bootstrap()
 
     return application
 

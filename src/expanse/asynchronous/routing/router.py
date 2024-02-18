@@ -19,6 +19,8 @@ from expanse.asynchronous.types import Scope
 from expanse.asynchronous.types import Send
 from expanse.asynchronous.types.routing import Endpoint
 from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.http.url_path import URLPath
+from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
 from expanse.common.routing.route import Route
 from expanse.common.routing.route_group import RouteGroup
@@ -44,6 +46,20 @@ class Router:
     def add_groups(self, groups: list[RouteGroup]) -> None:
         for group in groups:
             self.add_group(group)
+
+    async def url(self, path: str, /, **parameters: Any) -> URLPath:
+        matcher = await self._app.make(RouteMatcher)
+
+        return matcher.url(path, **parameters)
+
+    async def route(self, name: str, /, **parameters: Any) -> URLPath:
+        for route in self._routes:
+            if route.name == name:
+                matcher = await self._app.make(RouteMatcher)
+
+                return matcher.url(route.path, **parameters)
+
+        raise RouteNotFound(f"Route [{name}] is not defined")
 
     async def _search(self, scope: Scope) -> ASGIApp:
         matcher = await self._app.make(RouteMatcher)
@@ -108,21 +124,21 @@ class Router:
 
                 raise HTTPException(status_code=405, headers=headers)
 
-            arguments = []
+            arguments = {}
 
             for name, parameter in route.signature.parameters.items():
                 if name in route.param_names:
-                    arguments.append(request.path_params[name])
+                    arguments[name] = request.path_params[name]
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Form
                 ):
-                    arguments.append(parameter.annotation(data=await request.form))
+                    arguments[name] = parameter.annotation(data=await request.form)
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Query
                 ):
-                    arguments.append(parameter.annotation(params=request.query_params))
+                    arguments[name] = parameter.annotation(params=request.query_params)
 
-            return await container.call(route.endpoint, *arguments)
+            return await container.call(route.endpoint, **arguments)
 
         return await self._handle_request(
             request,

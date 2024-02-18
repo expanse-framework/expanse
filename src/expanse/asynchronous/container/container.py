@@ -192,6 +192,7 @@ class Container(BaseContainer):
         positional = []
         keywords = {}
         args = list(args)
+        _globals = getattr(callable, "__globals__", None)
 
         for name, parameter in inspect.signature(callable).parameters.items():
             klass = self._get_class(parameter)
@@ -204,7 +205,9 @@ class Container(BaseContainer):
                     parameter, args, kwargs, positional, keywords
                 )
             else:
-                await self._resolve_class(parameter, args, kwargs, positional, keywords)
+                await self._resolve_class(
+                    parameter, args, kwargs, positional, keywords, _globals=_globals
+                )
 
         return positional, keywords
 
@@ -282,15 +285,17 @@ class Container(BaseContainer):
         kwargs: dict[str, Any],
         positional: list[Any],
         keywords: dict[str, Any],
+        *,
+        _globals: dict[str, Any] | None = None,
     ) -> Any:
-        klass = self._get_class(parameter)
-
-        assert klass is not None
-
-        result = await self.make(self._get_alias(klass))
-
         match parameter.kind:
             case parameter.POSITIONAL_ONLY:
+                klass = self._get_class(parameter, _globals=_globals)
+
+                assert klass is not None
+
+                result = await self.make(self._get_alias(klass))
+
                 positional.append(result)
                 return
 
@@ -299,6 +304,12 @@ class Container(BaseContainer):
                 if parameter.name in kwargs:
                     keywords[parameter.name] = kwargs.pop(parameter.name)
                 else:
+                    klass = self._get_class(parameter, _globals=_globals)
+
+                    assert klass is not None
+
+                    result = await self.make(self._get_alias(klass))
+
                     positional.append(result)
 
                 return
@@ -309,10 +320,22 @@ class Container(BaseContainer):
                         parameter.name,
                     )
                 else:
+                    klass = self._get_class(parameter, _globals=_globals)
+
+                    assert klass is not None
+
+                    result = await self.make(self._get_alias(klass))
+
                     keywords[parameter.name] = result
                 return
 
             case parameter.VAR_POSITIONAL:
+                klass = self._get_class(parameter, _globals=_globals)
+
+                assert klass is not None
+
+                result = await self.make(self._get_alias(klass))
+
                 result = [result] if not isinstance(result, tuple) else result
 
                 positional.extend(result)
@@ -342,12 +365,10 @@ class Container(BaseContainer):
             callbacks += self._after_resolving_callbacks[actual_abstract]
 
         for callback in callbacks:
-            if self._is_lambda(callback):
+            if asyncio.iscoroutinefunction(callback):
+                await callback(instance)
+            else:
                 callback(instance)
-
-                continue
-
-            await self.call(callback)
 
     async def __aenter__(self) -> Self:
         return self

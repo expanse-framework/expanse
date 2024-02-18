@@ -5,8 +5,11 @@ import re
 from importlib import import_module
 from importlib.util import module_from_spec
 from importlib.util import spec_from_file_location
+from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import ForwardRef
+from typing import _eval_type
 
 
 if TYPE_CHECKING:
@@ -75,3 +78,18 @@ def class_to_name(class_: type | str) -> str:
     full_name = f"{module}.{name}" if module else name
 
     return full_name
+
+
+def eval_type_lenient(
+    value: Any, globalns: dict[str, Any] | None, localns: dict[str, Any] | None
+) -> Any:
+    if value is None:
+        value = NoneType
+    elif isinstance(value, str):
+        value = ForwardRef(value, is_argument=False, is_class=True)
+
+    try:
+        return _eval_type(value, globalns, localns)  # type: ignore  # noqa: PGH003
+    except NameError:
+        # the point of this function is to be tolerant to this case
+        return value

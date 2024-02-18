@@ -18,7 +18,7 @@ def app() -> Application:
     application = Application()
     application.set_config(Config({"app": {}}))
     application.alias(Config, "config")
-    application.bootstrap_with([])
+    application.bootstrap()
 
     return application
 

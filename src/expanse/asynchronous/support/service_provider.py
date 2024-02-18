@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from expanse.foundation.application import Application
+    from expanse.asynchronous.foundation.application import Application
 
 
 class ServiceProvider:

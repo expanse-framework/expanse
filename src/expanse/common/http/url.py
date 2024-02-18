@@ -4,6 +4,7 @@ from collections.abc import MutableMapping
 from urllib.parse import SplitResult
 from urllib.parse import urlsplit
 
+from expanse.common.http.url_path import URLPath
 from expanse.common.support._utils import string_matches
 
 
@@ -87,7 +88,7 @@ class URL:
 
     @property
     def path(self) -> str:
-        return self.components.path
+        return URLPath(self.components.path)
 
     @property
     def query(self) -> str:

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from re import Pattern
 
 from expanse.asynchronous.types import Scope
+from expanse.common.http.url_path import URLPath
+from expanse.common.routing.exceptions import NotEnoughURLParameters
 from expanse.common.routing.route import Match
 from expanse.common.routing.route import Route
 from expanse.types import Environ
@@ -174,10 +176,34 @@ class RouteMatcher:
 
         path_format += path[idx:]
 
-        return re.compile(path_regex), path_format, param_convertors
+        self._compiled[path] = re.compile(path_regex), path_format, param_convertors
+
+        return self._compiled[path]
 
     def add_convertor(self, key: str, convertor: Convertor) -> None:
         self._convertors[key] = convertor
+
+    def url(self, path: str, /, **parameters) -> URLPath:
+        path_regex, path_format, convertors = self.compile_path(path)
+
+        param_names = set(parameters.keys())
+        expected_param_names = set(convertors.keys())
+
+        if not expected_param_names.issubset(param_names):
+            raise NotEnoughURLParameters(
+                f"Not enough parameters for URL {path}: "
+                f"missing "
+                f"{', '.join(sorted(expected_param_names.difference(param_names)))}"
+            )
+
+        for key, value in list(parameters.items()):
+            if "{" + key + "}" in path_format:
+                convertor = convertors[key]
+                value = convertor.to_string(value)
+                path_format = path_format.replace("{" + key + "}", value)
+                parameters.pop(key)
+
+        return URLPath(path_format)
 
     def _match_from_environ(self, route: Route, environ: Environ) -> Match:
         path_regex, fmt, convertors = self.compile_path(route.path)

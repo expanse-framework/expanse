@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import Self
 
 from jinja2.environment import Environment
 from jinja2.loaders import FunctionLoader
@@ -27,3 +28,8 @@ class ViewFactory:
         content = await template.render_async(data or {})
 
         return Response(content=content, media_type="text/html")
+
+    def register_global(self, **globals: Any) -> Self:
+        self._env.globals.update(globals)
+
+        return self
