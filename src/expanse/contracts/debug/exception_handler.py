@@ -1,6 +1,8 @@
 from abc import ABC
 from abc import abstractmethod
 
+from cleo.io.outputs.output import Output
+
 from expanse.http.request import Request
 from expanse.http.response import Response
 
@@ -31,6 +33,16 @@ class ExceptionHandler(ABC):
         Render the exception into an HTTP response.
 
         :param request: The request during which the exception was raised
+        :param e: The exception to render
+        """
+        ...
+
+    @abstractmethod
+    def render_for_console(self, output: Output, e: Exception) -> None:
+        """
+        Render the exception to the console output.
+
+        :param output: the output to render the exception to
         :param e: The exception to render
         """
         ...

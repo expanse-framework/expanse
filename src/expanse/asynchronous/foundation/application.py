@@ -15,6 +15,7 @@ from expanse.asynchronous.exceptions.handler import ExceptionHandler
 from expanse.asynchronous.exceptions.middleware.handle_exceptions import (
     HandleExceptions,
 )
+from expanse.asynchronous.foundation.application_builder import ApplicationBuilder
 from expanse.asynchronous.foundation.bootstrap.boot_providers import BootProviders
 from expanse.asynchronous.foundation.bootstrap.load_configuration import (
     LoadConfiguration,
@@ -31,6 +32,8 @@ from expanse.common.support._utils import string_to_class
 
 
 if TYPE_CHECKING:
+    from cleo.io.inputs.input import Input
+
     from expanse.asynchronous.foundation.bootstrap.bootstrapper import Bootstrapper
     from expanse.asynchronous.foundation.http.middleware.middleware import Middleware
     from expanse.asynchronous.routing.router import Router
@@ -71,6 +74,18 @@ class Application(BaseApplication, Container):
         self._bind_paths()
         self._register_base_bindings()
 
+    @classmethod
+    def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
+        base_path = (
+            base_path
+            or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
+        )
+        builder = (
+            ApplicationBuilder(cls(base_path=base_path)).with_kernels().with_commands()
+        )
+
+        return builder
+
     def set_config(self, config: Config) -> None:
         super().set_config(config)
         self.instance(Config, config)
@@ -105,7 +120,6 @@ class Application(BaseApplication, Container):
             bootstrapper: Bootstrapper = await self.make(bootstrapper_class)
             await bootstrapper.bootstrap(self)
 
-        await self.register_configured_providers()
         await self.boot()
 
         self._has_been_bootstrapped = True
@@ -137,6 +151,13 @@ class Application(BaseApplication, Container):
 
     def add_middleware(self, middleware: type[Middleware]) -> None:
         self._default_middlewares.append(middleware)
+
+    async def handle_command(self, input: Input) -> int:
+        from expanse.asynchronous.foundation.console.kernel import Kernel
+
+        kernel = await self.make(Kernel)
+
+        return await kernel.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None

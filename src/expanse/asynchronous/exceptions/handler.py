@@ -1,6 +1,9 @@
+import logging
+
 from typing import Any
 from typing import Self
 
+from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
 
 from expanse.asynchronous.container.container import Container
@@ -11,6 +14,9 @@ from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.common.configuration.config import Config
 from expanse.common.foundation.http.exceptions import HTTPException
+
+
+logger = logging.getLogger(__name__)
 
 
 class ExceptionHandler(ExceptionHandlerContract):
@@ -26,7 +32,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         await self._report_exception(e)
 
     async def _report_exception(self, e: Exception) -> None:
-        raise e
+        # TODO: Better logging handling
+        ...
 
     async def should_report(self, e: Exception) -> bool:
         return e.__class__ not in self._dont_report
@@ -44,6 +51,13 @@ class ExceptionHandler(ExceptionHandlerContract):
 
     async def render(self, request: Request, e: Exception) -> Response:
         return await self._render_exception_response(request, e)
+
+    async def render_for_console(self, output: Output, e: Exception) -> None:
+        from cleo.ui.exception_trace import ExceptionTrace
+
+        trace = ExceptionTrace(e)
+
+        trace.render(output)
 
     async def _render_exception_response(
         self, request: Request, e: Exception

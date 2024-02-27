@@ -1,6 +1,7 @@
 from typing import Any
 from typing import Self
 
+from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
 
 from expanse.common.configuration.config import Config
@@ -44,6 +45,13 @@ class ExceptionHandler(ExceptionHandlerContract):
 
     def render(self, request: Request, e: Exception) -> Response:
         return self._render_exception_response(request, e)
+
+    def render_for_console(self, output: Output, e: Exception) -> None:
+        from cleo.ui.exception_trace import ExceptionTrace
+
+        trace = ExceptionTrace(e)
+
+        trace.render(output)
 
     def _render_exception_response(self, request: Request, e: Exception) -> Response:
         if request.expects_json():

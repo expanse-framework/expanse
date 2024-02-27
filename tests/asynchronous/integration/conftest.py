@@ -1,8 +1,8 @@
 import pytest
 
-from expanse.foundation.application import Application
-from expanse.testing.testing_command import TestingCommand
-from expanse.types.testing import TestingCommandHelper
+from expanse.asynchronous.foundation.application import Application
+from expanse.asynchronous.testing.testing_command import TestingCommand
+from expanse.asynchronous.types.testing import TestingCommandHelper
 
 
 @pytest.fixture()

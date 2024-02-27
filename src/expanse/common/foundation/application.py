@@ -49,6 +49,9 @@ class Application:
     def environment_path(self) -> Path:
         return self._environment_path or self._base_path
 
+    def path(self, path: str | Path) -> Path:
+        return self._base_path.joinpath("app").joinpath(path)
+
     @property
     def environment_file(self) -> str:
         return ".env"

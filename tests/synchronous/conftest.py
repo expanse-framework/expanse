@@ -5,30 +5,30 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from expanse.asynchronous.foundation.application import Application
-from expanse.asynchronous.testing.client import TestClient
 from expanse.common.configuration.config import Config
+from expanse.foundation.application import Application
+from expanse.testing.client import TestClient
 
 
 if TYPE_CHECKING:
-    from expanse.asynchronous.routing.router import Router
+    from expanse.routing.router import Router
 
 
 @pytest.fixture()
-async def app() -> Application:
+def app() -> Application:
     application = Application.configure(Path(__file__).parent.parent.parent).create()
     application.set_config(Config({"app": {}}))
-    await application.bootstrap()
+    application.bootstrap()
 
     return application
 
 
 @pytest.fixture()
-async def router(app: Application) -> Router:
-    return await app.make("router")
+def router(app: Application) -> Router:
+    return app.make("router")
 
 
 @pytest.fixture()
 def client(app: Application) -> TestClient:
-    with TestClient(app, raise_server_exceptions=True) as client:
+    with TestClient(app=app) as client:
         yield client

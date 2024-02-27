@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-uvicorn = "^0.23.2"
+uvicorn = { version = "^0.23.2", extras = ["standard"] }
 cleo = "^2.0.1"
 jinja2 = "^3.1.2"
 pydantic = "^2.3.0"
@@ -96,7 +96,17 @@ exclude = []
 
 
 [tool.coverage.run]
-omit = ["src/expanse/types/*", "src/expanse/support/_compat.py", "src/expanse/support/_utils.py"]
+omit = [
+    "src/expanse/asynchronous/console/_adapters/*",
+    "src/expanse/asynchronous/contracts/*",
+    "src/expanse/asynchronous/types/*",
+    "src/expanse/contracts/*",
+    "src/expanse/types/*",
+    "src/expanse/common/types/*",
+    "src/expanse/common/support/_compat.py",
+    "src/expanse/common/support/_utils.py",
+    "src/expanse/common/support/_utils.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [

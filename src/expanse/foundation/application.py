@@ -16,6 +16,7 @@ from expanse.contracts.debug.exception_handler import (
 )
 from expanse.exceptions.handler import ExceptionHandler
 from expanse.exceptions.middleware.handle_exceptions import HandleExceptions
+from expanse.foundation.application_builder import ApplicationBuilder
 from expanse.foundation.bootstrap.boot_providers import BootProviders
 from expanse.foundation.bootstrap.load_configuration import LoadConfiguration
 from expanse.foundation.bootstrap.load_environment_variables import (
@@ -26,6 +27,8 @@ from expanse.foundation.bootstrap.register_providers import RegisterProviders
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from cleo.io.inputs.input import Input
 
     from expanse.foundation.bootstrap.bootstrapper import Bootstrapper
     from expanse.foundation.http.middleware.middleware import Middleware
@@ -65,6 +68,18 @@ class Application(BaseApplication, Container):
         self._bind_paths()
         self._register_base_bindings()
 
+    @classmethod
+    def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
+        base_path = (
+            base_path
+            or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
+        )
+        builder = (
+            ApplicationBuilder(cls(base_path=base_path)).with_kernels().with_commands()
+        )
+
+        return builder
+
     def set_config(self, config: Config) -> None:
         super().set_config(config)
         self.instance(Config, config)
@@ -99,7 +114,6 @@ class Application(BaseApplication, Container):
             bootstrapper: Bootstrapper = self.make(bootstrapper_class)
             bootstrapper.bootstrap(self)
 
-        self.register_configured_providers()
         self.boot()
 
         self._has_been_bootstrapped = True
@@ -131,6 +145,13 @@ class Application(BaseApplication, Container):
 
     def add_middleware(self, middleware: type[Middleware]) -> None:
         self._default_middlewares.append(middleware)
+
+    def handle_command(self, input: Input) -> int:
+        from expanse.foundation.console.kernel import Kernel
+
+        kernel = self.make(Kernel)
+
+        return kernel.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None
