@@ -13,6 +13,7 @@ class ViewFinder:
         if not view_path.suffix:
             candidates = [
                 view_path.with_suffix(".jinja2"),
+                view_path.with_suffix(".html.jinja2"),
                 view_path.with_suffix(".html"),
             ]
         else:

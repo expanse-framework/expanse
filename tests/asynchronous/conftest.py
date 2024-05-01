@@ -7,7 +7,6 @@ import pytest
 
 from expanse.asynchronous.foundation.application import Application
 from expanse.asynchronous.testing.client import TestClient
-from expanse.common.configuration.config import Config
 
 
 if TYPE_CHECKING:
@@ -17,8 +16,9 @@ if TYPE_CHECKING:
 @pytest.fixture()
 async def app() -> Application:
     application = Application.configure(Path(__file__).parent.parent.parent).create()
-    application.set_config(Config({"app": {}}))
     await application.bootstrap()
+
+    application.config["app.debug"] = True
 
     return application
 

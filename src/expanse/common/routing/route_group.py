@@ -32,7 +32,10 @@ class RouteGroup(Generic[RouteT]):
             route_name = f"{self.name}.{route.name}"
 
         if self.prefix:
-            route_path = "/".join([self.prefix, route.path]).replace("//", "/")
+            if not route.path:
+                route_path = self.prefix
+            else:
+                route_path = "/".join([self.prefix, route.path]).replace("//", "/")
         else:
             route_path = route.path
 

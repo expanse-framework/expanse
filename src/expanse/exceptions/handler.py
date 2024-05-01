@@ -68,9 +68,22 @@ class ExceptionHandler(ExceptionHandlerContract):
 
     def _prepare_response(self, request: Request, e: Exception) -> Response:
         return Response.text(
-            e.detail if isinstance(e, HTTPException) else "Server Error",
+            self._render_exception_content(e),
             status_code=e.status_code if isinstance(e, HTTPException) else 500,
         )
+
+    def _render_exception_content(self, e: Exception) -> str:
+        config = self._container.make(Config)
+        if config.get("app.debug", False):
+            inspector = Inspector(e)
+
+            return (
+                f"{inspector.exception_name}: {inspector.exception_message} "
+                f"in {inspector.frames[-1].filename} "
+                f"at line {inspector.frames[-1].lineno}"
+            )
+
+        return e.detail if isinstance(e, HTTPException) else "Server Error"
 
     def _convert_exception_to_dict(self, e: Exception) -> dict[str, Any]:
         debug = self._container.make(Config).get("app.debug", False)

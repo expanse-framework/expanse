@@ -35,8 +35,8 @@ def string_to_class(string: str) -> type[Any]:
     return getattr(class_, method_name)
 
 
-def module_from_path(path: Path) -> ModuleType | None:
-    spec = spec_from_file_location(path.with_suffix("").name, path)
+def module_from_path(path: Path, name: str | None = None) -> ModuleType | None:
+    spec = spec_from_file_location(name or path.with_suffix("").name, path)
 
     if spec is None:
         return None

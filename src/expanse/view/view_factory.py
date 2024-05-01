@@ -18,7 +18,11 @@ class ViewFactory:
     def __init__(self, finder: ViewFinder, debug: bool = False) -> None:
         self._finder: ViewFinder = finder
 
-        self._env = Environment(loader=FunctionLoader(finder.find), auto_reload=debug)
+        self._env = Environment(
+            loader=FunctionLoader(finder.find),
+            cache_size=0 if debug else 400,
+            auto_reload=debug,
+        )
 
     def make(self, view: str, data: dict[str, Any] | None = None) -> Response:
         template = self._env.get_template(view)

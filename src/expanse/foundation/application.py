@@ -138,6 +138,9 @@ class Application(BaseApplication, Container):
 
         provider.register()
 
+        if self._has_been_bootstrapped:
+            self._boot_provider(provider)
+
         return provider
 
     def prepend_middleware(self, middleware: type[Middleware]) -> None:

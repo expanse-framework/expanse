@@ -57,6 +57,13 @@ class Router:
 
                 return matcher.url(route.path, **parameters)
 
+        for group in self._groups:
+            for route in group.routes:
+                if route.name == name:
+                    matcher = self._app.make(RouteMatcher)
+
+                    return matcher.url(route.path, **parameters)
+
         raise RouteNotFound(f"Route [{name}] is not defined")
 
     def _search(self, environ: Environ) -> WSGIApp:

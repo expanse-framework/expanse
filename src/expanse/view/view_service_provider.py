@@ -18,7 +18,7 @@ class ViewServiceProvider(ServiceProvider):
     def _create_factory(self, app: Application) -> ViewFactory:
         finder: ViewFinder = app.make("view:finder")
 
-        return ViewFactory(finder, debug=app.config.get("debug", False))
+        return ViewFactory(finder, debug=app.config.get("app.debug", False))
 
     def _register_view_finder(self) -> None:
         def _create_view_finder(app: Application) -> ViewFinder:

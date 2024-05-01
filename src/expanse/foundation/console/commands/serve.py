@@ -32,13 +32,21 @@ class ServeCommand(Command):
         }
 
         if self.option("watch"):
-            parameters["reload_includes"] = [
-                app.path(".").as_posix(),
-                app.resources_path.joinpath("views").as_posix(),
+            parameters["reload_dirs"] = [
+                app.base_path,
+                app.config_path,
+                app.base_path.joinpath("routes"),
             ]
 
         config = uvicorn.Config("app.app:app", **parameters)
         server = uvicorn.Server(config)
-        server.run()
+
+        if self.option("watch"):
+            from uvicorn.supervisors import ChangeReload
+
+            sock = config.bind_socket()
+            ChangeReload(config, target=server.run, sockets=[sock]).run()
+        else:
+            server.run()
 
         return 0

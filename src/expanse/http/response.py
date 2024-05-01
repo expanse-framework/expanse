@@ -91,7 +91,7 @@ class Response:
     ) -> Self:
         return cls(
             response=FileResponse(
-                path,
+                str(path),
                 headers=headers,
                 content_type=media_type,
                 download_name=filename,

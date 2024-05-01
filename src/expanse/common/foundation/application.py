@@ -21,6 +21,7 @@ class Application:
         self._base_path: Path = base_path
         self._config_path: Path | None = None
         self._resources_path: Path | None = None
+        self._static_path: Path | None = None
         self._environment_path: Path | None = None
         self._database_path: Path | None = None
 
@@ -40,6 +41,10 @@ class Application:
     @property
     def resources_path(self) -> Path:
         return self._resources_path or self._base_path.joinpath("resources")
+
+    @property
+    def static_path(self) -> Path:
+        return self._static_path or self._base_path.joinpath("static")
 
     @property
     def database_path(self) -> Path:
