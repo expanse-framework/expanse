@@ -8,7 +8,7 @@ from expanse.asynchronous.support.service_provider import ServiceProvider
 
 
 class CommandServiceProvider(ServiceProvider):
-    COMMANDS: ClassVar[list[str]] = ["serve"]
+    COMMANDS: ClassVar[list[str]] = ["routes list", "serve"]
 
     async def register(self) -> None:
         # TODO: register commands only on starting event once implemented

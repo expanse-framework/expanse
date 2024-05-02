@@ -22,10 +22,6 @@ class RouteGroup(Generic[RouteT]):
     def add_route(self, route: RouteT) -> None:
         self.routes.append(self._build_route(route))
 
-    def add_routes(self, routes: list[RouteT]) -> None:
-        for route in routes:
-            self.add_route(route)
-
     def _build_route(self, route: RouteT) -> RouteT:
         route_name = route.name
         if route_name is not None and self.name is not None:

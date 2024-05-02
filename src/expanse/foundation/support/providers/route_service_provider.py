@@ -1,21 +1,19 @@
-from __future__ import annotations
-
 import sys
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from expanse.common.support._utils import module_from_path
+from expanse.routing.router import Router
 from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from expanse.common.routing.route import Route
+    from collections.abc import Callable
 
 
 class RouteServiceProvider(ServiceProvider):
-    def load_routes_from_file(self, path: Path) -> list[Route]:
+    def load_routes_from_file(self, path: Path) -> None:
         module_name = (
             path.resolve()
             .relative_to(self._app.base_path)
@@ -27,14 +25,16 @@ class RouteServiceProvider(ServiceProvider):
         module = module_from_path(path, name=module_name)
 
         if module is None:
-            return []
+            return
 
         # Register route file to sys.modules
         if module_name not in sys.modules:
             sys.modules[module_name] = module
 
-        routes = module.routes
+        routes: Callable[[Router], None] = module.routes
 
-        assert isinstance(routes, list)
+        router: Router = Router(self._app)
 
-        return routes
+        routes(router)
+
+        return router

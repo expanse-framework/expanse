@@ -94,6 +94,8 @@ class Application(BaseApplication, Container):
         for service_provider in self._service_providers:
             self._boot_provider(service_provider)
 
+        self._booted = True
+
     def set_base_path(self, base_path: Path) -> Self:
         self._base_path = base_path
 

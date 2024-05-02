@@ -3,7 +3,6 @@ import pytest
 from expanse.foundation.http.middleware.middleware import Middleware
 from expanse.http.request import Request
 from expanse.http.response import Response
-from expanse.routing import helpers
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.types.http.middleware import RequestHandler
@@ -22,7 +21,7 @@ class SimpleMiddleware(Middleware):
 def test_simple_routes_are_properly_registered(
     router: Router, client: TestClient, method: str
 ) -> None:
-    router.add_route(getattr(helpers, method)("/", lambda: Response("Hello world!")))
+    getattr(router, method)("/", lambda: Response("Hello world!"))
 
     response = getattr(client, method)("/")
 
@@ -33,10 +32,8 @@ def test_simple_routes_are_properly_registered(
 def test_routes_with_middleware_are_properly_registered(
     router: Router, client: TestClient, method: str
 ) -> None:
-    router.add_route(
-        getattr(helpers, method)("/", lambda: Response("Hello world!")).middleware(
-            SimpleMiddleware
-        )
+    getattr(router, method)("/", lambda: Response("Hello world!")).middleware(
+        SimpleMiddleware
     )
 
     response = getattr(client, method)("/")

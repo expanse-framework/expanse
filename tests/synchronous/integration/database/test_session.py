@@ -4,7 +4,6 @@ import pytest
 
 from expanse.contracts.database.session import Session
 from expanse.http.response import Response
-from expanse.routing.helpers import get
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
@@ -20,7 +19,7 @@ def default_session(session: Session) -> Response:
 def test_the_default_session_can_be_injected(
     router: Router, client: TestClient
 ) -> None:
-    router.add_route(get("/default", default_session))
+    router.get("/default", default_session)
 
     response = client.get("/default")
 
@@ -48,7 +47,7 @@ def test_a_named_session_can_be_injected(
             )
         )
 
-    router.add_route(get("/named", named_session))
+    router.get("/named", named_session)
 
     response = client.get("/named")
 

@@ -56,6 +56,14 @@ class Route(BaseRoute):
     def delete(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
         return cls(path, endpoint, methods=["DELETE", "OPTIONS"], name=name)
 
+    @classmethod
+    def options(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
+        return cls(path, endpoint, methods=["OPTIONS"], name=name)
+
+    @classmethod
+    def head(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
+        return cls(path, endpoint, methods=["HEAD"], name=name)
+
     @property
     def param_names(self) -> set[str]:
         if self._param_names is None:
@@ -69,3 +77,6 @@ class Route(BaseRoute):
             self._signature = inspect.signature(self.endpoint)
 
         return self._signature
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}("{self.path}", {self.endpoint})'

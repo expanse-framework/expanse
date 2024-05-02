@@ -13,6 +13,8 @@ from expanse.asynchronous.http.form import Form
 from expanse.asynchronous.http.query import Query
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.routing.route import Route
+from expanse.asynchronous.routing.route_group import RouteGroup
 from expanse.asynchronous.types import ASGIApp
 from expanse.asynchronous.types import Receive
 from expanse.asynchronous.types import Scope
@@ -22,8 +24,6 @@ from expanse.common.foundation.http.exceptions import HTTPException
 from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
-from expanse.common.routing.route import Route
-from expanse.common.routing.route_group import RouteGroup
 from expanse.common.routing.route_matcher import RouteMatcher
 
 
@@ -51,6 +51,62 @@ class Router:
         matcher = await self._app.make(RouteMatcher)
 
         return matcher.url(path, **parameters)
+
+    def get(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+        route = Route.get(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def post(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+        route = Route.post(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def put(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+        route = Route.put(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def patch(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+        route = Route.patch(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def delete(
+        self, path: str, endpoint: Endpoint, *, name: str | None = None
+    ) -> Route:
+        route = Route.delete(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def head(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+        route = Route.head(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def options(
+        self, path: str, endpoint: Endpoint, *, name: str | None = None
+    ) -> Route:
+        route = Route.options(path, endpoint, name=name)
+        self.add_route(route)
+
+        return route
+
+    def group(
+        self,
+        name: str | None = None,
+        prefix: str | None = None,
+    ) -> RouteGroup:
+        group = RouteGroup(name=name, prefix=prefix)
+        self.add_group(group)
+
+        return group
 
     async def route(self, name: str, /, **parameters: Any) -> URLPath:
         for route in self._routes:

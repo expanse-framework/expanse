@@ -1,6 +1,5 @@
 from expanse.http.query import Query
 from expanse.http.response import Response
-from expanse.routing.helpers import post
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from tests.synchronous.integration.http.fixtures.request.models import FooModel
@@ -17,7 +16,7 @@ def index_validated(query: Query[FooModel]) -> Response:
 def test_simple_form_data_are_not_converted_if_no_validation_model(
     router: Router, client: TestClient
 ) -> None:
-    router.add_route(post("/", index))
+    router.post("/", index)
 
     response = client.post("/?bar=42", data={"bar": "42"})
 
@@ -27,7 +26,7 @@ def test_simple_form_data_are_not_converted_if_no_validation_model(
 def test_simple_form_data_are_converted_if_validation_model(
     router: Router, client: TestClient
 ) -> None:
-    router.add_route(post("/", index_validated))
+    router.post("/", index_validated)
 
     response = client.post("/?bar=42", data={"bar": "42"})
 

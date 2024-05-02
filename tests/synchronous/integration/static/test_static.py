@@ -48,7 +48,7 @@ def test_view_static_function_is_registered_successfully(client: TestClient) -> 
     def foo(view: ViewFactory) -> Response:
         return view.make("foo")
 
-    client.app.make(Router).add_route(Route.get("/foo", foo))
+    client.app.make(Router).get("/foo", foo)
 
     response = client.get("/foo")
     assert response.status_code == 200

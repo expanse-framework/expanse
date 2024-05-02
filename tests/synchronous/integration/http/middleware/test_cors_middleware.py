@@ -5,7 +5,6 @@ import pytest
 from expanse.foundation.application import Application
 from expanse.http.middleware.cors_middleware import CorsMiddleware
 from expanse.http.response import Response
-from expanse.routing.helpers import post
 from expanse.testing.client import TestClient
 
 
@@ -19,11 +18,9 @@ def setup_app(app: Application) -> None:
 
     router: Router = app.make("router")
 
-    router.add_route(post("/api/ping", lambda: Response.json("pong")))
-    router.add_route(post("/api/error", lambda: Response.abort(500)))
-    router.add_route(
-        post("/web/ping", lambda: Response("pong", media_type="text/plain"))
-    )
+    router.post("/api/ping", lambda: Response.json("pong"))
+    router.post("/api/error", lambda: Response.abort(500))
+    router.post("/web/ping", lambda: Response("pong", media_type="text/plain"))
 
     app.config["cors"] = {
         "paths": ["api/*"],

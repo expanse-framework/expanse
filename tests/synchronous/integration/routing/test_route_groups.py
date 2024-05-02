@@ -1,8 +1,6 @@
 from expanse.foundation.http.middleware.middleware import Middleware
 from expanse.http.request import Request
 from expanse.http.response import Response
-from expanse.routing.helpers import get
-from expanse.routing.helpers import group
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.types.http.middleware import RequestHandler
@@ -18,9 +16,8 @@ class SimpleMiddleware(Middleware):
 
 
 def test_route_group_with_middlewares(client: TestClient, router: Router) -> None:
-    api_group = group("api").middleware(SimpleMiddleware)
-    api_group.add_route(get("/", lambda: Response("Hello world!")))
-    router.add_group(api_group)
+    with router.group("api").middleware(SimpleMiddleware) as group:
+        group.get("/", lambda: Response("Hello world!"))
 
     response = client.get("/")
 

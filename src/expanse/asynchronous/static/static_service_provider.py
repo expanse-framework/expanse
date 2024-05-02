@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from expanse.asynchronous.routing.helpers import get
 from expanse.asynchronous.static.static import Static
 from expanse.asynchronous.support.service_provider import ServiceProvider
 from expanse.asynchronous.view.view_factory import ViewFactory
@@ -35,12 +34,10 @@ class StaticServiceProvider(ServiceProvider):
         if self._app.config.get("app.debug", False):
             prefix: str = self._app.config["static.prefix"].rstrip("/")
 
-            router.add_route(
-                get(
-                    f"{prefix}/{{path:path}}",
-                    (await self._app.make(Static)).get,
-                    name="static",
-                )
+            router.get(
+                f"{prefix}/{{path:path}}",
+                (await self._app.make(Static)).get,
+                name="static",
             )
 
     async def _register_view_globals(self, view: ViewFactory) -> None:
