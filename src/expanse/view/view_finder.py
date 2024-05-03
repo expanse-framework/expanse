@@ -7,6 +7,9 @@ class ViewFinder:
     def __init__(self, paths: list[Path]) -> None:
         self._paths: list[Path] = paths
 
+    def add_paths(self, paths: list[Path]) -> None:
+        self._paths.extend(paths)
+
     def find(self, view: str) -> str | None:
         view_path = Path(view)
 

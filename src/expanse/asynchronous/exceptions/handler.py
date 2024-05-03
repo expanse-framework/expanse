@@ -1,5 +1,6 @@
 import logging
 
+from pathlib import Path
 from typing import Any
 from typing import Self
 
@@ -10,6 +11,7 @@ from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
 )
+from expanse.asynchronous.contracts.debug.exception_renderer import ExceptionRenderer
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.common.configuration.config import Config
@@ -63,21 +65,73 @@ class ExceptionHandler(ExceptionHandlerContract):
         self, request: Request, e: Exception
     ) -> Response:
         if request.expects_json():
-            return await self._prepare_json_response(request, e)
+            return await self._render_json_response(request, e)
 
-        return await self._prepare_response(request, e)
+        return await self._render_response(request, e)
 
-    async def _prepare_json_response(self, request: Request, e: Exception) -> Response:
+    async def _render_json_response(self, request: Request, e: Exception) -> Response:
         return Response.json(
-            self._convert_exception_to_dict(e),
+            await self._convert_exception_to_dict(e),
             status_code=e.status_code if isinstance(e, HTTPException) else 500,
             indent=2,
         )
 
-    async def _prepare_response(self, request: Request, e: Exception) -> Response:
+    async def _render_response(self, request: Request, e: Exception) -> Response:
+        config = await self._container.make(Config)
+        if not isinstance(e, HTTPException) and config.get("app.debug"):
+            if self._container.has(ExceptionRenderer):
+                return Response.html(
+                    await (await self._container.make(ExceptionRenderer)).render(e),
+                    status_code=500,
+                )
+
+            return Response.text(
+                await self._render_exception_content(e), status_code=500
+            )
+
+        if not isinstance(e, HTTPException):
+            e = HTTPException(500, str(e))
+
+        return await self._render_http_exception(e)
+
+    async def _render_http_exception(self, e: HTTPException) -> Response:
+        await self._register_error_paths()
+
+        if view := (await self._get_http_exception_view(e)):
+            from expanse.asynchronous.view.view_factory import ViewFactory
+
+            factory = await self._container.make(ViewFactory)
+
+            response = await factory.make(
+                view, {"exception": e}, status_code=e.status_code
+            )
+
+            return response
+
         return Response.text(
             await self._render_exception_content(e),
-            status_code=e.status_code if isinstance(e, HTTPException) else 500,
+            status_code=e.status_code,
+        )
+
+    async def _get_http_exception_view(self, e: HTTPException) -> str | None:
+        view = f"errors/{e.status_code}"
+
+        from expanse.asynchronous.view.view_factory import ViewFactory
+
+        factory = await self._container.make(ViewFactory)
+
+        if not factory.exists(view):
+            return
+
+        return view
+
+    async def _register_error_paths(self) -> None:
+        import expanse
+
+        from expanse.asynchronous.view.view_finder import ViewFinder
+
+        (await self._container.make(ViewFinder)).add_paths(
+            [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]
         )
 
     async def _render_exception_content(self, e: Exception) -> str:
@@ -101,8 +155,8 @@ class ExceptionHandler(ExceptionHandlerContract):
             return {
                 "message": inspector.exception_message,
                 "exception": inspector.exception_name,
-                "file": inspector.frames[0].filename,
-                "line": inspector.frames[0].lineno,
+                "file": inspector.frames[-1].filename,
+                "line": inspector.frames[-1].lineno,
             }
 
         return {"message": e.detail if isinstance(e, HTTPException) else "Server error"}

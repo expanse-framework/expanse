@@ -29,4 +29,5 @@ class ViewServiceProvider(ServiceProvider):
                 ]
             )
 
-        self._app.singleton("view:finder", _create_view_finder)
+        self._app.singleton(ViewFinder, _create_view_finder)
+        self._app.alias(ViewFinder, "view:finder")

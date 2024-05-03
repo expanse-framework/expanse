@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 from typing import Self
 
@@ -10,6 +11,7 @@ from expanse.container.container import Container
 from expanse.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
 )
+from expanse.contracts.debug.exception_renderer import ExceptionRenderer
 from expanse.http.request import Request
 from expanse.http.response import Response
 
@@ -27,7 +29,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         self._report_exception(e)
 
     def _report_exception(self, e: Exception) -> None:
-        raise e
+        pass
 
     def should_report(self, e: Exception) -> bool:
         return e.__class__ not in self._dont_report
@@ -55,22 +57,61 @@ class ExceptionHandler(ExceptionHandlerContract):
 
     def _render_exception_response(self, request: Request, e: Exception) -> Response:
         if request.expects_json():
-            return self._prepare_json_response(request, e)
+            return self._render_json_response(request, e)
 
-        return self._prepare_response(request, e)
+        return self._render_response(request, e)
 
-    def _prepare_json_response(self, request: Request, e: Exception) -> Response:
+    def _render_json_response(self, request: Request, e: Exception) -> Response:
         return Response.json(
             self._convert_exception_to_dict(e),
             status_code=e.status_code if isinstance(e, HTTPException) else 500,
             indent=2,
         )
 
-    def _prepare_response(self, request: Request, e: Exception) -> Response:
+    def _render_response(self, request: Request, e: Exception) -> Response:
+        if not isinstance(e, HTTPException) and self._container.make(Config).get(
+            "app.debug"
+        ):
+            if self._container.has(ExceptionRenderer):
+                return Response.html(
+                    self._container.make(ExceptionRenderer).render(e), status_code=500
+                )
+
+            return Response.text(self._render_exception_content(e), status_code=500)
+
+        if not isinstance(e, HTTPException):
+            e = HTTPException(500, str(e))
+
+        return self._render_http_exception(e)
+
+    def _render_http_exception(self, e: HTTPException) -> Response:
+        self._register_error_paths()
+
+        if view := self._get_http_exception_view(e):
+            from expanse.view.view_factory import ViewFactory
+
+            factory = self._container.make(ViewFactory)
+
+            response = factory.make(view, {"exception": e}, status_code=e.status_code)
+
+            return response
+
         return Response.text(
             self._render_exception_content(e),
-            status_code=e.status_code if isinstance(e, HTTPException) else 500,
+            status_code=e.status_code,
         )
+
+    def _get_http_exception_view(self, e: HTTPException) -> str | None:
+        view = f"errors/{e.status_code}"
+
+        from expanse.view.view_factory import ViewFactory
+
+        factory = self._container.make(ViewFactory)
+
+        if not factory.exists(view):
+            return
+
+        return view
 
     def _render_exception_content(self, e: Exception) -> str:
         config = self._container.make(Config)
@@ -93,11 +134,20 @@ class ExceptionHandler(ExceptionHandlerContract):
             return {
                 "message": inspector.exception_message,
                 "exception": inspector.exception_name,
-                "file": inspector.frames[0].filename,
-                "line": inspector.frames[0].lineno,
+                "file": inspector.frames[-1].filename,
+                "line": inspector.frames[-1].lineno,
             }
 
         return {"message": e.detail if isinstance(e, HTTPException) else "Server error"}
+
+    def _register_error_paths(self) -> None:
+        import expanse
+
+        from expanse.view.view_finder import ViewFinder
+
+        self._container.make(ViewFinder).add_paths(
+            [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]
+        )
 
     def dont_report(self, *e: type[Exception]) -> Self:
         self._dont_report |= set(e)

@@ -91,6 +91,9 @@ class Container(ABC):
     def bound(self, abstract: str | type) -> bool:
         return abstract in self._bindings or abstract in self._instances
 
+    def has(self, abstract: str | type) -> bool:
+        return self.bound(abstract)
+
     def terminating(self, callback: _Callback, scoped: bool = False) -> None:
         if scoped:
             self._scoped_terminating_callbacks.append(callback)

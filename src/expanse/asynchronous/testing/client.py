@@ -196,24 +196,39 @@ class TestClient(BaseTestClient):
         self.async_backend = _AsyncBackend(
             backend=backend, backend_options=backend_options or {}
         )
+        self.raise_server_exceptions = raise_server_exceptions
         if headers is None:
             headers = {}
 
         headers.setdefault("user-agent", "testclient")
         super().__init__(
             app=self.app,
-            transport=_TestClientTransport(
-                self.app,
-                portal_factory=self._portal_factory,
-                raise_server_exceptions=raise_server_exceptions,
-            ),
             base_url=base_url,
             headers=headers,
             follow_redirects=True,
             cookies=cookies,
         )
 
+    @property
+    def transport(self) -> _TestClientTransport:
+        return _TestClientTransport(
+            self.app,
+            portal_factory=self._portal_factory,
+            raise_server_exceptions=self.raise_server_exceptions,
+        )
+
     @contextlib.contextmanager
     def _portal_factory(self) -> Generator[anyio.abc.BlockingPortal, None, None]:
         with anyio.from_thread.start_blocking_portal(**self.async_backend) as portal:
             yield portal
+
+    @contextlib.contextmanager
+    def handle_exceptions(
+        self, handle_exceptions: bool = True
+    ) -> contextlib.AbstractContextManager[None]:
+        raise_server_exceptions = self.transport.raise_server_exceptions
+        self.transport.raise_server_exceptions = not handle_exceptions
+
+        yield
+
+        self.transport.raise_server_exceptions = raise_server_exceptions

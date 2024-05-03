@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>{{ title }}</title>
+
+  <style>
+    /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */
+    html {
+      line-height: 1.15;
+      -webkit-text-size-adjust: 100%
+    }
+
+    body {
+      margin: 0
+    }
+
+    a {
+      background-color: transparent
+    }
+
+    code {
+      font-family: monospace, monospace;
+      font-size: 1em
+    }
+
+    [hidden] {
+      display: none
+    }
+
+    html {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+      line-height: 1.5
+    }
+
+    *, :after, :before {
+      box-sizing: border-box;
+      border: 0 solid #e2e8f0
+    }
+
+    a {
+      color: inherit;
+      text-decoration: inherit
+    }
+
+    code {
+      font-family: Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace
+    }
+
+    svg, video {
+      display: block;
+      vertical-align: middle
+    }
+
+    video {
+      max-width: 100%;
+      height: auto
+    }
+
+    * {
+      --tw-gradient-from-position: ;
+      --tw-gradient-to-position: ;
+    }
+
+    .bg-gray-100 {
+      --bg-opacity: 1;
+      background-color: #f7fafc;
+      background-color: rgba(247, 250, 252, var(--bg-opacity))
+    }
+
+    .border-gray-200 {
+      --border-opacity: 1;
+      border-color: #e2e8f0;
+      border-color: rgba(226, 232, 240, var(--border-opacity))
+    }
+
+    .border-r {
+      border-right-width: 1px
+    }
+
+    .flex {
+      display: flex
+    }
+
+    .items-center {
+      align-items: center
+    }
+
+    .justify-center {
+      justify-content: center
+    }
+
+    .text-lg {
+      font-size: 1.125rem
+    }
+
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto
+    }
+
+    .ml-4 {
+      margin-left: 1rem
+    }
+
+    .max-w-xl {
+      max-width: 36rem
+    }
+
+    .min-h-screen {
+      min-height: 100vh
+    }
+
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem
+    }
+
+    .pt-8 {
+      padding-top: 2rem
+    }
+
+    .relative {
+      position: relative
+    }
+
+    .text-gray-500 {
+      --text-opacity: 1;
+      color: #a0aec0;
+      color: rgba(100, 116, 139, var(--text-opacity))
+    }
+
+    .uppercase {
+      text-transform: uppercase
+    }
+
+    .antialiased {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale
+    }
+
+    .tracking-wider {
+      letter-spacing: .05em
+    }
+
+    .saturate-200 {
+      --tw-saturate: saturate(2);
+      filter: var(--tw-saturate);
+    }
+
+    .text-transparent {
+      color: transparent;
+    }
+
+    .bg-clip-text {
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    .bg-gradient-to-r {
+      background-image: linear-gradient(to right, var(--tw-gradient-stops));
+    }
+
+    .from-indigo-600 {
+      --tw-gradient-from: #4f46e5 var(--tw-gradient-from-position);
+      --tw-gradient-to: rgb(79 70 229 / 0) var(--tw-gradient-to-position);
+      --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+    }
+
+    .to-sky-600 {
+      --tw-gradient-to: #0284c7 var(--tw-gradient-to-position);
+    }
+
+    .font-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+    }
+
+    @-webkit-keyframes spin {
+      0% {
+        transform: rotate(0deg)
+      }
+      to {
+        transform: rotate(1turn)
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg)
+      }
+      to {
+        transform: rotate(1turn)
+      }
+    }
+
+    @-webkit-keyframes ping {
+      0% {
+        transform: scale(1);
+        opacity: 1
+      }
+      75%, to {
+        transform: scale(2);
+        opacity: 0
+      }
+    }
+
+    @keyframes ping {
+      0% {
+        transform: scale(1);
+        opacity: 1
+      }
+      75%, to {
+        transform: scale(2);
+        opacity: 0
+      }
+    }
+
+    @-webkit-keyframes pulse {
+      0%, to {
+        opacity: 1
+      }
+      50% {
+        opacity: .5
+      }
+    }
+
+    @keyframes pulse {
+      0%, to {
+        opacity: 1
+      }
+      50% {
+        opacity: .5
+      }
+    }
+
+    @-webkit-keyframes bounce {
+      0%, to {
+        transform: translateY(-25%);
+        -webkit-animation-timing-function: cubic-bezier(.8, 0, 1, 1);
+        animation-timing-function: cubic-bezier(.8, 0, 1, 1)
+      }
+      50% {
+        transform: translateY(0);
+        -webkit-animation-timing-function: cubic-bezier(0, 0, .2, 1);
+        animation-timing-function: cubic-bezier(0, 0, .2, 1)
+      }
+    }
+
+    @keyframes bounce {
+      0%, to {
+        transform: translateY(-25%);
+        -webkit-animation-timing-function: cubic-bezier(.8, 0, 1, 1);
+        animation-timing-function: cubic-bezier(.8, 0, 1, 1)
+      }
+      50% {
+        transform: translateY(0);
+        -webkit-animation-timing-function: cubic-bezier(0, 0, .2, 1);
+        animation-timing-function: cubic-bezier(0, 0, .2, 1)
+      }
+    }
+
+    @media (min-width: 640px) {
+      .sm\:items-center {
+        align-items: center
+      }
+
+      .sm\:justify-start {
+        justify-content: flex-start
+      }
+
+      .sm\:px-6 {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem
+      }
+
+      .sm\:pt-0 {
+        padding-top: 0
+      }
+    }
+
+    @media (min-width: 768px) {
+    }
+
+    @media (min-width: 1024px) {
+      .lg\:px-8 {
+        padding-left: 2rem;
+        padding-right: 2rem
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+
+      .dark\:bg-gray-950 {
+        --bg-opacity: 1;
+        background-color: #020617;
+        background-color: rgba(2, 6, 23, var(--bg-opacity))
+      }
+    }
+  </style>
+
+  <style>
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    }
+  </style>
+</head>
+<body class="antialiased">
+<div class="relative flex items-top justify-center min-h-screen bg-gray-100 dark:bg-gray-950 sm:items-center sm:pt-0">
+  <div class="max-w-xl mx-auto sm:px-6 lg:px-8">
+    <div class="flex items-center pt-8 sm:justify-start sm:pt-0">
+      <div
+        class="font-mono px-4 text-lg border-r border-gray-200 tracking-wider saturate-200 bg-gradient-to-r from-indigo-600 to-sky-600 text-transparent bg-clip-text">
+        {{ exception.status_code }}
+      </div>
+
+      <div class="ml-4 text-lg text-gray-500 uppercase tracking-wider">
+        {{ message }}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

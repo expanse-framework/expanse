@@ -69,6 +69,22 @@ class Response:
         )
 
     @classmethod
+    def html(
+        cls,
+        content: Any = "",
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> Self:
+        return cls(
+            response=PlainTextResponse(
+                content,
+                status_code=status_code,
+                headers=headers,
+                media_type="text/html",
+            )
+        )
+
+    @classmethod
     def text(
         cls,
         content: Any = "",
