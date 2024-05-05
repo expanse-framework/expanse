@@ -5,6 +5,9 @@ from typing import NoReturn
 from baize.wsgi.responses import Response as BaizeResponse
 
 from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.http.form import Form
+from expanse.common.http.json import JSON
+from expanse.common.http.query import Query
 from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
@@ -13,8 +16,6 @@ from expanse.container.container import Container
 from expanse.foundation.application import Application
 from expanse.foundation.http.middleware.middleware import Middleware
 from expanse.foundation.http.middleware.middleware_stack import MiddlewareStack
-from expanse.http.form import Form
-from expanse.http.query import Query
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.route import Route
@@ -189,9 +190,14 @@ class Router:
                 if name in route.param_names:
                     arguments[name] = request.path_params[name]
                 elif isinstance(parameter.annotation, type) and issubclass(
+                    parameter.annotation, JSON
+                ):
+                    arguments[name] = parameter.annotation(data=request.json)
+                elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Form
                 ):
-                    arguments[name] = parameter.annotation(data=request.form)
+                    arguments[name] = parameter.annotation(request.form)
+
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Query
                 ):

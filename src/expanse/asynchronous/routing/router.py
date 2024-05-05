@@ -9,8 +9,6 @@ from expanse.asynchronous.foundation.http.middleware.middleware import Middlewar
 from expanse.asynchronous.foundation.http.middleware.middleware_stack import (
     MiddlewareStack,
 )
-from expanse.asynchronous.http.form import Form
-from expanse.asynchronous.http.query import Query
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.route import Route
@@ -21,6 +19,9 @@ from expanse.asynchronous.types import Scope
 from expanse.asynchronous.types import Send
 from expanse.asynchronous.types.routing import Endpoint
 from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.http.form import Form
+from expanse.common.http.json import JSON
+from expanse.common.http.query import Query
 from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
@@ -186,9 +187,13 @@ class Router:
                 if name in route.param_names:
                     arguments[name] = request.path_params[name]
                 elif isinstance(parameter.annotation, type) and issubclass(
+                    parameter.annotation, JSON
+                ):
+                    arguments[name] = parameter.annotation(data=await request.json)
+                elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Form
                 ):
-                    arguments[name] = parameter.annotation(data=await request.form)
+                    arguments[name] = parameter.annotation(await request.form)
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Query
                 ):

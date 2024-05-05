@@ -74,10 +74,11 @@ class Response:
         content: Any = "",
         status_code: int = 200,
         headers: Mapping[str, str] | None = None,
+        media_type: str = "text/plain",
     ) -> Self:
         return cls(
             response=PlainTextResponse(
-                content, status_code=status_code, headers=headers
+                content, status_code=status_code, headers=headers, media_type=media_type
             )
         )
 
@@ -88,13 +89,11 @@ class Response:
         status_code: int = 200,
         headers: Mapping[str, str] | None = None,
     ) -> Self:
-        return cls(
-            response=PlainTextResponse(
-                content,
-                status_code=status_code,
-                headers=headers,
-                media_type="text/html",
-            )
+        return cls.text(
+            content,
+            status_code=status_code,
+            headers=headers,
+            media_type="text/html",
         )
 
     @classmethod

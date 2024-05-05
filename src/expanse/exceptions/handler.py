@@ -4,6 +4,7 @@ from typing import Self
 
 from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
+from pydantic import ValidationError
 
 from expanse.common.configuration.config import Config
 from expanse.common.foundation.http.exceptions import HTTPException
@@ -20,7 +21,7 @@ class ExceptionHandler(ExceptionHandlerContract):
     def __init__(self, container: Container) -> None:
         self._container = container
 
-        self._dont_report: set[type[Exception]] = {HTTPException}
+        self._dont_report: set[type[Exception]] = {HTTPException, ValidationError}
 
     def report(self, e: Exception) -> None:
         if not self.should_report(e):
@@ -32,7 +33,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         pass
 
     def should_report(self, e: Exception) -> bool:
-        return e.__class__ not in self._dont_report
+        return not any(isinstance(e, klass) for klass in self._dont_report)
 
     def ignore(self, exception_class: type[Exception]) -> Self:
         self._dont_report.add(exception_class)
@@ -46,6 +47,9 @@ class ExceptionHandler(ExceptionHandlerContract):
         return self
 
     def render(self, request: Request, e: Exception) -> Response:
+        if isinstance(e, ValidationError):
+            return self._render_validation_exception(e, request)
+
         return self._render_exception_response(request, e)
 
     def render_for_console(self, output: Output, e: Exception) -> None:
@@ -101,6 +105,27 @@ class ExceptionHandler(ExceptionHandlerContract):
             status_code=e.status_code,
         )
 
+    def _render_validation_exception(
+        self, e: ValidationError, request: Request
+    ) -> Response:
+        if request.expects_json() or request.is_json():
+            content = {"code": "validation_error", "detail": []}
+
+            for error in e.errors():
+                content["detail"].append(
+                    {
+                        "loc": error["loc"],
+                        "message": error["msg"],
+                        "type": error["type"],
+                    }
+                )
+
+            return Response.json(content, status_code=422)
+
+        http_exception = HTTPException(422, str(e))
+
+        return self._render_http_exception(http_exception)
+
     def _get_http_exception_view(self, e: HTTPException) -> str | None:
         view = f"errors/{e.status_code}"
 
@@ -118,11 +143,17 @@ class ExceptionHandler(ExceptionHandlerContract):
         if config.get("app.debug", False):
             inspector = Inspector(e)
 
-            return (
-                f"{inspector.exception_name}: {inspector.exception_message} "
-                f"in {inspector.frames[-1].filename} "
-                f"at line {inspector.frames[-1].lineno}"
-            )
+            message = [f"{inspector.exception_name}: {inspector.exception_message}"]
+
+            if inspector.frames:
+                message.extend(
+                    [
+                        f"in {inspector.frames[-1].filename}",
+                        f"at line {inspector.frames[-1].lineno}",
+                    ]
+                )
+
+            return " ".join(message)
 
         return e.detail if isinstance(e, HTTPException) else "Server Error"
 

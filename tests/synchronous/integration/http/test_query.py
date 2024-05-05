@@ -1,4 +1,4 @@
-from expanse.http.query import Query
+from expanse.common.http.query import Query
 from expanse.http.response import Response
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient

@@ -9,5 +9,5 @@ from pydantic import BaseModel
 T = TypeVar("T")
 
 
-class Form(BaseModel, Generic[T]):
+class JSON(BaseModel, Generic[T]):
     data: T

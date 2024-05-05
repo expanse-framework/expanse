@@ -1,8 +1,8 @@
-from expanse.asynchronous.http.query import Query
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
-from tests.asynchronous.http.fixtures.request.models import FooModel
+from expanse.common.http.query import Query
+from tests.asynchronous.integration.http.fixtures.request.models import FooModel
 
 
 async def index(query: Query) -> Response:

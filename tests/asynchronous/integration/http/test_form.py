@@ -1,15 +1,15 @@
+from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.routing.router import Router
+from expanse.asynchronous.testing.client import TestClient
 from expanse.common.http.form import Form
-from expanse.http.response import Response
-from expanse.routing.router import Router
-from expanse.testing.client import TestClient
-from tests.synchronous.integration.http.fixtures.request.models import FooModel
+from tests.asynchronous.integration.http.fixtures.request.models import FooModel
 
 
-def create_foo(form: Form) -> Response:
+async def create_foo(form: Form) -> Response:
     return Response.json({"bar": form.fields["bar"].value})
 
 
-def create_foo_validated(form: Form[FooModel]) -> Response:
+async def create_foo_validated(form: Form[FooModel]) -> Response:
     if not form.is_valid():
         return Response.json({"errors": form.errors, "data": form.data})
 
