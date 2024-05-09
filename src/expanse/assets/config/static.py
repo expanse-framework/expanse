@@ -5,8 +5,8 @@ from pydantic import HttpUrl
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
-from expanse.common.foundation.helpers import PlaceholderPath
-from expanse.common.foundation.helpers import static_path
+from expanse.common.core.helpers import PlaceholderPath
+from expanse.common.core.helpers import static_path
 
 
 class Config(BaseSettings):

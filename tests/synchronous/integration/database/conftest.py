@@ -4,8 +4,8 @@ from typing import Any
 import pytest
 
 from expanse.contracts.database.database_manager import DatabaseManager
+from expanse.core.application import Application
 from expanse.database.database_service_provider import DatabaseServiceProvider
-from expanse.foundation.application import Application
 
 
 @pytest.fixture(autouse=True)

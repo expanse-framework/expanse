@@ -1,7 +1,7 @@
 from httpx import BaseTransport
 from httpx import Client as BaseClient
 
-from expanse.common.foundation.application import Application
+from expanse.common.core.application import Application
 
 
 class TestClient(BaseClient):

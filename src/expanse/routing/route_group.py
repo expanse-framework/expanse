@@ -8,7 +8,7 @@ from expanse.routing.route import Route
 
 
 if TYPE_CHECKING:
-    from expanse.foundation.http.middleware.middleware import Middleware
+    from expanse.core.http.middleware.middleware import Middleware
     from expanse.routing.router import Router
     from expanse.types.routing import Endpoint
 

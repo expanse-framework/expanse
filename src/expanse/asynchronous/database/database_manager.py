@@ -13,9 +13,9 @@ from expanse.asynchronous.contracts.database.database_manager import (
     DatabaseManager as DatabaseManagerContract,
 )
 from expanse.asynchronous.contracts.database.session import Session
+from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.engine import Engine
 from expanse.asynchronous.database.session import Session as ConcreteSession
-from expanse.asynchronous.foundation.application import Application
 from expanse.database.config import DatabaseConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig

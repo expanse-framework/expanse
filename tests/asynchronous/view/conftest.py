@@ -10,7 +10,7 @@ from expanse.asynchronous.view.view_service_provider import ViewServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.asynchronous.foundation.application import Application
+    from expanse.asynchronous.core.application import Application
 
 
 @pytest.fixture(autouse=True)

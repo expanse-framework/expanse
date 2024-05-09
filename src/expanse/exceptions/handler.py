@@ -7,7 +7,7 @@ from crashtest.inspector import Inspector
 from pydantic import ValidationError
 
 from expanse.common.configuration.config import Config
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 from expanse.container.container import Container
 from expanse.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,

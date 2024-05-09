@@ -1,6 +1,6 @@
 import pytest
 
-from expanse.asynchronous.foundation.application import Application
+from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.testing.testing_command import TestingCommand
 from expanse.asynchronous.types.testing import TestingCommandHelper
 

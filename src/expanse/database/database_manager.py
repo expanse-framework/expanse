@@ -13,12 +13,12 @@ from expanse.contracts.database.connection import Connection
 from expanse.contracts.database.database_manager import (
     DatabaseManager as DatabaseManagerContract,
 )
+from expanse.core.application import Application
 from expanse.database.config import DatabaseConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig
 from expanse.database.connection import Connection as ConcreteConnection
 from expanse.database.session import Session
-from expanse.foundation.application import Application
 
 
 class DatabaseManager(DatabaseManagerContract):

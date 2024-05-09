@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 from expanse.http.middleware.cors_middleware import CorsMiddleware
 from expanse.http.response import Response
 from expanse.testing.client import TestClient

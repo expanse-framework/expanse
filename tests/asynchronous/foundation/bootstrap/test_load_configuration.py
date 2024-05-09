@@ -1,9 +1,7 @@
 import pytest
 
-from expanse.asynchronous.foundation.application import Application
-from expanse.asynchronous.foundation.bootstrap.load_configuration import (
-    LoadConfiguration,
-)
+from expanse.asynchronous.core.application import Application
+from expanse.asynchronous.core.bootstrap.load_configuration import LoadConfiguration
 from expanse.common.configuration.config import Config
 
 

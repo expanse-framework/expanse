@@ -5,11 +5,11 @@ from sqlalchemy import URL
 from sqlalchemy.util import immutabledict
 from treat.mock import Mockery
 
+from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database import database_manager
 from expanse.asynchronous.database.connection import Connection
 from expanse.asynchronous.database.database_manager import DatabaseManager
 from expanse.asynchronous.database.session import Session
-from expanse.asynchronous.foundation.application import Application
 from expanse.common.configuration.config import Config
 
 

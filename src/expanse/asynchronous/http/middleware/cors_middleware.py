@@ -1,7 +1,7 @@
 import re
 
 from expanse.asynchronous.container.container import Container
-from expanse.asynchronous.foundation.http.middleware.middleware import Middleware
+from expanse.asynchronous.core.http.middleware.middleware import Middleware
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.types.http.middleware import RequestHandler

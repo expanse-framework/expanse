@@ -15,7 +15,7 @@ import anyio.abc
 import anyio.from_thread
 import httpx
 
-from expanse.asynchronous.foundation.application import Application
+from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.types import ASGIApp
 from expanse.asynchronous.types import Message
 from expanse.common.testing.client import TestClient as BaseTestClient

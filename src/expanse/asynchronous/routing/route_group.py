@@ -8,7 +8,7 @@ from expanse.common.routing.route_group import RouteGroup as BaseRouteGroup
 
 
 if TYPE_CHECKING:
-    from expanse.asynchronous.foundation.http.middleware.middleware import Middleware
+    from expanse.asynchronous.core.http.middleware.middleware import Middleware
     from expanse.asynchronous.routing.router import Router
     from expanse.asynchronous.types.routing import Endpoint
 

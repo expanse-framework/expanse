@@ -1,0 +1,52 @@
+from typing import Any
+from typing import ClassVar
+
+from cleo.helpers import option
+from cleo.io.inputs.option import Option
+
+from expanse.console.commands.command import Command
+from expanse.core.application import Application
+
+
+class ServeCommand(Command):
+    name: str = "serve"
+
+    options: ClassVar[list[Option]] = [
+        option("--port", flag=False, default=8000),
+        option("watch"),
+    ]
+
+    def handle(self, app: Application) -> int:
+        import uvicorn
+
+        log_level: str = "info"
+        if self.io.is_verbose():
+            log_level = "debug"
+
+        parameters: dict[str, Any] = {
+            "port": self.option("port"),
+            "interface": "wsgi",
+            "log_level": log_level,
+            "reload": self.option("watch"),
+            "use_colors": self.io.is_decorated(),
+        }
+
+        if self.option("watch"):
+            parameters["reload_dirs"] = [
+                app.base_path,
+                app.config_path,
+                app.base_path.joinpath("routes"),
+            ]
+
+        config = uvicorn.Config("app.app:app", **parameters)
+        server = uvicorn.Server(config)
+
+        if self.option("watch"):
+            from uvicorn.supervisors import ChangeReload
+
+            sock = config.bind_socket()
+            ChangeReload(config, target=server.run, sockets=[sock]).run()
+        else:
+            server.run()
+
+        return 0

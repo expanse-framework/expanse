@@ -1,6 +1,6 @@
 # ruff: noqa: I002
 
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 from expanse.support.service_provider import ServiceProvider
 from expanse.view.view_factory import ViewFactory
 from expanse.view.view_finder import ViewFinder

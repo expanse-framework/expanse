@@ -16,7 +16,7 @@ from expanse.console.commands.command import Command
 if TYPE_CHECKING:
     from cleo.events.event import Event
 
-    from expanse.foundation.application import Application as Expanse
+    from expanse.core.application import Application as Expanse
 
 
 class Application(BaseApplication):

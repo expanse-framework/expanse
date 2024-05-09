@@ -12,7 +12,7 @@ from baize.wsgi.responses import PlainTextResponse
 from baize.wsgi.responses import Response as BaizeResponse
 from baize.wsgi.responses import SmallResponse as BaizeSmallResponse
 
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 
 
 if TYPE_CHECKING:

@@ -11,7 +11,7 @@ class ServiceProvidersList(BaseServiceProvidersList[ServiceProvider]):
     def default(cls) -> Self:
         return cls(
             [
-                "expanse.foundation.console.providers.command_service_provider.CommandServiceProvider",
+                "expanse.core.console.providers.command_service_provider.CommandServiceProvider",
                 "expanse.database.database_service_provider.DatabaseServiceProvider",
                 "expanse.view.view_service_provider.ViewServiceProvider",
                 "expanse.static.static_service_provider.StaticServiceProvider",

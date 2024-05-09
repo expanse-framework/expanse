@@ -1,6 +1,6 @@
 from typing import Self
 
-from expanse.asynchronous.foundation.http.middleware.middleware import Middleware
+from expanse.asynchronous.core.http.middleware.middleware import Middleware
 from expanse.asynchronous.types.routing import Endpoint
 from expanse.common.routing.route import Route as BaseRoute
 

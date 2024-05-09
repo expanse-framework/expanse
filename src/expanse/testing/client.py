@@ -3,7 +3,7 @@ import contextlib
 import httpx
 
 from expanse.common.testing.client import TestClient as BaseTestClient
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 
 
 class TestClient(BaseTestClient):

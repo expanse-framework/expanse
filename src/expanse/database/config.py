@@ -8,7 +8,7 @@ from pydantic import Field
 from pydantic import RootModel
 from pydantic_settings import SettingsConfigDict
 
-from expanse.common.foundation.helpers import PlaceholderPath
+from expanse.common.core.helpers import PlaceholderPath
 
 
 class PoolConfig(BaseModel):
@@ -30,9 +30,9 @@ class SQLiteConfig(PoolConfig, BaseModel):
 
 class PostgreSQLConfig(PoolConfig, BaseModel):
     driver: Literal["postgresql"] = "postgresql"
-    dbapi: Literal[
-        "psycopg", "psycopg2", "pg8000", "psycopg_async", "asyncpg"
-    ] | None = None
+    dbapi: (
+        Literal["psycopg", "psycopg2", "pg8000", "psycopg_async", "asyncpg"] | None
+    ) = None
     url: AnyUrl | None = None
     host: str | None = None
     port: int = 5432

@@ -4,7 +4,7 @@ from typing import NoReturn
 
 from baize.wsgi.responses import Response as BaizeResponse
 
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 from expanse.common.http.form import Form
 from expanse.common.http.json import JSON
 from expanse.common.http.query import Query
@@ -13,9 +13,9 @@ from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
 from expanse.common.routing.route_matcher import RouteMatcher
 from expanse.container.container import Container
-from expanse.foundation.application import Application
-from expanse.foundation.http.middleware.middleware import Middleware
-from expanse.foundation.http.middleware.middleware_stack import MiddlewareStack
+from expanse.core.application import Application
+from expanse.core.http.middleware.middleware import Middleware
+from expanse.core.http.middleware.middleware_stack import MiddlewareStack
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.route import Route

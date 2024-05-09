@@ -7,7 +7,7 @@ from cleo.commands.command import Command as BaseCommand
 
 
 if TYPE_CHECKING:
-    from expanse.foundation.application import Application as Expanse
+    from expanse.core.application import Application as Expanse
 
 
 class Command(BaseCommand):

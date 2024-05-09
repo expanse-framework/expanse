@@ -1,8 +1,8 @@
 import pytest
 
 from expanse.common.configuration.config import Config
-from expanse.foundation.application import Application
-from expanse.foundation.bootstrap.load_configuration import LoadConfiguration
+from expanse.core.application import Application
+from expanse.core.bootstrap.load_configuration import LoadConfiguration
 
 
 @pytest.fixture()

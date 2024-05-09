@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from expanse.asynchronous.console.commands.command import Command
-from expanse.asynchronous.foundation.application import Application
-from expanse.asynchronous.foundation.console.kernel import Kernel
+from expanse.asynchronous.core.application import Application
+from expanse.asynchronous.core.console.kernel import Kernel
 from expanse.asynchronous.types.testing import TestingCommandHelper
 
 

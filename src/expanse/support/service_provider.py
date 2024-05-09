@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from expanse.foundation.application import Application
+    from expanse.core.application import Application
 
 
 class ServiceProvider:
@@ -15,4 +15,3 @@ class ServiceProvider:
         """
         Register any application services.
         """
-        ...

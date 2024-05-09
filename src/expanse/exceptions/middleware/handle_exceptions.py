@@ -1,6 +1,6 @@
 from expanse.container.container import Container
 from expanse.contracts.debug.exception_handler import ExceptionHandler
-from expanse.foundation.http.middleware.middleware import Middleware
+from expanse.core.http.middleware.middleware import Middleware
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.types.http.middleware import RequestHandler

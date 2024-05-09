@@ -4,8 +4,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
-from expanse.common.foundation.helpers import PlaceholderPath
-from expanse.common.foundation.helpers import resource_path
+from expanse.common.core.helpers import PlaceholderPath
+from expanse.common.core.helpers import resource_path
 
 
 class Config(BaseSettings):

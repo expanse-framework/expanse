@@ -4,11 +4,9 @@ from typing import NoReturn
 from baize.asgi.responses import Response as BaizeResponse
 
 from expanse.asynchronous.container.container import Container
-from expanse.asynchronous.foundation.application import Application
-from expanse.asynchronous.foundation.http.middleware.middleware import Middleware
-from expanse.asynchronous.foundation.http.middleware.middleware_stack import (
-    MiddlewareStack,
-)
+from expanse.asynchronous.core.application import Application
+from expanse.asynchronous.core.http.middleware.middleware import Middleware
+from expanse.asynchronous.core.http.middleware.middleware_stack import MiddlewareStack
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.route import Route
@@ -18,7 +16,7 @@ from expanse.asynchronous.types import Receive
 from expanse.asynchronous.types import Scope
 from expanse.asynchronous.types import Send
 from expanse.asynchronous.types.routing import Endpoint
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 from expanse.common.http.form import Form
 from expanse.common.http.json import JSON
 from expanse.common.http.query import Query

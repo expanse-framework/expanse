@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 from expanse.testing.client import TestClient
 
 

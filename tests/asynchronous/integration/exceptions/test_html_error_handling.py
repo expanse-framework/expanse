@@ -1,7 +1,7 @@
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 
 
 async def error() -> Response:

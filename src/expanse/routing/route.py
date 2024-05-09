@@ -1,7 +1,7 @@
 from typing import Self
 
 from expanse.common.routing.route import Route as BaseRoute
-from expanse.foundation.http.middleware.middleware import Middleware
+from expanse.core.http.middleware.middleware import Middleware
 from expanse.types.routing import Endpoint
 
 

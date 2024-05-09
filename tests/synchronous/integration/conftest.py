@@ -1,6 +1,6 @@
 import pytest
 
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 from expanse.testing.testing_command import TestingCommand
 from expanse.types.testing import TestingCommandHelper
 

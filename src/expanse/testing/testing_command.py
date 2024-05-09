@@ -1,7 +1,7 @@
 from cleo.io.outputs.buffered_output import BufferedOutput
 
-from expanse.foundation.application import Application
-from expanse.foundation.console.kernel import Kernel
+from expanse.core.application import Application
+from expanse.core.console.kernel import Kernel
 
 
 class TestingCommand:

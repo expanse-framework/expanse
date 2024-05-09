@@ -7,10 +7,10 @@ from sqlalchemy.util import immutabledict
 from treat.mock import Mockery
 
 from expanse.common.configuration.config import Config
+from expanse.core.application import Application
 from expanse.database import database_manager
 from expanse.database.connection import Connection
 from expanse.database.database_manager import DatabaseManager
-from expanse.foundation.application import Application
 
 
 @pytest.fixture()

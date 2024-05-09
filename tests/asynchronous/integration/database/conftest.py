@@ -4,10 +4,10 @@ from typing import Any
 import pytest
 
 from expanse.asynchronous.contracts.database.database_manager import DatabaseManager
+from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.database_service_provider import (
     DatabaseServiceProvider,
 )
-from expanse.asynchronous.foundation.application import Application
 
 
 @pytest.fixture(autouse=True)

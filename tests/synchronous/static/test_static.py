@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from expanse.foundation.application import Application
+from expanse.core.application import Application
 from expanse.static.static import Static
 
 

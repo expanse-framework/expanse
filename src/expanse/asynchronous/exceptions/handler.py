@@ -16,7 +16,7 @@ from expanse.asynchronous.contracts.debug.exception_renderer import ExceptionRen
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.common.configuration.config import Config
-from expanse.common.foundation.http.exceptions import HTTPException
+from expanse.common.core.http.exceptions import HTTPException
 
 
 logger = logging.getLogger(__name__)

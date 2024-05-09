@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from cleo.events.event import Event
 
     from expanse.asynchronous.console._adapters.command import Command as AdapterCommand
-    from expanse.asynchronous.foundation.application import Application as Expanse
+    from expanse.asynchronous.core.application import Application as Expanse
 
 
 class Application(BaseApplication):
