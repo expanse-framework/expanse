@@ -3,9 +3,14 @@ import uuid
 
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 from expanse.container.container import Container
+
+
+class Something:
+    ...
 
 
 class Abstract(ABC):
@@ -13,10 +18,58 @@ class Abstract(ABC):
     def foo(self) -> str:
         ...
 
+    @abstractmethod
+    def run(self, foo: str, bar: str, baz: str | None = None) -> tuple[str, str, str]:
+        ...
+
+    @abstractmethod
+    def run2(
+        self, something: Something, foo: str, bar: str, baz: str | None = None
+    ) -> tuple[str, str, str]:
+        ...
+
+    @abstractmethod
+    def run3(
+        self,
+        something: Something,
+        foo: str,
+        callback: Callable[[int], int],
+        bar: str,
+        baz: str | None = None,
+    ) -> tuple[str, int, str, str]:
+        ...
+
 
 class Concrete(Abstract):
     def foo(self) -> str:
         return f"bar {id(self)}"
+
+    def run(self, foo: str, bar: str, baz: str | None = None) -> tuple[str, str, str]:
+        return foo, bar, baz
+
+    def run2(
+        self, something: Something, foo: str, bar: str, baz: str | None = None
+    ) -> tuple[str, str, str]:
+        return foo, bar, baz
+
+    def run3(
+        self,
+        something: Something,
+        foo: str,
+        callback: Callable[[int], int],
+        bar: str,
+        baz: str | None = None,
+    ) -> tuple[str, int, str, str]:
+        return foo, callback(3), bar, baz
+
+
+class Foo:
+    def __init__(self, concrete: Abstract) -> None:
+        self.concrete = concrete
+        self._id = str(uuid.uuid4())
+
+    def get_id(self) -> str:
+        return self._id
 
 
 def test_singleton_returns_same_instance() -> None:
@@ -103,3 +156,67 @@ def test_scoped_container_can_resolve_base_container_dependencies() -> None:
     result = scoped.make(Abstract)
 
     assert isinstance(result, Concrete)
+
+
+def test_call_resolves_dependencies_and_parameters_if_parameters_only() -> None:
+    container = Container()
+    container.singleton(Abstract, Concrete)
+
+    concrete = container.make(Abstract)
+
+    result = container.call(concrete.run, "foo", "bar")
+    assert result == ("foo", "bar", None)
+
+    result = container.call(concrete.run, "foo", "bar", baz="baz")
+    assert result == ("foo", "bar", "baz")
+
+
+def test_call_resolves_deps_and_params_with_mix_of_deps_and_params() -> None:
+    container = Container()
+    container.singleton(Abstract, Concrete)
+    container.singleton(Something)
+
+    concrete = container.make(Abstract)
+
+    result = container.call(concrete.run2, "foo", "bar")
+    assert result == ("foo", "bar", None)
+
+    result = container.call(concrete.run2, "foo", "bar", baz="baz")
+    assert result == ("foo", "bar", "baz")
+
+
+def test_call_resolves_dependencies_and_parameters_with_any_parameter_type() -> None:
+    container = Container()
+    container.singleton(Abstract, Concrete)
+    container.singleton(Something)
+
+    def callback(i: int) -> int:
+        return i
+
+    concrete = container.make(Abstract)
+
+    result = container.call(concrete.run3, "foo", callback, "bar")
+    assert result == ("foo", 3, "bar", None)
+
+    result = container.call(concrete.run3, "foo", callback, "bar", baz="baz")
+    assert result == ("foo", 3, "bar", "baz")
+
+
+def test_call_can_call_instance_methods() -> None:
+    container = Container()
+    container.instance(Container, container)
+    container.bind(Abstract, Concrete)
+
+    id1 = container.call(Foo.get_id)
+
+    assert isinstance(id1, str)
+
+    id2 = container.call(Foo.get_id)
+
+    assert isinstance(id2, str)
+    assert id1 != id2
+
+    container.singleton(Foo)
+    container.make(Foo)
+
+    assert container.call(Foo.get_id) == container.call(Foo.get_id)

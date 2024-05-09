@@ -75,6 +75,21 @@ class Container(BaseContainer):
     def call(
         self, callable: Callable[..., ReturnType], *args: Any, **kwargs: Any
     ) -> ReturnType:
+        if (
+            isinstance(callable, types.FunctionType)
+            and "." in callable.__qualname__
+            and not inspect.ismethod(callable)
+            and "<locals>" not in callable.__qualname__
+        ):
+            # We have an instance method, so we will retrieve the corresponding class,
+            # resolve it and call the method.
+            class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
+            class_: type = callable.__globals__[class_name]
+
+            instance = self.make(class_)
+
+            callable = getattr(instance, func_name)
+
         (
             positional,
             keywords,

@@ -63,6 +63,15 @@ class Concrete(Abstract):
         return foo, callback(3), bar, baz
 
 
+class Foo:
+    def __init__(self, concrete: Abstract) -> None:
+        self.concrete = concrete
+        self._id = str(uuid.uuid4())
+
+    def get_id(self) -> str:
+        return self._id
+
+
 async def test_singleton_returns_same_instance() -> None:
     """
     Singletons should return the same instance.
@@ -177,7 +186,7 @@ async def test_call_resolves_dependencies_and_parameters_if_parameters_only() ->
     assert result == ("foo", "bar", "baz")
 
 
-async def test_call_resolves_dependencies_and_parameters_with_mix_of_dependencies_and_parameters() -> None:  # noqa: E501
+async def test_call_resolves_deps_and_params_with_mix_of_deps_and_params() -> None:
     container = Container()
     container.singleton(Abstract, Concrete)
     container.singleton(Something)
@@ -191,7 +200,9 @@ async def test_call_resolves_dependencies_and_parameters_with_mix_of_dependencie
     assert result == ("foo", "bar", "baz")
 
 
-async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type() -> None:  # noqa: E501
+async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type() -> (
+    None
+):
     container = Container()
     container.singleton(Abstract, Concrete)
     container.singleton(Something)
@@ -206,3 +217,23 @@ async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type
 
     result = await container.call(concrete.run3, "foo", callback, "bar", baz="baz")
     assert result == ("foo", 3, "bar", "baz")
+
+
+async def test_call_can_call_instance_methods() -> None:
+    container = Container()
+    container.instance(Container, container)
+    container.bind(Abstract, Concrete)
+
+    id1 = await container.call(Foo.get_id)
+
+    assert isinstance(id1, str)
+
+    id2 = await container.call(Foo.get_id)
+
+    assert isinstance(id2, str)
+    assert id1 != id2
+
+    container.singleton(Foo)
+    await container.make(Foo)
+
+    assert (await container.call(Foo.get_id)) == (await container.call(Foo.get_id))
