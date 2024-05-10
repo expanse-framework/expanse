@@ -1,5 +1,7 @@
 import logging
 
+from contextlib import AbstractContextManager
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from typing import Self
@@ -27,6 +29,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         self._container = container
 
         self._dont_report: set[type[Exception]] = {HTTPException, ValidationError}
+        self._raise_unhandled_exceptions: bool = False
 
     async def report(self, e: Exception) -> None:
         if not await self.should_report(e):
@@ -36,7 +39,8 @@ class ExceptionHandler(ExceptionHandlerContract):
 
     async def _report_exception(self, e: Exception) -> None:
         # TODO: Better logging handling
-        ...
+        if self._raise_unhandled_exceptions:
+            raise e
 
     async def should_report(self, e: Exception) -> bool:
         return not any(isinstance(e, klass) for klass in self._dont_report)
@@ -196,3 +200,14 @@ class ExceptionHandler(ExceptionHandlerContract):
         self._dont_report |= set(e)
 
         return self
+
+    @contextmanager
+    def raise_unhandled_exceptions(
+        self, raise_exceptions: bool = True
+    ) -> AbstractContextManager[None]:
+        original_value = self._raise_unhandled_exceptions
+        self._raise_unhandled_exceptions = raise_exceptions
+
+        yield
+
+        self._raise_unhandled_exceptions = original_value

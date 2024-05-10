@@ -15,8 +15,8 @@ import anyio.abc
 import anyio.from_thread
 import httpx
 
+from expanse.asynchronous.contracts.debug.exception_handler import ExceptionHandler
 from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.types import ASGIApp
 from expanse.asynchronous.types import Message
 from expanse.common.testing.client import TestClient as BaseTestClient
 
@@ -32,7 +32,7 @@ class _AsyncBackend(TypedDict):
 class _TestClientTransport(httpx.BaseTransport):
     def __init__(
         self,
-        app: ASGIApp,
+        app: Application,
         portal_factory: _PortalFactoryType,
         root_path: str = "",
         raise_server_exceptions: bool = False,
@@ -155,13 +155,11 @@ class _TestClientTransport(httpx.BaseTransport):
                 template = message["info"]["template"]
                 context = message["info"]["context"]
 
-        try:
-            with self.portal_factory() as portal:
-                response_complete = portal.call(anyio.Event)
+        with self.portal_factory() as portal:
+            response_complete = portal.call(anyio.Event)
+            handler: ExceptionHandler = portal.call(self.app.make, ExceptionHandler)
+            with handler.raise_unhandled_exceptions(self.raise_server_exceptions):
                 portal.call(self.app, scope, receive, send)
-        except BaseException as exc:
-            if self.raise_server_exceptions:
-                raise exc
 
         if self.raise_server_exceptions:
             assert response_started, "TestClient did not receive any response."
@@ -181,7 +179,7 @@ class _TestClientTransport(httpx.BaseTransport):
         return response
 
 
-class TestClient(BaseTestClient):
+class TestClient(BaseTestClient[Application]):
     def __init__(
         self,
         app: Application,
@@ -192,6 +190,7 @@ class TestClient(BaseTestClient):
         headers: dict[str, str] | None = None,
         raise_server_exceptions: bool = False,
     ) -> None:
+        self._transport: _TestClientTransport | None = None
         self.app = app
         self.async_backend = _AsyncBackend(
             backend=backend, backend_options=backend_options or {}
@@ -211,11 +210,14 @@ class TestClient(BaseTestClient):
 
     @property
     def transport(self) -> _TestClientTransport:
-        return _TestClientTransport(
-            self.app,
-            portal_factory=self._portal_factory,
-            raise_server_exceptions=self.raise_server_exceptions,
-        )
+        if self._transport is None:
+            self._transport = _TestClientTransport(
+                self.app,
+                portal_factory=self._portal_factory,
+                raise_server_exceptions=self.raise_server_exceptions,
+            )
+
+        return self._transport
 
     @contextlib.contextmanager
     def _portal_factory(self) -> Generator[anyio.abc.BlockingPortal, None, None]:

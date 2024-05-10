@@ -29,5 +29,5 @@ def router(app: Application) -> Router:
 
 @pytest.fixture()
 def client(app: Application) -> TestClient:
-    with TestClient(app=app) as client:
+    with TestClient(app=app, raise_server_exceptions=True) as client:
         yield client

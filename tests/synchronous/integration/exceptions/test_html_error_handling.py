@@ -17,7 +17,8 @@ def test_unhandled_exceptions_are_displayed_with_debug_information_if_debug_mode
 ) -> None:
     router.get("/error", error)
 
-    response = client.get("/error")
+    with client.handle_exceptions():
+        response = client.get("/error")
 
     assert response.status_code == 500
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
@@ -31,7 +32,8 @@ def test_unhandled_exceptions_are_displayed_with_basic_information_if_not_debug_
 
     router.get("/error", error)
 
-    response = client.get("/error")
+    with client.handle_exceptions():
+        response = client.get("/error")
 
     assert response.status_code == 500
     assert response.headers["Content-Type"] == "text/html; charset=utf-8"
