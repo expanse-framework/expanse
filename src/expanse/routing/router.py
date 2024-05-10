@@ -44,11 +44,6 @@ class Router:
         for group in groups:
             self.add_group(group)
 
-    def url(self, path: str, /, **parameters: Any) -> URLPath:
-        matcher = self._app.make(RouteMatcher)
-
-        return matcher.url(path, **parameters)
-
     def get(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         route = Route.get(path, endpoint, name=name)
         self.add_route(route)
@@ -105,7 +100,9 @@ class Router:
 
         return group
 
-    def route(self, name: str, /, **parameters: Any) -> URLPath:
+    def route(self, name: str, parameters: dict[str, Any] | None = None) -> URLPath:
+        parameters = parameters or {}
+
         for route in self._routes:
             if route.name == name:
                 matcher = self._app.make(RouteMatcher)
@@ -120,6 +117,13 @@ class Router:
                     return matcher.url(route.path, **parameters)
 
         raise RouteNotFound(f"Route [{name}] is not defined")
+
+    def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
+        matcher = self._app.make(RouteMatcher)
+
+        parameters = parameters or {}
+
+        return matcher.url(path, **parameters)
 
     def _search(self, environ: Environ) -> WSGIApp:
         matcher = self._app.make(RouteMatcher)

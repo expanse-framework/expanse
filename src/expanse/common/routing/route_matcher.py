@@ -1,6 +1,7 @@
 import math
 import re
 import typing
+import urllib.parse
 import uuid
 
 from dataclasses import dataclass
@@ -202,6 +203,10 @@ class RouteMatcher:
                 value = convertor.to_string(value)
                 path_format = path_format.replace("{" + key + "}", value)
                 parameters.pop(key)
+
+        if parameters:
+            # If we still have parameters, convert them to a query string
+            path_format += f"?{urllib.parse.urlencode(parameters)}"
 
         return URLPath(path_format)
 

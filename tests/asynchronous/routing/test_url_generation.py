@@ -18,7 +18,7 @@ from expanse.common.routing.exceptions import NotEnoughURLParameters
 async def test_url_generation(
     router: Router, path: str, parameters: dict[str, Any], expected: str
 ) -> None:
-    assert await router.url(path, **parameters) == expected
+    assert await router.url(path, parameters) == expected
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ async def test_url_generation_with_missing_parameters(
     router: Router, path: str, parameters: dict[str, Any], expected: str
 ) -> None:
     with pytest.raises(NotEnoughURLParameters) as e:
-        await router.url(path, **parameters)
+        await router.url(path, parameters)
 
     assert str(e.value) == expected
 
@@ -64,4 +64,4 @@ async def test_route_url_generation(
     router.get("/foo", lambda: Response.text("foo"), name="foo")
     router.get("/foo/{bar}", lambda: Response.text("foo"), name="foo.bar")
     router.get("/foo/{bar}/{baz:int}", lambda: Response.text("foo"), name="foo.bar.baz")
-    assert await router.route(path, **parameters) == expected
+    assert await router.route(path, parameters) == expected

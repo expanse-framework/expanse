@@ -44,11 +44,6 @@ class Router:
         for group in groups:
             self.add_group(group)
 
-    async def url(self, path: str, /, **parameters: Any) -> URLPath:
-        matcher = await self._app.make(RouteMatcher)
-
-        return matcher.url(path, **parameters)
-
     def get(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         route = Route.get(path, endpoint, name=name)
         self.add_route(route)
@@ -105,7 +100,11 @@ class Router:
 
         return group
 
-    async def route(self, name: str, /, **parameters: Any) -> URLPath:
+    async def route(
+        self, name: str, parameters: dict[str, Any] | None = None
+    ) -> URLPath:
+        parameters = parameters or {}
+
         for route in self._routes:
             if route.name == name:
                 matcher = await self._app.make(RouteMatcher)
@@ -113,6 +112,13 @@ class Router:
                 return matcher.url(route.path, **parameters)
 
         raise RouteNotFound(f"Route [{name}] is not defined")
+
+    async def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
+        matcher = await self._app.make(RouteMatcher)
+
+        parameters = parameters or {}
+
+        return matcher.url(path, **parameters)
 
     async def _search(self, scope: Scope) -> ASGIApp:
         matcher = await self._app.make(RouteMatcher)
