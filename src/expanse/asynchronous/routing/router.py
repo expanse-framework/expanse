@@ -1,8 +1,6 @@
 from typing import Any
 from typing import NoReturn
 
-from baize.asgi.responses import Response as BaizeResponse
-
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.core.http.middleware.middleware import Middleware
@@ -150,7 +148,7 @@ class Router:
             request = Request(scope, receive, send)
             async with self._app.create_scoped_container():
                 response = await self._handle_routed_request(route, request)
-                app = await self._adapt_response(response)
+                app = await self._response_to_asgi_app(response)
 
                 return await app(scope, receive, send)
 
@@ -166,14 +164,14 @@ class Router:
             response = await self._handle_request(
                 request, self._app._default_middlewares, endpoint
             )
-            app = await self._adapt_response(response)
+            app = await self._response_to_asgi_app(response)
 
             return await app(scope, receive, send)
 
         return wrapper
 
-    async def _handle_routed_request(self, route: Route, request: Request) -> Response:
-        async def endpoint_wrapper(container: Container) -> Response:
+    async def _handle_routed_request(self, route: Route, request: Request) -> Any:
+        async def endpoint_wrapper(container: Container) -> Any:
             if route.methods and request.method not in route.methods:
                 headers = {"Allow": ", ".join(route.methods)}
 
@@ -219,14 +217,8 @@ class Router:
 
             return await stack.handle(endpoint, *args)
 
-    async def _adapt_response(self, response: Any) -> ASGIApp:
-        if isinstance(response, BaizeResponse):
-            return response
-
-        if isinstance(response, Response):
-            return response.response
-
-        raise ValueError(f"Cannot adapt type {type(response)} to a valid response")
+    async def _response_to_asgi_app(self, response: Response) -> ASGIApp:
+        return response.response
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         app = await self._search(scope)

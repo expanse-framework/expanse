@@ -180,10 +180,12 @@ class Application(BaseApplication, Container):
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     async def _register_base_service_providers(self) -> None:
+        from expanse.asynchronous.http.http_service_provider import HTTPServiceProvider
         from expanse.asynchronous.routing.routing_service_provider import (
             RoutingServiceProvider,
         )
 
+        await self.register(HTTPServiceProvider(self))
         await self.register(RoutingServiceProvider(self))
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

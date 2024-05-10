@@ -13,6 +13,11 @@ class Something:
     ...
 
 
+class AnotherThing:
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+
 class Abstract(ABC):
     @abstractmethod
     def foo(self) -> str:
@@ -32,11 +37,12 @@ class Abstract(ABC):
     def run3(
         self,
         something: Something,
+        another_thing: AnotherThing,
         foo: str,
         callback: Callable[[int], int],
         bar: str,
         baz: str | None = None,
-    ) -> tuple[str, int, str, str]:
+    ) -> tuple[str, str, int, str, str]:
         ...
 
 
@@ -55,12 +61,13 @@ class Concrete(Abstract):
     def run3(
         self,
         something: Something,
+        another_thing: AnotherThing,
         foo: str,
         callback: Callable[[int], int],
         bar: str,
         baz: str | None = None,
-    ) -> tuple[str, int, str, str]:
-        return foo, callback(3), bar, baz
+    ) -> tuple[str, str, int, str, str]:
+        return foo, another_thing.value, callback(3), bar, baz
 
 
 class Foo:
@@ -212,11 +219,15 @@ async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type
 
     concrete = await container.make(Abstract)
 
-    result = await container.call(concrete.run3, "foo", callback, "bar")
-    assert result == ("foo", 3, "bar", None)
+    result = await container.call(
+        concrete.run3, AnotherThing("Value 1"), "foo", callback, "bar"
+    )
+    assert result == ("foo", "Value 1", 3, "bar", None)
 
-    result = await container.call(concrete.run3, "foo", callback, "bar", baz="baz")
-    assert result == ("foo", 3, "bar", "baz")
+    result = await container.call(
+        concrete.run3, AnotherThing("Value 2"), "foo", callback, "bar", baz="baz"
+    )
+    assert result == ("foo", "Value 2", 3, "bar", "baz")
 
 
 async def test_call_can_call_instance_methods() -> None:

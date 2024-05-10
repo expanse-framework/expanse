@@ -179,8 +179,10 @@ class Application(BaseApplication, Container):
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     def _register_base_service_providers(self) -> None:
+        from expanse.http.http_service_provider import HTTPServiceProvider
         from expanse.routing.routing_service_provider import RoutingServiceProvider
 
+        self.register(HTTPServiceProvider(self))
         self.register(RoutingServiceProvider(self))
 
     def __call__(

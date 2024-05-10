@@ -2,8 +2,6 @@ from collections.abc import Iterable
 from typing import Any
 from typing import NoReturn
 
-from baize.wsgi.responses import Response as BaizeResponse
-
 from expanse.common.core.http.exceptions import HTTPException
 from expanse.common.http.form import Form
 from expanse.common.http.json import JSON
@@ -158,7 +156,7 @@ class Router:
             with self._app.create_scoped_container():
                 response = self._handle_routed_request(route, request)
 
-                return self._adapt_response(response)(environ, start_response)
+                return self._response_as_wsgi_app(response)(environ, start_response)
 
         return wrapper
 
@@ -173,11 +171,11 @@ class Router:
                 request, self._app._default_middlewares, endpoint
             )
 
-            return self._adapt_response(response)(environ, start_response)
+            return self._response_as_wsgi_app(response)(environ, start_response)
 
         return wrapper
 
-    def _handle_routed_request(self, route: Route, request: Request) -> Response:
+    def _handle_routed_request(self, route: Route, request: Request) -> Any:
         def endpoint_wrapper(container: Container) -> Response:
             if route.methods and request.method not in route.methods:
                 headers = {"Allow": ", ".join(route.methods)}
@@ -225,14 +223,8 @@ class Router:
 
             return stack.handle(endpoint, *args)
 
-    def _adapt_response(self, response: Any) -> WSGIApp:
-        if isinstance(response, BaizeResponse):
-            return response
-
-        if isinstance(response, Response):
-            return response.response
-
-        raise ValueError(f"Cannot adapt type {type(response)} to a valid response")
+    def _response_as_wsgi_app(self, response: Response) -> WSGIApp:
+        return response.response
 
     def __call__(
         self, environ: Environ, start_response: StartResponse

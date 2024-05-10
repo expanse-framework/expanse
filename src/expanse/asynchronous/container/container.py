@@ -309,7 +309,21 @@ class Container(BaseContainer):
 
                 assert klass is not None
 
-                result = await self.make(self._get_alias(klass))
+                if self.has(self._get_alias(klass)):
+                    result = await self.make(self._get_alias(klass))
+                else:
+                    try:
+                        result = await self.make(self._get_alias(klass))
+                    except Exception as e:
+                        if not args:
+                            raise e
+
+                        arg = args[0]
+
+                        if not isinstance(arg, klass):
+                            raise e
+
+                        result = args.pop(0)
 
                 positional.append(result)
                 return
@@ -323,7 +337,21 @@ class Container(BaseContainer):
 
                     assert klass is not None
 
-                    result = await self.make(self._get_alias(klass))
+                    if self.has(self._get_alias(klass)):
+                        result = await self.make(self._get_alias(klass))
+                    else:
+                        try:
+                            result = await self.make(self._get_alias(klass))
+                        except Exception as e:
+                            if not args:
+                                raise e
+
+                            arg = args[0]
+
+                            if not isinstance(arg, klass):
+                                raise e
+
+                            result = args.pop(0)
 
                     positional.append(result)
 

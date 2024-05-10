@@ -1,5 +1,7 @@
 from abc import ABC
 from abc import abstractmethod
+from contextlib import AbstractContextManager
+from contextlib import contextmanager
 
 from cleo.io.outputs.output import Output
 
@@ -44,5 +46,18 @@ class ExceptionHandler(ABC):
 
         :param output: the output to render the exception to
         :param e: The exception to render
+        """
+        ...
+
+    @abstractmethod
+    @contextmanager
+    def raise_unhandled_exceptions(
+        self, raise_exceptions: bool = True
+    ) -> AbstractContextManager[None]:
+        """
+        Temporarily enable/disable raising unhandled exceptions.
+        This is mainly useful for debugging purposes.
+
+        :param raise_exceptions: Whether unhandled exceptions should be raised.
         """
         ...

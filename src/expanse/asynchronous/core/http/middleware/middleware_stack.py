@@ -1,11 +1,13 @@
 from collections.abc import Awaitable
 from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.core.http.middleware.middleware import Middleware
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.http.response_adapter import ResponseAdapter
 from expanse.asynchronous.types.http.middleware import RequestHandler
 from expanse.asynchronous.types.routing import Endpoint
 
@@ -23,7 +25,18 @@ class MiddlewareStack:
 
     async def _build_stack(self, endpoint: Endpoint, *parameters) -> RequestHandler:
         async def endpoint_call(_: Request) -> Response:
-            return await self._container.call(endpoint, *parameters)
+            response: Any = await self._container.call(endpoint, *parameters)
+            print(response)
+
+            if isinstance(response, Response):
+                return response
+
+            print((await self._container.make(ResponseAdapter)).adapter(response))
+
+            return await self._container.call(
+                (await self._container.make(ResponseAdapter)).adapter(response),
+                response,
+            )
 
         stack = endpoint_call
 
