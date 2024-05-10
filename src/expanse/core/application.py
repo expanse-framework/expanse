@@ -56,12 +56,12 @@ class Application(BaseApplication, Container):
         Container.__init__(self)
 
         self._service_providers: list[ServiceProvider] = []
-        self._default_bootstrappers: list[
-            type[Bootstrapper]
-        ] = self.__class__._bootstrappers.copy()
-        self._default_middlewares: list[
-            type[Middleware]
-        ] = self.__class__._middleware.copy()
+        self._default_bootstrappers: list[type[Bootstrapper]] = (
+            self.__class__._bootstrappers.copy()
+        )
+        self._default_middlewares: list[type[Middleware]] = (
+            self.__class__._middleware.copy()
+        )
 
         self._bind_paths()
         self._register_base_bindings()

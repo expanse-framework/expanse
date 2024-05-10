@@ -32,8 +32,7 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., ...]
 
 
-class UnboundAbstractError(Exception):
-    ...
+class UnboundAbstractError(Exception): ...
 
 
 class Container(ABC):
@@ -45,9 +44,9 @@ class Container(ABC):
 
         self._scoped_bindings: dict[str, Any] = {}
 
-        self._after_resolving_callbacks: dict[
-            str | type, list[_Callback]
-        ] = defaultdict(list)
+        self._after_resolving_callbacks: dict[str | type, list[_Callback]] = (
+            defaultdict(list)
+        )
 
         self._terminating_callbacks: list[_Callback] = []
 
@@ -101,8 +100,7 @@ class Container(ABC):
             self._terminating_callbacks.append(callback)
 
     @abstractmethod
-    def create_scoped_container(self) -> Self:
-        ...
+    def create_scoped_container(self) -> Self: ...
 
     def has_scoped_bindings(self) -> bool:
         return bool(self._scoped_bindings)
@@ -129,8 +127,7 @@ class Container(ABC):
     @abstractmethod
     def _concrete_closure(
         self, abstract: str | type, concrete: Any
-    ) -> Callable[[Self], ...]:
-        ...
+    ) -> Callable[[Self], ...]: ...
 
     def _is_buildable(self, abstract: str, concrete: Any) -> bool:
         return abstract == concrete or isinstance(

@@ -141,7 +141,7 @@ class DatabaseManager(DatabaseManagerContract):
                 existing_autocommit = dbapi_connection.autocommit
                 dbapi_connection.autocommit = True
                 cursor = dbapi_connection.cursor()
-                cursor.execute("SET SESSION search_path='%s'" % config.search_path)
+                cursor.execute(f"SET SESSION search_path='{config.search_path}'")
                 cursor.close()
                 dbapi_connection.autocommit = existing_autocommit
 

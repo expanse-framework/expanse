@@ -9,5 +9,4 @@ if TYPE_CHECKING:
 
 
 class TestingCommandHelper(Protocol):
-    def __call__(self, name: str, parameters: str | None = None) -> TestingCommand:
-        ...
+    def __call__(self, name: str, parameters: str | None = None) -> TestingCommand: ...

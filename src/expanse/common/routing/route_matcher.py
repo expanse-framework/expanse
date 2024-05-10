@@ -73,7 +73,7 @@ class FloatConvertor(Convertor):
         assert value >= 0.0, "Negative floats are not supported"
         assert not math.isnan(value), "NaN values are not supported"
         assert not math.isinf(value), "Infinite values are not supported"
-        return ("%0.20f" % value).rstrip("0").rstrip(".")
+        return f"{value:0.20f}".rstrip("0").rstrip(".")
 
 
 class UUIDConvertor(Convertor):
@@ -153,7 +153,7 @@ class RouteMatcher:
             path_regex += f"(?P<{param_name}>{convertor.regex})"
 
             path_format += path[idx : match.start()]
-            path_format += "{%s}" % param_name
+            path_format += f"{{{param_name}}}"
 
             if param_name in param_convertors:
                 duplicated_params.add(param_name)

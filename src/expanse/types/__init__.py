@@ -18,8 +18,7 @@ class StartResponse(Protocol):
         status: str,
         response_headers: tuple[str, str],
         exc_info: ExcInfo | None = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 WSGIApp = Callable[[Environ, StartResponse], Iterable[bytes]]

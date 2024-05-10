@@ -23,8 +23,7 @@ class Session(BaseSession):
         bind_arguments: dict[str, Any] | None = None,
         _parent_execute_state: Any | None = None,
         _add_event: Any | None = None,
-    ) -> Result[Any]:
-        ...
+    ) -> Result[Any]: ...
 
     def execute(
         self,
@@ -57,8 +56,7 @@ class Session(BaseSession):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     def scalar(
         self,
@@ -89,8 +87,7 @@ class Session(BaseSession):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
-    ) -> ScalarResult[Any]:
-        ...
+    ) -> ScalarResult[Any]: ...
 
     def scalars(
         self,

@@ -23,8 +23,7 @@ class Connection(BaseAsyncConnection):
         parameters: _CoreSingleExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     async def scalar(
         self,
@@ -47,8 +46,7 @@ class Connection(BaseAsyncConnection):
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
-    ) -> ScalarResult[Any]:
-        ...
+    ) -> ScalarResult[Any]: ...
 
     async def scalars(
         self,
@@ -71,8 +69,7 @@ class Connection(BaseAsyncConnection):
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
-    ) -> CursorResult[Any]:
-        ...
+    ) -> CursorResult[Any]: ...
 
     async def execute(
         self,

@@ -9,8 +9,7 @@ from typing import Any
 from expanse.container.container import Container
 
 
-class Something:
-    ...
+class Something: ...
 
 
 class AnotherThing:
@@ -20,18 +19,17 @@ class AnotherThing:
 
 class Abstract(ABC):
     @abstractmethod
-    def foo(self) -> str:
-        ...
+    def foo(self) -> str: ...
 
     @abstractmethod
-    def run(self, foo: str, bar: str, baz: str | None = None) -> tuple[str, str, str]:
-        ...
+    def run(
+        self, foo: str, bar: str, baz: str | None = None
+    ) -> tuple[str, str, str]: ...
 
     @abstractmethod
     def run2(
         self, something: Something, foo: str, bar: str, baz: str | None = None
-    ) -> tuple[str, str, str]:
-        ...
+    ) -> tuple[str, str, str]: ...
 
     @abstractmethod
     def run3(
@@ -42,8 +40,7 @@ class Abstract(ABC):
         callback: Callable[[int], int],
         bar: str,
         baz: str | None = None,
-    ) -> tuple[str, str, int, str, str]:
-        ...
+    ) -> tuple[str, str, int, str, str]: ...
 
 
 class Concrete(Abstract):

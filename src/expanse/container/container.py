@@ -29,8 +29,7 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., None]
 
 
-class UnboundAbstractError(Exception):
-    ...
+class UnboundAbstractError(Exception): ...
 
 
 class Container(BaseContainer):
@@ -62,12 +61,10 @@ class Container(BaseContainer):
         return concrete(*positional, **keywords)
 
     @overload
-    def make(self, abstract: type[T]) -> T:
-        ...
+    def make(self, abstract: type[T]) -> T: ...
 
     @overload
-    def make(self, abstract: str) -> Any:
-        ...
+    def make(self, abstract: str) -> Any: ...
 
     def make(self, abstract: str | type[T]) -> Any | T:
         return self._resolve(abstract)
@@ -140,12 +137,10 @@ class Container(BaseContainer):
         return closure
 
     @overload
-    def _resolve(self, abstract: type[T]) -> T:
-        ...
+    def _resolve(self, abstract: type[T]) -> T: ...
 
     @overload
-    def _resolve(self, abstract: str) -> Any:
-        ...
+    def _resolve(self, abstract: str) -> Any: ...
 
     def _resolve(self, abstract: str | type[T]) -> Any | T:
         abstract = self._get_alias(abstract)

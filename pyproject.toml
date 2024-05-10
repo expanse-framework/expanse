@@ -43,11 +43,17 @@ markers = ["asynchronous: Mark a test as asynchronous"]
 
 [tool.ruff]
 fix = true
-unfixable = [
-    "ERA", # do not autoremove commented out code
-]
-target-version = "py310"
 line-length = 88
+target-version = "py310"
+src = ["src"]
+extend-exclude = [
+    # External to the project's coding standards:
+    "docs/*",
+    # ruff disagrees with black when it comes to formatting
+    "*.pyi",
+]
+
+[tool.ruff.lint]
 extend-select = [
     "B", # flake8-bugbear
     "C4", # flake8-comprehensions
@@ -69,17 +75,14 @@ ignore = [
     "N818", #  Exception name should be named with an Error suffix
     "RUF001",
 ]
-extend-exclude = [
-    # External to the project's coding standards:
-    "docs/*",
-    # ruff disagrees with black when it comes to formatting
-    "*.pyi",
+unfixable = [
+    "ERA", # do not autoremove commented out code
 ]
 
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 force-single-line = true
 lines-between-types = 1
 lines-after-imports = 2

@@ -1,5 +1,4 @@
-class ContainerException(Exception):
-    ...
+class ContainerException(Exception): ...
 
 
 class ResolutionException(ContainerException):

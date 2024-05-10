@@ -3,5 +3,4 @@ from expanse.asynchronous.contracts.database.connection import (
 )
 
 
-class Connection(ConnectionContract):
-    ...
+class Connection(ConnectionContract): ...

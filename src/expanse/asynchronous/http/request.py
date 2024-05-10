@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from expanse.asynchronous.types import Scope
     from expanse.asynchronous.types import Send
 
-    pass
-
 
 class Request(BaseRequest):
     def __init__(

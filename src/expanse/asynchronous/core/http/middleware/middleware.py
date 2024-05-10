@@ -11,5 +11,4 @@ if TYPE_CHECKING:
 
 
 class Middleware(Protocol):
-    async def handle(self, request: Request, next_call: RequestHandler) -> Response:
-        ...
+    async def handle(self, request: Request, next_call: RequestHandler) -> Response: ...
