@@ -24,7 +24,7 @@ class ServeCommand(Command):
             log_level = "debug"
 
         parameters: dict[str, Any] = {
-            "port": self.option("port"),
+            "port": int(self.option("port")),
             "interface": "wsgi",
             "log_level": log_level,
             "reload": self.option("watch"),
@@ -32,13 +32,21 @@ class ServeCommand(Command):
         }
 
         if self.option("watch"):
-            parameters["reload_includes"] = [
-                app.path(".").as_posix(),
-                app.resources_path.joinpath("views").as_posix(),
+            parameters["reload_dirs"] = [
+                app.base_path,
+                app.config_path,
+                app.base_path.joinpath("routes"),
             ]
 
         config = uvicorn.Config("app.app:app", **parameters)
         server = uvicorn.Server(config)
-        await server.serve()
+
+        if self.option("watch"):
+            from uvicorn.supervisors import ChangeReload
+
+            sock = config.bind_socket()
+            ChangeReload(config, target=server.serve, sockets=[sock]).run()
+        else:
+            await server.serve()
 
         return 0

@@ -22,9 +22,11 @@ class ServeCommand(Command):
         log_level: str = "info"
         if self.io.is_verbose():
             log_level = "debug"
+        elif self.io.output.is_quiet():
+            log_level = "error"
 
         parameters: dict[str, Any] = {
-            "port": self.option("port"),
+            "port": int(self.option("port")),
             "interface": "wsgi",
             "log_level": log_level,
             "reload": self.option("watch"),

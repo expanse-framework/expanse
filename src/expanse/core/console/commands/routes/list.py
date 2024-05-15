@@ -14,6 +14,7 @@ METHODS_COLORS: dict[str, str] = {
     "PUT": "fg=yellow",
     "PATCH": "fg=yellow",
     "DELETE": "fg=red",
+    "OPTIONS": "fg=default;options=dark",
 }
 
 
@@ -35,7 +36,7 @@ class RoutesListCommand(Command):
 
         for route in routes:
             methods = "|".join(
-                f"<{METHODS_COLORS.get(method.upper())}>{method}</>"
+                f"<{METHODS_COLORS.get(method.upper(), 'fg=default')}>{method}</>"
                 for method in route.methods
             )
             self.line(f"  {methods}  {route.path}")
