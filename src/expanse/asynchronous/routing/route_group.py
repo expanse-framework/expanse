@@ -24,7 +24,7 @@ class RouteGroup(BaseRouteGroup):
         self._middlewares: list[type[Middleware]] = []
 
     def add_routes(self, routes: list[Route] | Router) -> None:
-        from expanse.routing.router import Router
+        from expanse.asynchronous.routing.router import Router
 
         if isinstance(routes, Router):
             for route in routes._routes:

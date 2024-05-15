@@ -49,14 +49,12 @@ class Middleware3:
         return response
 
 
-def configure_middleware(stack: MiddlewareStack) -> None:
+async def configure_middleware(stack: MiddlewareStack) -> None:
     stack.append(Middleware1, Middleware2, Middleware3)
 
 
 async def test_middleware_configuration(root: Path, caplog: LogCaptureFixture) -> None:
-    app = (
-        await Application.configure(root).with_middleware(configure_middleware).create()
-    )
+    app = Application.configure(root).with_middleware(configure_middleware).create()
     await app.bootstrap()
 
     router: Router = await app.make(Router)

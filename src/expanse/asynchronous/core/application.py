@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import traceback
 
+from collections.abc import Awaitable
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import ClassVar
 from typing import Self
-
-import async_chain
 
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.contracts.debug.exception_handler import (
@@ -53,27 +53,22 @@ class Application(BaseApplication, Container):
         Container.__init__(self)
 
         self._service_providers: list[ServiceProvider] = []
-        self._default_bootstrappers: list[type[Bootstrapper]] = (
-            self.__class__._bootstrappers.copy()
-        )
+        self._default_bootstrappers: list[
+            type[Bootstrapper]
+        ] = self.__class__._bootstrappers.copy()
+        self._bootstrapping_callbacks: list[Callable[[Self], Awaitable[None]]] = []
 
         self._bind_paths()
         self._register_base_bindings()
 
     @classmethod
-    @async_chain.method
-    async def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
+    def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
         base_path = (
             base_path
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
         )
-        builder = (
-            await ApplicationBuilder(cls(base_path=base_path))
-            .with_kernels()
-            .with_commands()
-        )
 
-        return builder
+        return ApplicationBuilder(base_path).with_kernels().with_commands()
 
     def set_config(self, config: Config) -> None:
         super().set_config(config)
@@ -111,9 +106,17 @@ class Application(BaseApplication, Container):
             bootstrapper: Bootstrapper = await self.make(bootstrapper_class)
             await bootstrapper.bootstrap(self)
 
+        for callback in self._bootstrapping_callbacks:
+            await callback(self)
+
         await self.boot()
 
         self._has_been_bootstrapped = True
+
+        return self
+
+    def bootstrapping(self, *callback: Callable[[Self], Awaitable[None]]) -> Self:
+        self._bootstrapping_callbacks.extend(callback)
 
         return self
 

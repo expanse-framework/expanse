@@ -22,10 +22,11 @@ class ServeCommand(Command):
         log_level: str = "info"
         if self.io.is_verbose():
             log_level = "debug"
+        elif self.io.output.is_quiet():
+            log_level = "error"
 
         parameters: dict[str, Any] = {
             "port": int(self.option("port")),
-            "interface": "wsgi",
             "log_level": log_level,
             "reload": self.option("watch"),
             "use_colors": self.io.is_decorated(),
@@ -45,7 +46,7 @@ class ServeCommand(Command):
             from uvicorn.supervisors import ChangeReload
 
             sock = config.bind_socket()
-            ChangeReload(config, target=server.serve, sockets=[sock]).run()
+            ChangeReload(config, target=server.run, sockets=[sock]).run()
         else:
             await server.serve()
 

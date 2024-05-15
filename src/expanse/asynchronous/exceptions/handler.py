@@ -20,7 +20,6 @@ from expanse.asynchronous.http.response import Response
 from expanse.common.configuration.config import Config
 from expanse.common.core.http.exceptions import HTTPException
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -158,6 +157,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         import expanse
 
         from expanse.asynchronous.view.view_finder import ViewFinder
+
+        print(self._container)
 
         (await self._container.make(ViewFinder)).add_paths(
             [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]

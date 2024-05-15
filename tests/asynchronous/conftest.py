@@ -27,7 +27,7 @@ async def app(root: Path) -> Application:
         stack.use([])
 
     application = (
-        await Application.configure(root).with_middleware(configure_middleware).create()
+        Application.configure(root).with_middleware(configure_middleware).create()
     )
 
     await application.bootstrap()
