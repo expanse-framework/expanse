@@ -2,27 +2,28 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from expanse.core.application import Application
-from expanse.http.middleware.cors_middleware import CorsMiddleware
-from expanse.http.response import Response
-from expanse.testing.client import TestClient
+from expanse.asynchronous.core.application import Application
+from expanse.asynchronous.core.http.gateway import Gateway
+from expanse.asynchronous.http.middleware.manage_cors import ManageCors
+from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.testing.client import TestClient
 
 
 if TYPE_CHECKING:
-    from expanse.routing.router import Router
+    from expanse.asynchronous.routing.router import Router
 
 
 @pytest.fixture(autouse=True)
-def setup_app(app: Application) -> None:
-    app.prepend_middleware(CorsMiddleware)
+async def setup_app(app: Application) -> None:
+    (await app.make(Gateway)).prepend_middleware(ManageCors)
 
-    router: Router = app.make("router")
+    router: Router = await app.make("router")
 
     router.post("/api/ping", lambda: Response.json("pong"))
     router.post("/api/error", lambda: Response.abort(500))
     router.post("/web/ping", lambda: Response("pong", media_type="text/plain"))
 
-    app.config["cors"] = {
+    (await app.make("config"))["cors"] = {
         "paths": ["api/*"],
         "supports_credentials": False,
         "allowed_origins": ["http://localhost"],
@@ -56,10 +57,10 @@ def test_it_should_return_access_control_allow_origin_with_origin_specified(
     assert response.headers["Access-Control-Allow-Origin"] == "http://localhost"
 
 
-def test_allow_all_origins(
+async def test_allow_all_origins(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_origins"] = ["*"]
+    (await client.app.make("config"))["cors"]["allowed_origins"] = ["*"]
     response = client.options(
         "/api/ping",
         headers={"Origin": "http://localhost", "Access-Control-Request-Method": "POST"},
@@ -69,10 +70,10 @@ def test_allow_all_origins(
     assert response.headers["Access-Control-Allow-Origin"] == "*"
 
 
-def test_allow_exact_origin(
+async def test_allow_exact_origin(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_origins"] = [
+    (await client.app.make("config"))["cors"]["allowed_origins"] = [
         "http://localhost",
         "http://localhost2",
     ]
@@ -88,10 +89,12 @@ def test_allow_exact_origin(
     assert response.headers["Access-Control-Allow-Origin"] == "http://localhost2"
 
 
-def test_allow_all_origins_wildcard(
+async def test_allow_all_origins_wildcard(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_origins"] = ["*.python-expanse.org"]
+    (await client.app.make("config"))["cors"]["allowed_origins"] = [
+        "*.python-expanse.org"
+    ]
     response = client.options(
         "/api/ping",
         headers={
@@ -107,10 +110,12 @@ def test_allow_all_origins_wildcard(
     )
 
 
-def test_allowed_origins_wildcard_includes_nested_subdomain(
+async def test_allowed_origins_wildcard_includes_nested_subdomain(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_origins"] = ["*.python-expanse.org"]
+    (await client.app.make("config"))["cors"]["allowed_origins"] = [
+        "*.python-expanse.org"
+    ]
     response = client.options(
         "/api/ping",
         headers={
@@ -126,10 +131,12 @@ def test_allowed_origins_wildcard_includes_nested_subdomain(
     )
 
 
-def test_allowed_origins_wildcard_no_match(
+async def test_allowed_origins_wildcard_no_match(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_origins"] = ["*.python-expanse.org"]
+    (await client.app.make("config"))["cors"]["allowed_origins"] = [
+        "*.python-expanse.org"
+    ]
     response = client.options(
         "/api/ping",
         headers={
@@ -203,10 +210,10 @@ def test_method_not_allowed(
     assert "Access-Control-Allow-Methods" not in response.headers
 
 
-def test_method_allow_all_methods_allowed(
+async def test_method_allow_all_methods_allowed(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_methods"] = ["*"]
+    (await client.app.make("config"))["cors"]["allowed_methods"] = ["*"]
 
     response = client.options(
         "/api/ping",
@@ -240,10 +247,10 @@ def test_allowed_headers_allow_options(
     assert response.text == ""
 
 
-def test_allowed_headers_allow_wildcard(
+async def test_allowed_headers_allow_wildcard(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_headers"] = ["*"]
+    (await client.app.make("config"))["cors"]["allowed_headers"] = ["*"]
 
     response = client.options(
         "/api/ping",
@@ -295,10 +302,10 @@ def test_allowed_headers_allowed(
     assert response.json() == "pong"
 
 
-def test_allowed_headers_wildcard(
+async def test_allowed_headers_wildcard(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["allowed_headers"] = ["*"]
+    (await client.app.make("config"))["cors"]["allowed_headers"] = ["*"]
 
     response = client.post(
         "/api/ping",
@@ -331,6 +338,7 @@ def test_allowed_headers_post_not_allowed(
 def test_error(
     client: TestClient,
 ) -> None:
+    client = TestClient(client.app, raise_server_exceptions=False)
     response = client.post(
         "/api/error",
         headers={
@@ -343,10 +351,10 @@ def test_error(
     assert response.headers["Access-Control-Allow-Origin"] == "http://localhost"
 
 
-def test_supports_credentials(
+async def test_supports_credentials(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["supports_credentials"] = True
+    (await client.app.make("config"))["cors"]["supports_credentials"] = True
     response = client.options(
         "/api/ping",
         headers={
@@ -373,10 +381,10 @@ def test_no_matching_path(
     assert response.text == "pong"
 
 
-def test_exposed_headers(
+async def test_exposed_headers(
     client: TestClient,
 ) -> None:
-    client.app.config["cors"]["exposed_headers"] = ["X-Foo"]
+    (await client.app.make("config"))["cors"]["exposed_headers"] = ["X-Foo"]
     response = client.post(
         "/api/ping",
         headers={

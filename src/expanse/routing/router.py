@@ -1,6 +1,5 @@
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 from typing import Any
-from typing import NoReturn
 
 from expanse.common.core.http.exceptions import HTTPException
 from expanse.common.http.form import Form
@@ -12,16 +11,18 @@ from expanse.common.routing.route import Match
 from expanse.common.routing.route_matcher import RouteMatcher
 from expanse.container.container import Container
 from expanse.core.application import Application
-from expanse.core.http.middleware.middleware import Middleware
-from expanse.core.http.middleware.middleware_stack import MiddlewareStack
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.http.response_adapter import ResponseAdapter
+from expanse.routing.pipeline import Pipeline
 from expanse.routing.route import Route
 from expanse.routing.route_group import RouteGroup
-from expanse.types import Environ
-from expanse.types import StartResponse
-from expanse.types import WSGIApp
+from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Router:
@@ -125,7 +126,25 @@ class Router:
 
         return matcher.url(path, **parameters)
 
-    def _search(self, environ: Environ) -> WSGIApp:
+    def handle(self, container: Container, request: Request) -> Response:
+        route = self._search(request)
+
+        handler: RequestHandler
+        pipes: list[Callable[[Request, RequestHandler], Response]] = []
+        if route is None:
+            # No matching route was found, so we use the default handler
+            # to handle the request.
+            handler = self._default_handler(container)
+        else:
+            handler = self._route_handler(route, container)
+            pipes = [
+                container.make(middleware).handle
+                for middleware in route.get_middleware()
+            ]
+
+        return Pipeline(container).use(pipes).send(request).to(handler)
+
+    def _search(self, request: Request) -> Route | None:
         matcher = self._app.make(RouteMatcher)
 
         partial: Route | None = None
@@ -136,11 +155,11 @@ class Router:
             routes.extend(group.routes)
 
         for route in routes:
-            # Determine if any route matches the incoming scope,
+            # Determine if any route matches the incoming request,
             # and hand over to the matching route if found.
-            match = matcher.match(route, environ)
+            match = matcher.match(route, request)
             if match == Match.FULL:
-                return self._route_handler(route)
+                return route
             elif match == Match.PARTIAL and partial is None:
                 partial = route
 
@@ -149,38 +168,12 @@ class Router:
             # These are cases where an endpoint is
             # able to handle the request, but is not a preferred option.
             # We use this in particular to deal with "405 Method Not Allowed".
-            return self._route_handler(partial)
+            return partial
 
-        # Default response
-        return self._default_handler(self._default_endpoint)
+        return None
 
-    def _route_handler(self, route: Route) -> WSGIApp:
-        def wrapper(environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
-            request = Request(environ, start_response)
-            with self._app.create_scoped_container():
-                response = self._handle_routed_request(route, request)
-
-                return self._response_as_wsgi_app(response)(environ, start_response)
-
-        return wrapper
-
-    def _default_endpoint(self) -> NoReturn:
-        raise HTTPException(status_code=404)
-
-    def _default_handler(self, endpoint: Endpoint) -> WSGIApp:
-        def wrapper(environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
-            request = Request(environ, start_response)
-
-            response = self._handle_request(
-                request, self._app._default_middlewares, endpoint
-            )
-
-            return self._response_as_wsgi_app(response)(environ, start_response)
-
-        return wrapper
-
-    def _handle_routed_request(self, route: Route, request: Request) -> Any:
-        def endpoint_wrapper(container: Container) -> Response:
+    def _route_handler(self, route: Route, container: Container) -> RequestHandler:
+        def handler(request: Request) -> Response:
             if route.methods and request.method not in route.methods:
                 headers = {"Allow": ", ".join(route.methods)}
 
@@ -205,34 +198,20 @@ class Router:
                 ):
                     arguments[name] = parameter.annotation(params=request.query_params)
 
-            return container.call(route.endpoint, **arguments)
+            raw_response = container.call(route.endpoint, **arguments)
 
-        return self._handle_request(
-            request,
-            self._app._default_middlewares + route.get_middleware(),
-            endpoint_wrapper,
-        )
+            # Do not go through the response adapter if the response is already a Response instance
+            if isinstance(raw_response, Response):
+                return raw_response
 
-    def _handle_request(
-        self,
-        request: Request,
-        middlewares: list[type[Middleware]],
-        endpoint: Endpoint,
-        *args: Any,
-    ) -> Response:
-        with self._app.create_scoped_container() as container:
-            container.instance(Request, request)
+            return container.call(
+                container.make(ResponseAdapter).adapter(raw_response), raw_response
+            )
 
-            stack = MiddlewareStack(container, middlewares)
+        return handler
 
-            return stack.handle(endpoint, *args)
+    def _default_handler(self, _: Container) -> RequestHandler:
+        def handler(request: Request) -> Response:
+            raise Response.abort(404)
 
-    def _response_as_wsgi_app(self, response: Response) -> WSGIApp:
-        return response.response
-
-    def __call__(
-        self, environ: Environ, start_response: StartResponse
-    ) -> Iterable[bytes]:
-        app = self._search(environ)
-
-        return app(environ, start_response)
+        return handler

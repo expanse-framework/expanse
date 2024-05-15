@@ -200,7 +200,7 @@ class Cors:
             )
 
 
-class CorsMiddleware(Middleware):
+class ManageCors(Middleware):
     def __init__(self, container: Container) -> None:
         self._container: Container = container
         self._cors: Cors = Cors()
@@ -245,4 +245,4 @@ class CorsMiddleware(Middleware):
         return False
 
 
-__all__ = ["CorsMiddleware"]
+__all__ = ["ManageCors"]

@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from expanse.common.configuration.config import Config
-    from expanse.core.http.middleware.base import Middleware
     from expanse.support.service_provider import ServiceProvider
 
 
@@ -86,9 +85,3 @@ class Application:
         self._base_path = base_path
 
         return self
-
-    def prepend_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.insert(0, middleware)
-
-    def add_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.append(middleware)

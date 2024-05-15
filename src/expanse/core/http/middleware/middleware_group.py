@@ -1,17 +1,11 @@
 from typing import Self
 
-from expanse.asynchronous.core.http.middleware.middleware import Middleware
-from expanse.asynchronous.core.http.middleware.middleware_group import MiddlewareGroup
+from expanse.core.http.middleware.middleware import Middleware
 
 
-class MiddlewareStack:
+class MiddlewareGroup:
     def __init__(self, middlewares: list[type[Middleware]] | None = None) -> None:
-        self._middlewares: list[type[Middleware]] = middlewares or []
-        self._groups: dict[str, MiddlewareGroup] = {}
-
-    @property
-    def middleware(self) -> list[type[Middleware]]:
-        return self._middlewares
+        self._middlewares = middlewares or []
 
     def append(self, *middleware: type[Middleware]) -> Self:
         """
@@ -36,14 +30,3 @@ class MiddlewareStack:
         self._middlewares = middleware
 
         return self
-
-    def group(self, name: str) -> MiddlewareGroup:
-        """
-        Retrieve the middleware group with the given name.
-
-        If does not exist it will be created automatically.
-        """
-        if name not in self._groups:
-            self._groups[name] = MiddlewareGroup()
-
-        return self._groups[name]

@@ -60,6 +60,17 @@ files = [
 ]
 
 [[package]]
+name = "async-chain"
+version = "0.1.2"
+description = "A coroutine builder"
+optional = false
+python-versions = ">=3.6,<4.0"
+files = [
+    {file = "async-chain-0.1.2.tar.gz", hash = "sha256:c2e3648fb5acfe850c051a38aeee130429fd0a462613553493f112c9535de664"},
+    {file = "async_chain-0.1.2-py3-none-any.whl", hash = "sha256:32acf3225391d0c152ab9465e2b9ec3e67e5a45c7afa817953c9b7358a3dbe79"},
+]
+
+[[package]]
 name = "async-timeout"
 version = "4.0.3"
 description = "Timeout context manager for asyncio programs"
@@ -1607,4 +1618,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "cb60a42ab3a06d023e5670fbca1536577d608739ed4d9052b03d9e7dec29410d"
+content-hash = "bd78fa9d8f056e177e2f0e4044552dc7e7ff4b9910e8e1bbef53f34d5dc35a37"

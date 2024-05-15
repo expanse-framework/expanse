@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from typing import ClassVar
 from typing import Self
 
+import async_chain
+
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
@@ -19,9 +21,6 @@ from expanse.asynchronous.core.bootstrap.load_environment_variables import (
 )
 from expanse.asynchronous.core.bootstrap.register_providers import RegisterProviders
 from expanse.asynchronous.exceptions.handler import ExceptionHandler
-from expanse.asynchronous.exceptions.middleware.handle_exceptions import (
-    HandleExceptions,
-)
 from expanse.common.configuration.config import Config
 from expanse.common.core.application import Application as BaseApplication
 from expanse.common.support._utils import string_to_class
@@ -31,8 +30,6 @@ if TYPE_CHECKING:
     from cleo.io.inputs.input import Input
 
     from expanse.asynchronous.core.bootstrap.bootstrapper import Bootstrapper
-    from expanse.asynchronous.core.http.middleware.middleware import Middleware
-    from expanse.asynchronous.routing.router import Router
     from expanse.asynchronous.support.service_provider import ServiceProvider
     from expanse.asynchronous.types import Receive
     from expanse.asynchronous.types import Scope
@@ -47,10 +44,6 @@ class Application(BaseApplication, Container):
         BootProviders,
     ]
 
-    _middleware: ClassVar[list[type[Middleware]]] = [HandleExceptions]
-
-    _middleware_groups: ClassVar[dict[str, type[Middleware]]] = {}
-
     def __init__(self, base_path: Path | None = None) -> None:
         BaseApplication.__init__(
             self,
@@ -63,21 +56,21 @@ class Application(BaseApplication, Container):
         self._default_bootstrappers: list[type[Bootstrapper]] = (
             self.__class__._bootstrappers.copy()
         )
-        self._default_middlewares: list[type[Middleware]] = (
-            self.__class__._middleware.copy()
-        )
 
         self._bind_paths()
         self._register_base_bindings()
 
     @classmethod
-    def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
+    @async_chain.method
+    async def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
         base_path = (
             base_path
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
         )
         builder = (
-            ApplicationBuilder(cls(base_path=base_path)).with_kernels().with_commands()
+            await ApplicationBuilder(cls(base_path=base_path))
+            .with_kernels()
+            .with_commands()
         )
 
         return builder
@@ -144,12 +137,6 @@ class Application(BaseApplication, Container):
 
         return provider
 
-    def prepend_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.insert(0, middleware)
-
-    def add_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.append(middleware)
-
     async def handle_command(self, input: Input) -> int:
         from expanse.asynchronous.core.console.kernel import Kernel
 
@@ -169,12 +156,16 @@ class Application(BaseApplication, Container):
             await self.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
+        from expanse.asynchronous.core.http.gateway import Gateway
+
         self.instance("app", self)
         self.instance(self.__class__, self)
         self.instance(Container, self)
         self._config = Config({})
         self.instance(Config, self._config)
         self.alias(Config, "config")
+
+        self.singleton(Gateway)
 
         # TODO: make the exception handler configurable
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
@@ -200,6 +191,8 @@ class Application(BaseApplication, Container):
                     await send({"type": "lifespan.shutdown.complete"})
                     return
 
-        router: Router = await self.make("router")
+        from expanse.asynchronous.core.http.gateway import Gateway
 
-        await router(scope, receive, send)
+        gateway = await self.make(Gateway)
+
+        await gateway(scope, receive, send)

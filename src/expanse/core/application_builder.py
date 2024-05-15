@@ -4,8 +4,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Self
 
+from expanse.core.http.middleware.middleware_stack import MiddlewareStack
+
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from expanse.console.commands.command import Command
     from expanse.core.application import Application
 
@@ -41,6 +45,20 @@ class ApplicationBuilder:
             kernel.add_commands(command_classes)
 
         self._app.after_resolving(ConsoleKernel, _register_commands)
+
+        return self
+
+    def with_middleware(self, callback: Callable[[MiddlewareStack], None]) -> Self:
+        from expanse.core.http.gateway import Gateway
+
+        def configure_middleware(gateway: Gateway) -> None:
+            stack = MiddlewareStack()
+
+            callback(stack)
+
+            gateway.set_middleware(stack.middleware)
+
+        self._app.on_resolved(Gateway, configure_middleware)
 
         return self
 

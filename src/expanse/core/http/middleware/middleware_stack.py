@@ -1,54 +1,59 @@
-from collections.abc import Callable
-from functools import wraps
-from typing import Any
+from typing import Self
 
-from expanse.container.container import Container
 from expanse.core.http.middleware.middleware import Middleware
-from expanse.http.request import Request
-from expanse.http.response import Response
-from expanse.http.response_adapter import ResponseAdapter
-from expanse.types.http.middleware import RequestHandler
-from expanse.types.routing import Endpoint
+from expanse.core.http.middleware.middleware_group import MiddlewareGroup
 
 
 class MiddlewareStack:
-    def __init__(
-        self, container: Container, middlewares: list[type[Middleware]] | None = None
-    ) -> None:
-        self._container = container
-        self._middlewares = middlewares or []
+    def __init__(self, middlewares: list[type[Middleware]] | None = None) -> None:
+        self._middlewares: list[type[Middleware]] | None = middlewares
+        self._groups: dict[str, MiddlewareGroup] = {}
 
-    def handle(self, endpoint: Endpoint, *parameters) -> Response:
-        return self._build_stack(endpoint, *parameters)(self._container.make(Request))
+    @property
+    def middleware(self) -> list[type[Middleware]]:
+        if self._middlewares is None:
+            self._middlewares = self.get_default_middleware()
 
-    def _build_stack(self, endpoint: Endpoint, *parameters) -> RequestHandler:
-        def endpoint_call(_: Request) -> Response:
-            response: Any = self._container.call(endpoint, *parameters)
+        return self._middlewares
 
-            if isinstance(response, Response):
-                return response
+    def append(self, *middleware: type[Middleware]) -> Self:
+        """
+        Append middleware to the middleware stack.
+        """
+        self.middleware.extend(middleware)
 
-            return self._container.call(
-                self._container.make(ResponseAdapter).adapter(response), response
-            )
+        return self
 
-        stack = endpoint_call
+    def prepend(self, *middleware: type[Middleware]) -> Self:
+        """
+        Prepend middleware to the middleware stack.
+        """
+        self._middlewares = [*middleware, *self.middleware]
 
-        for middleware_class in reversed(self._middlewares):
-            middleware = self._container.make(middleware_class)
-            stack = self._wrap(middleware)(stack)
+        return self
 
-        return stack
+    def use(self, middleware: list[type[Middleware]]) -> Self:
+        """
+        Replace the current middleware with the given middleware.
+        """
+        self._middlewares = middleware
 
-    def _wrap(
-        self, middleware: Middleware
-    ) -> Callable[[RequestHandler], RequestHandler]:
-        @wraps(middleware.handle)
-        def decorator(next_call: RequestHandler) -> Callable[[Request], Response]:
-            @wraps(next_call)
-            def view(request: Request) -> Response:
-                return self._container.call(middleware.handle, next_call)
+        return self
 
-            return view
+    def group(self, name: str) -> MiddlewareGroup:
+        """
+        Retrieve the middleware group with the given name.
 
-        return decorator
+        If it does not exist it will be created automatically.
+        """
+        if name not in self._groups:
+            self._groups[name] = MiddlewareGroup()
+
+        return self._groups[name]
+
+    def get_default_middleware(self) -> list[Middleware]:
+        from expanse.http.middleware.manage_cors import ManageCors
+
+        return [
+            ManageCors,
+        ]

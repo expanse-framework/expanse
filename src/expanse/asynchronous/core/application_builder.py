@@ -4,8 +4,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Self
 
+import async_chain
+
+from expanse.asynchronous.core.http.middleware.middleware_stack import MiddlewareStack
+
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from expanse.asynchronous.console.commands.command import Command
     from expanse.asynchronous.core.application import Application
 
@@ -14,14 +20,18 @@ class ApplicationBuilder:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
 
-    def with_kernels(self) -> Self:
+    @async_chain.method
+    async def with_kernels(self) -> Self:
         from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
 
         self._app.singleton(ConsoleKernel)
 
         return self
 
-    def with_commands(self, commands: list[type[Command] | Path] | None = None) -> Self:
+    @async_chain.method
+    async def with_commands(
+        self, commands: list[type[Command] | Path] | None = None
+    ) -> Self:
         from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
 
         if not commands:
@@ -44,5 +54,22 @@ class ApplicationBuilder:
 
         return self
 
-    def create(self) -> Application:
+    @async_chain.method
+    async def with_middleware(
+        self, callback: Callable[[MiddlewareStack], None]
+    ) -> Self:
+        from expanse.asynchronous.core.http.gateway import Gateway
+
+        def configure_middleware(gateway: Gateway) -> None:
+            stack = MiddlewareStack()
+
+            callback(stack)
+
+            gateway.set_middleware(stack.middleware)
+
+        await self._app.on_resolved(Gateway, configure_middleware)
+
+        return self
+
+    async def create(self) -> Application:
         return self._app

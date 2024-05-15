@@ -1,18 +1,15 @@
+from typing import TYPE_CHECKING
 from typing import Any
-from typing import NoReturn
 
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.core.http.middleware.middleware import Middleware
-from expanse.asynchronous.core.http.middleware.middleware_stack import MiddlewareStack
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.http.response_adapter import ResponseAdapter
+from expanse.asynchronous.routing.pipeline import Pipeline
 from expanse.asynchronous.routing.route import Route
 from expanse.asynchronous.routing.route_group import RouteGroup
-from expanse.asynchronous.types import ASGIApp
-from expanse.asynchronous.types import Receive
-from expanse.asynchronous.types import Scope
-from expanse.asynchronous.types import Send
+from expanse.asynchronous.types.http.middleware import RequestHandler
 from expanse.asynchronous.types.routing import Endpoint
 from expanse.common.core.http.exceptions import HTTPException
 from expanse.common.http.form import Form
@@ -22,6 +19,11 @@ from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route import Match
 from expanse.common.routing.route_matcher import RouteMatcher
+
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable
+    from collections.abc import Callable
 
 
 class Router:
@@ -120,7 +122,25 @@ class Router:
 
         return matcher.url(path, **parameters)
 
-    async def _search(self, scope: Scope) -> ASGIApp:
+    async def handle(self, container: Container, request: Request) -> Response:
+        route = await self._search(request)
+
+        handler: RequestHandler
+        pipes: list[Callable[[Request, RequestHandler], Awaitable[Response]]] = []
+        if route is None:
+            # No matching route was found, so we use the default handler
+            # to handle the request.
+            handler = self._default_handler(container)
+        else:
+            handler = self._route_handler(route, container)
+            pipes = [
+                (await container.make(middleware)).handle
+                for middleware in route.get_middleware()
+            ]
+
+        return await Pipeline(container).use(pipes).send(request).to(handler)
+
+    async def _search(self, request: Request) -> Route | None:
         matcher = await self._app.make(RouteMatcher)
 
         partial: Route | None = None
@@ -133,9 +153,9 @@ class Router:
         for route in routes:
             # Determine if any route matches the incoming scope,
             # and hand over to the matching route if found.
-            match = matcher.match(route, scope=scope)
+            match = matcher.match(route, request)
             if match == Match.FULL:
-                return self._route_handler(route)
+                return route
             elif match == Match.PARTIAL and partial is None:
                 partial = route
 
@@ -144,40 +164,12 @@ class Router:
             # These are cases where an endpoint is
             # able to handle the request, but is not a preferred option.
             # We use this in particular to deal with "405 Method Not Allowed".
-            return self._route_handler(partial)
+            return partial
 
-        # Default response
-        return self._default_handler(self._default_endpoint)
+        return None
 
-    def _route_handler(self, route: Route) -> ASGIApp:
-        async def wrapper(scope: Scope, receive: Receive, send: Send) -> None:
-            request = Request(scope, receive, send)
-            async with self._app.create_scoped_container():
-                response = await self._handle_routed_request(route, request)
-                app = await self._response_to_asgi_app(response)
-
-                return await app(scope, receive, send)
-
-        return wrapper
-
-    def _default_endpoint(self) -> NoReturn:
-        raise HTTPException(status_code=404)
-
-    def _default_handler(self, endpoint: Endpoint) -> ASGIApp:
-        async def wrapper(scope: Scope, receive: Receive, send: Send) -> None:
-            request = Request(scope, receive, send)
-
-            response = await self._handle_request(
-                request, self._app._default_middlewares, endpoint
-            )
-            app = await self._response_to_asgi_app(response)
-
-            return await app(scope, receive, send)
-
-        return wrapper
-
-    async def _handle_routed_request(self, route: Route, request: Request) -> Any:
-        async def endpoint_wrapper(container: Container) -> Any:
+    def _route_handler(self, route: Route, container: Container) -> RequestHandler:
+        async def handler(request: Request) -> Response:
             if route.methods and request.method not in route.methods:
                 headers = {"Allow": ", ".join(route.methods)}
 
@@ -196,37 +188,27 @@ class Router:
                     parameter.annotation, Form
                 ):
                     arguments[name] = parameter.annotation(await request.form)
+
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Query
                 ):
                     arguments[name] = parameter.annotation(params=request.query_params)
 
-            return await container.call(route.endpoint, **arguments)
+            raw_response = await container.call(route.endpoint, **arguments)
 
-        return await self._handle_request(
-            request,
-            self._app._default_middlewares + route.get_middleware(),
-            endpoint_wrapper,
-        )
+            # Do not go through the response adapter if the response is already a Response instance
+            if isinstance(raw_response, Response):
+                return raw_response
 
-    async def _handle_request(
-        self,
-        request: Request,
-        middlewares: list[type[Middleware]],
-        endpoint: Endpoint,
-        *args: Any,
-    ) -> Response:
-        async with self._app.create_scoped_container() as container:
-            container.instance(Request, request)
+            return await container.call(
+                (await container.make(ResponseAdapter)).adapter(raw_response),
+                raw_response,
+            )
 
-            stack = MiddlewareStack(container, middlewares)
+        return handler
 
-            return await stack.handle(endpoint, *args)
+    def _default_handler(self, _: Container) -> RequestHandler:
+        async def handler(request: Request) -> Response:
+            raise Response.abort(404)
 
-    async def _response_to_asgi_app(self, response: Response) -> ASGIApp:
-        return response.response
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        app = await self._search(scope)
-
-        return await app(scope, receive, send)
+        return handler

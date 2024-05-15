@@ -7,12 +7,12 @@ import uuid
 from dataclasses import dataclass
 from re import Pattern
 
-from expanse.asynchronous.types import Scope
+from expanse.asynchronous.http.request import Request as ASGIRequest
 from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import NotEnoughURLParameters
 from expanse.common.routing.route import Match
 from expanse.common.routing.route import Route
-from expanse.types import Environ
+from expanse.http.request import Request
 
 
 T = typing.TypeVar("T")
@@ -112,13 +112,12 @@ class RouteMatcher:
         }
         self._compiled: dict[str, tuple[Pattern, str, dict[str, Convertor]]] = {}
 
-    def match(
-        self, route: Route, environ: Environ | None = None, scope: Scope | None = None
-    ) -> Match:
-        if scope is not None:
-            return self._match_from_scope(route, scope)
+    def match(self, route: Route, request: Request | ASGIRequest) -> Match:
+        match request:
+            case Request():
+                return self._match_from_request(route, request)
 
-        return self._match_from_environ(route, environ)
+        return self._match_from_asgi_request(route, request)
 
     def compile_path(self, path: str) -> tuple[Pattern, str, dict[str, Convertor]]:
         """
@@ -210,36 +209,34 @@ class RouteMatcher:
 
         return URLPath(path_format)
 
-    def _match_from_environ(self, route: Route, environ: Environ) -> Match:
+    def _match_from_request(self, route: Route, request: Request) -> Match:
         path_regex, fmt, convertors = self.compile_path(route.path)
-        match = path_regex.match(environ.get("PATH_INFO", ""))
+        match = path_regex.match(request.url.path)
         if match:
             matched_params = match.groupdict()
             for key, value in matched_params.items():
                 matched_params[key] = convertors[key].convert(value)
-            path_params = environ.get("PATH_PARAMS", {})
+            path_params = request.path_params
             path_params.update(matched_params)
-            environ["PATH_PARAMS"] = path_params
 
-            if route.methods and environ["REQUEST_METHOD"] not in route.methods:
+            if route.methods and request.method not in route.methods:
                 return Match.PARTIAL
 
             return Match.FULL
 
         return Match.NONE
 
-    def _match_from_scope(self, route: Route, scope: Scope) -> Match:
+    def _match_from_asgi_request(self, route: Route, request: ASGIRequest) -> Match:
         path_regex, fmt, convertors = self.compile_path(route.path)
-        match = path_regex.match(scope.get("path", ""))
+        match = path_regex.match(request.url.path)
         if match:
             matched_params = match.groupdict()
             for key, value in matched_params.items():
                 matched_params[key] = convertors[key].convert(value)
-            path_params = scope.get("path_params", {})
+            path_params = request.path_params
             path_params.update(matched_params)
-            scope["path_params"] = path_params
 
-            if route.methods and scope["method"] not in route.methods:
+            if route.methods and request.method not in route.methods:
                 return Match.PARTIAL
 
             return Match.FULL

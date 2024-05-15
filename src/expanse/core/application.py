@@ -20,7 +20,6 @@ from expanse.core.bootstrap.load_configuration import LoadConfiguration
 from expanse.core.bootstrap.load_environment_variables import LoadEnvironmentVariables
 from expanse.core.bootstrap.register_providers import RegisterProviders
 from expanse.exceptions.handler import ExceptionHandler
-from expanse.exceptions.middleware.handle_exceptions import HandleExceptions
 
 
 if TYPE_CHECKING:
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
     from cleo.io.inputs.input import Input
 
     from expanse.core.bootstrap.bootstrapper import Bootstrapper
-    from expanse.core.http.middleware.middleware import Middleware
     from expanse.support.service_provider import ServiceProvider
     from expanse.types import Environ
     from expanse.types import StartResponse
@@ -43,10 +41,6 @@ class Application(BaseApplication, Container):
         BootProviders,
     ]
 
-    _middleware: ClassVar[list[type[Middleware]]] = [HandleExceptions]
-
-    _middleware_groups: ClassVar[dict[str, type[Middleware]]] = {}
-
     def __init__(self, base_path: Path | None = None) -> None:
         BaseApplication.__init__(
             self,
@@ -58,9 +52,6 @@ class Application(BaseApplication, Container):
         self._service_providers: list[ServiceProvider] = []
         self._default_bootstrappers: list[type[Bootstrapper]] = (
             self.__class__._bootstrappers.copy()
-        )
-        self._default_middlewares: list[type[Middleware]] = (
-            self.__class__._middleware.copy()
         )
 
         self._bind_paths()
@@ -143,12 +134,6 @@ class Application(BaseApplication, Container):
 
         return provider
 
-    def prepend_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.insert(0, middleware)
-
-    def add_middleware(self, middleware: type[Middleware]) -> None:
-        self._default_middlewares.append(middleware)
-
     def handle_command(self, input: Input) -> int:
         from expanse.core.console.kernel import Kernel
 
@@ -168,12 +153,16 @@ class Application(BaseApplication, Container):
             self.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
+        from expanse.core.http.gateway import Gateway
+
         self.instance("app", self)
         self.instance(self.__class__, self)
         self.instance(Container, self)
         self._config = Config({})
         self.instance(Config, self._config)
         self.alias(Config, "config")
+
+        self.singleton(Gateway)
 
         # TODO: make the exception handler configurable
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
@@ -188,8 +177,8 @@ class Application(BaseApplication, Container):
     def __call__(
         self, environ: Environ, start_response: StartResponse
     ) -> Iterable[bytes]:
-        from expanse.routing.router import Router
+        from expanse.core.http.gateway import Gateway
 
         self.bootstrap()
 
-        return self.make(Router)(environ, start_response)
+        return self.make(Gateway)(environ, start_response)

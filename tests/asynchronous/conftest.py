@@ -10,12 +10,26 @@ from expanse.asynchronous.testing.client import TestClient
 
 
 if TYPE_CHECKING:
+    from expanse.asynchronous.core.http.middleware.middleware_stack import (
+        MiddlewareStack,
+    )
     from expanse.asynchronous.routing.router import Router
 
 
 @pytest.fixture()
-async def app() -> Application:
-    application = Application.configure(Path(__file__).parent.parent.parent).create()
+def root() -> Path:
+    return Path(__file__).parent.parent.parent
+
+
+@pytest.fixture()
+async def app(root: Path) -> Application:
+    async def configure_middleware(stack: MiddlewareStack) -> None:
+        stack.use([])
+
+    application = (
+        await Application.configure(root).with_middleware(configure_middleware).create()
+    )
+
     await application.bootstrap()
 
     application.config["app.debug"] = True
