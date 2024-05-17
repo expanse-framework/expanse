@@ -11,7 +11,7 @@ uvicorn = { version = "^0.23.2", extras = ["standard"] }
 cleo = "^2.0.1"
 jinja2 = "^3.1.2"
 pydantic = "^2.3.0"
-pendulum = { git = "https://github.com/sdispater/pendulum.git", rev = "master" }
+pendulum = "^3.0.0"
 pydantic-settings = "^2.1.0"
 sqlalchemy = "^2.0.25"
 baize = "^0.20.8"
