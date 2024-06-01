@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import traceback
 
-from collections.abc import Awaitable
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import ClassVar
@@ -27,6 +25,9 @@ from expanse.common.support._utils import string_to_class
 
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+    from collections.abc import Callable
+
     from cleo.io.inputs.input import Input
 
     from expanse.asynchronous.core.bootstrap.bootstrapper import Bootstrapper
@@ -53,9 +54,9 @@ class Application(BaseApplication, Container):
         Container.__init__(self)
 
         self._service_providers: list[ServiceProvider] = []
-        self._default_bootstrappers: list[
-            type[Bootstrapper]
-        ] = self.__class__._bootstrappers.copy()
+        self._default_bootstrappers: list[type[Bootstrapper]] = (
+            self.__class__._bootstrappers.copy()
+        )
         self._bootstrapping_callbacks: list[Callable[[Self], Awaitable[None]]] = []
 
         self._bind_paths()
@@ -170,7 +171,6 @@ class Application(BaseApplication, Container):
 
         self.singleton(Gateway)
 
-        # TODO: make the exception handler configurable
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     async def _register_base_service_providers(self) -> None:

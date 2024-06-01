@@ -16,6 +16,7 @@ from httpx._transports.wsgi import WSGIByteStream
 from expanse.common.testing.client import TestClient as BaseTestClient
 from expanse.contracts.debug.exception_handler import ExceptionHandler
 from expanse.core.application import Application
+from expanse.exceptions.handler import ExceptionHandler as ConcreteExceptionHandler
 
 
 if TYPE_CHECKING:
@@ -69,6 +70,9 @@ class WSGITransport(httpx.WSGITransport):
             return lambda _: None
 
         assert isinstance(self.app, Application)
+
+        if not self.app.has(ExceptionHandler):
+            self.app.singleton(ExceptionHandler, ConcreteExceptionHandler)
 
         handler: ExceptionHandler = self.app.make(ExceptionHandler)
         with handler.raise_unhandled_exceptions(self.raise_app_exceptions):

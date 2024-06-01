@@ -35,6 +35,9 @@ class Pipeline:
         except Exception as e:
             from expanse.contracts.debug.exception_handler import ExceptionHandler
 
+            if not self._container.has(ExceptionHandler):
+                raise e
+
             handler = self._container.make(ExceptionHandler)
 
             handler.report(e)

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <title>{{ error.type }}: {{ error.message }}</title>
+
+  <style>
+    {{ asset_content("app.css") }}
+  </style>
+</head>
+<body class="bg-light-note text-primary-600 dark:bg-slate-950 dark:text-primary-100">
+{% include "__expanse__/_partials/dark_mode.jinja2" %}
+
+<div data-controller="menu" data-action="keydown->menu#close">
+  <div class="absolute left-0 right-0 top-0 z-30 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="relative flex items-center justify-end py-6 md:space-x-10">
+      {% include "__expanse__/_partials/dark_mode_switcher.jinja2" %}
+    </div>
+  </div>
+</div>
+<div class="mx-auto mt-48 w-full max-w-7xl px-12 pb-16 md:mt-48 lg:px-0">
+  <div
+    class="absolute left-1/2 top-[256px] h-[60px] w-[1024px] -translate-x-1/2 rotate-45 bg-gradient-to-r from-transparent from-20% via-amber-600 to-red-500 to-65% blur-3xl saturate-200 dark:via-red-400 dark:to-rose-300"
+  ></div>
+
+  <div
+    class="absolute left-[64px] top-[478px] h-[45px] w-[1024px] rotate-45 bg-gradient-to-r from-transparent from-35% via-amber-500 to-red-400 blur-3xl saturate-200"
+  ></div>
+
+  <div class="mb-8">
+    <h5 class="text-lg text-primary-500 dark:text-primary-300">{{ error.type }}</h5>
+    <h1 class="text-xl font-medium">{{ error.message }}</h1>
+  </div>
+
+  <div
+    class="relative z-10 flex h-auto max-h-[60vh] overflow-hidden bg-slate-800 shadow-xl dark:bg-slate-900/70 dark:ring-1 dark:ring-inset dark:ring-white/10 dark:backdrop-blur sm:max-h-[none] sm:rounded-xl"
+  >
+    <div class="relative flex w-full flex-col">
+      <div class="flex-none border-b border-slate-500/30">
+        <div class="flex h-8 items-center space-x-1.5 px-3">
+          <div class="h-2.5 w-2.5 rounded-full bg-rose-400"></div>
+          <div class="h-2.5 w-2.5 rounded-full bg-amber-400"></div>
+          <div class="h-2.5 w-2.5 rounded-full bg-emerald-400"></div>
+        </div>
+      </div>
+      <div class="relative flex min-h-0 flex-auto flex-col">
+        <div class="flex min-h-0 w-full flex-auto overflow-auto">
+          <div class="relative w-full flex-auto">
+            {% set frame = trace[0].frames[0] %}
+            <div
+              id="frame-{{ frame.number }}"
+              class="h-full"
+              role="tabpanel"
+              data-tabs-target="panel"
+            >
+              {{ frame.code | safe }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="relative -mt-4 h-auto rounded-lg bg-light-primary bg-opacity-90 px-8 pb-4 pt-8 shadow-sm backdrop-blur-lg dark:bg-slate-800 dark:bg-opacity-40"
+    data-controller="tabs"
+  >
+    <nav id="exception-tabs" class="ml-4 flex space-x-8">
+      <a
+        class="tab active"
+        data-toggle="tab"
+        href="#stack-trace"
+        role="tab"
+        aria-controls="nav-home"
+        aria-selected="true"
+        data-tabs-target="tab"
+        data-action="click->tabs#change"
+      >Stack trace</a
+      >
+    </nav>
+    <div>
+      <div id="stack-trace" role="tabpanel" data-tabs-target="panel">
+        <div class="relative flex gap-4 overflow-visible" data-controller="tabs">
+          <!-- Stack trace -->
+          <div class="tabs max-w-[480px] self-start">
+            {% for collection in trace %}
+              {% set collection_loop = loop %}
+              {% if collection.is_repeated %}
+                <div class="frame repeated" data-number="...">
+                  <div class="tab">
+                    <p>
+                      Previous
+                      <strong class="font-medium dark:text-amber-700"
+                      >{{ collection.frames_count }}</strong
+                      >
+                      frame {% if collection.frames_count > 1 %}s{% endif %} repeated
+                      <strong class="font-medium dark:text-amber-700"
+                      >{{ collection.repetitions }}</strong
+                      >
+                      times
+                    </p>
+                  </div>
+                </div>
+              {% else %}
+                {% for frame in collection.frames %}
+                  <div
+                    data-number="{{ frame.number }}"
+                    class="frame {% if collection_loop.first and loop.first %}active{% endif %}"
+                    role="tab"
+                    data-toggle="tab"
+                    id="frame-{{ frame.number }}"
+                    aria-controls="nav-home"
+                    aria-selected="{% if collection_loop.first %}true{% else %}false{% endif %}"
+                    data-tabs-target="tab"
+                    data-action="click->tabs#change"
+                  >
+                    <a class="tab" href="#"
+                    ><h3 class="font-medium">
+                      {{ frame.filepath }}{% if frame.lineno != None %}:{{ frame.lineno }}{% endif %}
+                    </h3>
+                      <p>in <code>{{ frame.function }}</code></p>
+                      <div class="line">{{ frame.highlighted_line }}</div>
+                    </a>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+          </div>
+          <!-- Code -->
+          <div class="sticky top-4 flex-1 self-start overflow-hidden">
+            <div
+              class="relative flex h-auto max-h-[60vh] overflow-hidden bg-slate-800 shadow-xl dark:bg-slate-900/70 dark:ring-1 dark:ring-inset dark:ring-white/10 dark:backdrop-blur sm:max-h-[none] sm:rounded-xl"
+            >
+              <div class="relative flex w-full flex-col">
+                <div class="flex-none">
+                  <div class="flex h-8 items-center space-x-1.5 px-3">
+                    <div class="h-2.5 w-2.5 rounded-full bg-rose-400"></div>
+                    <div class="h-2.5 w-2.5 rounded-full bg-amber-400"></div>
+                    <div class="h-2.5 w-2.5 rounded-full bg-emerald-400"></div>
+                  </div>
+                </div>
+
+                {% for collection in trace %}
+                  {% if not collection.is_repeated %}
+                    {% for frame in collection.frames %}
+                      <div
+                        class="{% if loop.index > 1 %}!hidden{% endif %}"
+                        id="frame-{{ frame.number }}"
+                        role="tabpanel"
+                        data-tabs-target="panel"
+                      >
+                        <div
+                          class="flex flex-none overflow-auto whitespace-nowrap"
+                          style="opacity: 1;"
+                        >
+                          <div class="relative min-w-full flex-none px-1">
+                            <ul class="flex text-sm leading-6 text-slate-400">
+                              <li class="flex-none">
+                                <button
+                                  type="button"
+                                  class="relative px-3 py-2 text-orange-400"
+                                >
+                                  {{ frame.filename }}<span
+                                  class="absolute inset-x-3 bottom-0 z-10 h-px bg-orange-400"
+                                ></span>
+                                </button>
+                              </li>
+                            </ul>
+                            <div class="absolute inset-x-0 bottom-0 h-px bg-slate-500/30"></div>
+                          </div>
+                        </div>
+                        <div class="relative flex min-h-0 flex-auto flex-col">
+                          <div class="flex min-h-0 w-full flex-auto overflow-auto">
+                            <div class="relative w-full flex-auto">{{ frame.code | safe }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8" data-controller="tabs"></div>
+</div>
+
+<script>
+  {{ asset_content("app.js") }}
+</script>
+</body>
+</html>

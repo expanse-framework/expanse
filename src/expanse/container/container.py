@@ -166,10 +166,8 @@ class Container(BaseContainer):
         if self._is_buildable(actual_abstract, concrete):
             try:
                 obj = self.build(concrete, metadata)
-            except Exception:
-                logger.exception('Unable to build the "%s" dependency', abstract)
-
-                raise
+            except Exception as e:
+                raise ValueError(f'Unable to build the "{abstract}" dependency') from e
         else:
             obj = self.make(concrete)
 

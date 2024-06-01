@@ -20,6 +20,7 @@ from expanse.asynchronous.http.response import Response
 from expanse.common.configuration.config import Config
 from expanse.common.core.http.exceptions import HTTPException
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,8 +110,8 @@ class ExceptionHandler(ExceptionHandlerContract):
 
             factory = await self._container.make(ViewFactory)
 
-            response = await factory.make(
-                view, {"exception": e}, status_code=e.status_code
+            response = await factory.render(
+                await factory.make(view, {"exception": e}, status_code=e.status_code)
             )
 
             return response

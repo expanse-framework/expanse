@@ -41,6 +41,9 @@ class Pipeline:
                 ExceptionHandler,
             )
 
+            if not self._container.has(ExceptionHandler):
+                raise e
+
             handler = await self._container.make(ExceptionHandler)
 
             await handler.report(e)

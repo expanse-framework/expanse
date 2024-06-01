@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import Literal
 from typing import Self
+from typing import overload
 
 from jinja2.environment import Environment
 from jinja2.loaders import FunctionLoader
 
 from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.view.view import View
 
 
 if TYPE_CHECKING:
@@ -28,16 +31,28 @@ class ViewFactory:
         data: dict[str, Any] | None = None,
         status_code: int = 200,
         headers: dict[str, Any] | None = None,
-    ) -> Response:
-        template = self._env.get_template(view)
+    ) -> View:
+        return View(view, data, status_code=status_code, headers=headers)
 
-        content = await template.render_async(data or {})
+    @overload
+    async def render(self, view: View, raw: Literal[False]) -> Response: ...
+
+    @overload
+    async def render(self, view: View, raw: Literal[True]) -> str: ...
+
+    async def render(self, view: View, raw: bool = False) -> Response | str:
+        template = self._env.get_template(view.identifier)
+
+        content = await template.render_async(view.data)
+
+        if raw:
+            return content
 
         return Response(
             content=content,
             media_type="text/html",
-            status_code=status_code,
-            headers=headers,
+            status_code=view.status_code,
+            headers=view.headers,
         )
 
     def exists(self, view: str) -> bool:

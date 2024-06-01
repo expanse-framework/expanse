@@ -1,7 +1,8 @@
-# ruff: noqa: I002
-
 from expanse.core.application import Application
+from expanse.http.response import Response
+from expanse.http.response_adapter import ResponseAdapter
 from expanse.support.service_provider import ServiceProvider
+from expanse.view.view import View
 from expanse.view.view_factory import ViewFactory
 from expanse.view.view_finder import ViewFinder
 
@@ -10,6 +11,9 @@ class ViewServiceProvider(ServiceProvider):
     def register(self) -> None:
         self._register_factory()
         self._register_view_finder()
+
+    def boot(self) -> None:
+        self._app.on_resolved(ResponseAdapter, self._register_response_adapters)
 
     def _register_factory(self) -> None:
         self._app.singleton(ViewFactory, self._create_factory)
@@ -31,3 +35,9 @@ class ViewServiceProvider(ServiceProvider):
 
         self._app.singleton(ViewFinder, _create_view_finder)
         self._app.alias(ViewFinder, "view:finder")
+
+    def _register_response_adapters(self, adapter: ResponseAdapter) -> None:
+        def adapt_view(raw_response: View, factory: ViewFactory) -> Response:
+            return factory.render(raw_response)
+
+        adapter.register_adapter(View, adapt_view)

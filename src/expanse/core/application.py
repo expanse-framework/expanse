@@ -164,7 +164,6 @@ class Application(BaseApplication, Container):
 
         self.singleton(Gateway)
 
-        # TODO: make the exception handler configurable
         self.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     def _register_base_service_providers(self) -> None:

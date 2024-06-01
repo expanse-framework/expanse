@@ -1,7 +1,20 @@
+from expanse.asynchronous.contracts.debug.exception_renderer import (
+    ExceptionRenderer as BaseExceptionRenderer,
+)
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 from expanse.common.core.http.exceptions import HTTPException
+
+
+class ExceptionRenderer(BaseExceptionRenderer):
+    def __init__(self) -> None:
+        self.rendered: bool = False
+
+    async def render(self, exception: Exception) -> str:
+        self.rendered = True
+
+        return "Rendered"
 
 
 async def error() -> Response:
@@ -22,7 +35,7 @@ def test_unhandled_exceptions_are_displayed_with_debug_information_if_debug_mode
 
     assert response.status_code == 500
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert response.text == f"Exception: Internal error in {__file__} at line 8"
+    assert response.text == f"Exception: Internal error in {__file__} at line 21"
 
 
 def test_unhandled_exceptions_are_displayed_with_basic_information_if_not_debug_mode(
@@ -51,3 +64,20 @@ def test_http_exceptions_are_displayed_via_a_dedicated_html_page(
     assert response.status_code == 403
     assert response.headers["Content-Type"] == "text/html; charset=utf-8"
     assert "Forbidden" in response.text
+
+
+def test_http_exception_are_displayed_via_renderer_if_configured(
+    router, client: TestClient
+) -> None:
+    renderer = ExceptionRenderer()
+    client.app.instance(BaseExceptionRenderer, renderer)
+
+    router.get("/error", error)
+
+    with client.handle_exceptions():
+        response = client.get("/error")
+
+    assert response.status_code == 500
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert response.text == "Rendered"
+    assert renderer.rendered

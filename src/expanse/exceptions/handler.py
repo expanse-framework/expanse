@@ -100,7 +100,9 @@ class ExceptionHandler(ExceptionHandlerContract):
 
             factory = self._container.make(ViewFactory)
 
-            response = factory.make(view, {"exception": e}, status_code=e.status_code)
+            response = factory.render(
+                factory.make(view, {"exception": e}, status_code=e.status_code)
+            )
 
             return response
 

@@ -32,6 +32,10 @@ psycopg = "^3.1.18"
 asyncpg = "^0.29.0"
 pg8000 = "^1.30.4"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest-mock = "^3.14.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
