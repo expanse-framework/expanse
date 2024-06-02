@@ -5,6 +5,6 @@ from expanse.exceptions.exception_renderer import ExceptionRenderer
 from expanse.support.service_provider import ServiceProvider
 
 
-class ExceptionServiceProvider(ServiceProvider):
+class CoreServiceProvider(ServiceProvider):
     def register(self) -> None:
         self._app.singleton(ExceptionRendererContract, ExceptionRenderer)

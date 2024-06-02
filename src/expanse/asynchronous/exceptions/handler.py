@@ -159,8 +159,6 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         from expanse.asynchronous.view.view_finder import ViewFinder
 
-        print(self._container)
-
         (await self._container.make(ViewFinder)).add_paths(
             [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]
         )

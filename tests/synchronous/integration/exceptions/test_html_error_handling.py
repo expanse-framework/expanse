@@ -34,8 +34,8 @@ def test_unhandled_exceptions_are_displayed_with_debug_information_if_debug_mode
         response = client.get("/error")
 
     assert response.status_code == 500
-    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert response.text == f"Exception: Internal error in {__file__} at line 21"
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert "Internal error" in response.text
 
 
 def test_unhandled_exceptions_are_displayed_with_basic_information_if_not_debug_mode(

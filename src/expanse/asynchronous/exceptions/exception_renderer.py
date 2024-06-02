@@ -5,9 +5,9 @@ import expanse.common.exceptions
 from expanse.asynchronous.contracts.debug.exception_renderer import (
     ExceptionRenderer as ExceptionRendererContract,
 )
+from expanse.asynchronous.view.view_factory import ViewFactory
+from expanse.asynchronous.view.view_finder import ViewFinder
 from expanse.common.exceptions.exception_renderer import ExceptionRendererMixin
-from expanse.view.view_factory import ViewFactory
-from expanse.view.view_finder import ViewFinder
 
 
 class ExceptionRenderer(ExceptionRendererContract, ExceptionRendererMixin):
@@ -21,7 +21,7 @@ class ExceptionRenderer(ExceptionRendererContract, ExceptionRendererMixin):
     async def render(self, exception: Exception) -> str:
         trace = self.build_trace(exception)
 
-        view = self._view.make(
+        view = await self._view.make(
             "__expanse__/trace",
             {
                 "error": {
@@ -33,7 +33,7 @@ class ExceptionRenderer(ExceptionRendererContract, ExceptionRendererMixin):
             },
         )
 
-        return self._view.render(view, raw=True)
+        return await self._view.render(view, raw=True)
 
     def asset_content(self, asset_name: str) -> str:
         return (
