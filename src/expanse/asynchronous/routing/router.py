@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import NoReturn
 
 from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.core.application import Application
@@ -132,6 +133,9 @@ class Router:
             # to handle the request.
             handler = self._default_handler(container)
         else:
+            # Set the route to the request
+            request.set_route(route)
+
             handler = self._route_handler(route, container)
             pipes = [
                 (await container.make(middleware)).handle
@@ -207,8 +211,12 @@ class Router:
 
         return handler
 
-    def _default_handler(self, _: Container) -> RequestHandler:
-        async def handler(request: Request) -> Response:
-            raise Response.abort(404)
+    def _default_handler(self, container: Container) -> RequestHandler:
+        async def handler(request: Request) -> NoReturn:
+            from expanse.asynchronous.routing.responder import Responder
+
+            responder = await container.make(Responder)
+
+            await responder.abort(404)
 
         return handler

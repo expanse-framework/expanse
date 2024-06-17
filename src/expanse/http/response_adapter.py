@@ -3,6 +3,7 @@ from typing import Protocol
 from typing import Self
 from typing import TypeVar
 
+from expanse.container.container import Container
 from expanse.http.request import Request
 from expanse.http.response import Response
 
@@ -30,8 +31,14 @@ class ResponseAdapter:
 
         return self
 
-    def _adapt_string(self, request: Request, response: str) -> Response:
-        if request.expects_json():
-            return Response.json(response)
+    def _adapt_string(
+        self, response: str, request: Request, container: Container
+    ) -> Response:
+        from expanse.routing.responder import Responder
 
-        return Response.text(response)
+        responder = container.make(Responder)
+
+        if request.expects_json():
+            return responder.json(response)
+
+        return responder.text(response)

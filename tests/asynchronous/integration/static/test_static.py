@@ -1,11 +1,11 @@
 from pathlib import Path
 
+from expanse.asynchronous.http.helpers import view
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.route import Route
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.static.static_service_provider import StaticServiceProvider
 from expanse.asynchronous.testing.client import TestClient
-from expanse.asynchronous.view.view_factory import ViewFactory
 from expanse.asynchronous.view.view_service_provider import ViewServiceProvider
 
 
@@ -47,8 +47,8 @@ async def test_view_static_function_is_registered_successfully(
     await client.app.register(provider)
     await provider.boot()
 
-    async def foo(view: ViewFactory) -> Response:
-        return await view.make("foo")
+    async def foo() -> Response:
+        return await view("foo")
 
     (await client.app.make(Router)).add_route(Route.get("/foo", foo))
 
@@ -68,8 +68,8 @@ async def test_static_url_includes_base_url(client: TestClient) -> None:
     await client.app.register(provider)
     await provider.boot()
 
-    async def foo(view: ViewFactory) -> Response:
-        return await view.make("foo")
+    async def foo() -> Response:
+        return await view("foo")
 
     (await client.app.make(Router)).add_route(Route.get("/foo", foo))
 

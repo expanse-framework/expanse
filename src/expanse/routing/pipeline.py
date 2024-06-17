@@ -30,6 +30,10 @@ class Pipeline:
         return self
 
     def to(self, handler: RequestHandler) -> Response:
+        from expanse.core.helpers import _set_container
+
+        _set_container(self._container)
+
         try:
             return self._build_pipeline(handler)(self._request)
         except Exception as e:
@@ -43,6 +47,8 @@ class Pipeline:
             handler.report(e)
 
             return handler.render(self._request, e)
+        finally:
+            _set_container(None)
 
     def _build_pipeline(self, handler: RequestHandler) -> RequestHandler:
         stack = handler

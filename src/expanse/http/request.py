@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import Any
+from typing import Self
 
 from baize.wsgi.requests import Request as BaseRequest
 
@@ -9,6 +11,7 @@ from expanse.common.http.url import URL
 
 
 if TYPE_CHECKING:
+    from expanse.routing.route import Route
     from expanse.types import Environ
     from expanse.types import StartResponse
 
@@ -17,8 +20,10 @@ class Request(BaseRequest):
     def __init__(self, environ: Environ, start_response: StartResponse | None = None):
         super().__init__(environ, start_response)
 
-        self._acceptable_content_types: list[str] | None = None
         self._url: URL | None = None
+        self._route: Route | None = None
+
+        self._acceptable_content_types: list[str] | None = None
 
     @property
     def url(self) -> URL:
@@ -91,6 +96,71 @@ class Request(BaseRequest):
 
     def is_pjax(self) -> bool:
         return self.headers.get("X-PJAX") == "true"
+
+    @property
+    def route(self) -> Route | None:
+        return self._route
+
+    def set_route(self, route: Route) -> Self:
+        self._route = route
+
+        return self
+
+    @classmethod
+    def create(
+        cls, raw_url: str, method: str = "GET", environ: dict[str, Any] | None = None
+    ) -> Request:
+        base_environ = {
+            "wsgi.url_scheme": "http",
+            "SERVER_NAME": "localhost",
+            "SERVER_PORT": 80,
+            "HTTP_HOST": "localhost",
+            "HTTP_USER_AGENT": "Expanse",
+            "HTTP_ACCEPT": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "HTTP_ACCEPT_LANGUAGE": "en-us,en;q=0.5",
+            "REMOTE_ADDR": "127.0.0.1",
+            "SCRIPT_NAME": "",
+            "SCRIPT_FILENAME": "",
+            "SERVER_PROTOCOL": "HTTP/1.1",
+            "PATH_INFO": "",
+            "REQUEST_METHOD": method.upper(),
+            **(environ or {}),
+        }
+
+        url = URL(raw_url)
+
+        if url.hostname is not None:
+            base_environ["SERVER_NAME"] = url.hostname
+            base_environ["HTTP_HOST"] = url.hostname
+
+        if url.scheme:
+            base_environ["wsgi.url_scheme"] = url.scheme
+
+            if url.scheme == "https":
+                base_environ["HTTPS"] = "on"
+                base_environ["SERVER_PORT"] = 443
+            else:
+                base_environ.pop("HTTPS", None)
+                base_environ["SERVER_PORT"] = 80
+
+        if url.port is not None:
+            base_environ["SERVER_PORT"] = url.port
+            base_environ["HTTP_HOST"] += f":{url.port}"
+
+        path = url.path
+        if not path:
+            path = "/"
+
+        query_string = ""
+        if url.query:
+            query_string = {url.query}
+
+        base_environ["REQUEST_URI"] = path + (
+            "?" + query_string if query_string else ""
+        )
+        base_environ["QUERY_STRING"] = query_string
+
+        return cls(environ=base_environ)
 
 
 __all__ = ["Request"]

@@ -1,3 +1,4 @@
+from expanse.asynchronous.http.helpers import respond
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.http.response_adapter import ResponseAdapter
 from expanse.asynchronous.routing.router import Router
@@ -35,7 +36,7 @@ async def test_string_adapter_adapts_response_based_on_request_acceptable_type(
 
 async def test_register_new_adapter(router: Router, client: TestClient) -> None:
     async def adapt_response(response: CustomResponseType) -> Response:
-        return Response.text(response.content)
+        return await (await respond()).text(response.content)
 
     adapter = await client.app.make(ResponseAdapter)
     adapter.register_adapter(CustomResponseType, adapt_response)

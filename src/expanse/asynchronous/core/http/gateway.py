@@ -67,4 +67,4 @@ class Gateway:
     async def _prepare_response(
         self, response: Response, scope: Scope, receive: Receive, send: Send
     ) -> None:
-        return await response.response(scope, receive, send)
+        return await response(scope, receive, send)

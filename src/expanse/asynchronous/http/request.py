@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import Any
+from typing import Self
 
 from baize.asgi import empty_receive
 from baize.asgi import empty_send
@@ -11,6 +13,7 @@ from expanse.common.http.url import URL
 
 
 if TYPE_CHECKING:
+    from expanse.asynchronous.routing.route import Route
     from expanse.asynchronous.types import Receive
     from expanse.asynchronous.types import Scope
     from expanse.asynchronous.types import Send
@@ -24,6 +27,10 @@ class Request(BaseRequest):
 
         self._acceptable_content_types: list[str] | None = None
         self._url: URL | None = None
+
+        self._route: Route | None = None
+
+        self._acceptable_content_types: list[str] | None = None
 
     @property
     def url(self) -> URL:
@@ -52,6 +59,10 @@ class Request(BaseRequest):
             ]
 
         return self._acceptable_content_types
+
+    @property
+    def route(self) -> Route | None:
+        return self._route
 
     def accepts_any_content_type(self) -> bool:
         """
@@ -96,6 +107,72 @@ class Request(BaseRequest):
 
     def is_pjax(self) -> bool:
         return self.headers.get("X-PJAX") == "true"
+
+    def set_route(self, route: Route) -> Self:
+        self._route = route
+
+        return self
+
+    @classmethod
+    def create(
+        cls, raw_url: str, method: str = "GET", scope: dict[str, Any] | None = None
+    ) -> Request:
+        default_headers = {
+            b"User-Agent": b"Expanse",
+            b"Accept": b"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            b"Accept-Language": b"en-us,en;q=0.5",
+        }
+        base_scope = {
+            "type": "http",
+            "scheme": "http",
+            "server": ["localhost", 80],
+            "headers": [],
+            "REMOTE_ADDR": "127.0.0.1",
+            "root_path": "",
+            "http_version": "1.1",
+            "path": "",
+            "raw_path": "",
+            "method": method.upper(),
+            **(scope or {}),
+        }
+
+        headers = base_scope["headers"]
+        header_names = {header[0] for header in headers}
+
+        for default_header in default_headers:
+            if default_header not in header_names:
+                headers.append([default_header, default_headers[default_header]])
+
+        url = URL(raw_url)
+
+        if url.hostname is not None:
+            base_scope["server"][0] = url.hostname
+
+        if url.scheme:
+            base_scope["scheme"] = url.scheme
+
+            if url.scheme == "https":
+                base_scope["server"][1] = 443
+            else:
+                base_scope["server"][1] = 80
+
+        if url.port is not None:
+            base_scope["server"][1] = url.port
+
+        path = url.path
+        if not path:
+            path = "/"
+
+        base_scope["path"] = path
+        base_scope["raw_path"] = path
+
+        query_string = ""
+        if url.query:
+            query_string = {url.query}
+
+        base_scope["query_string"] = query_string
+
+        return cls(scope=base_scope)
 
 
 __all__ = ["Request"]

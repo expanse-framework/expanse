@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from typing import Self
 
+from expanse.http.helpers import abort
+from expanse.http.helpers import respond
 from expanse.http.response import Response
 
 
@@ -18,9 +20,9 @@ class Static:
         full_path = self._find(path)
 
         if not full_path:
-            return Response(status_code=404)
+            abort(404)
 
-        return Response.file(full_path)
+        return respond().file(full_path)
 
     def url(self, path: str) -> str:
         static_url = []

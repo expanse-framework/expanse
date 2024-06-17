@@ -1,4 +1,5 @@
 from expanse.common.http.form import Form
+from expanse.http.helpers import json
 from expanse.http.response import Response
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
@@ -6,16 +7,16 @@ from tests.synchronous.integration.http.fixtures.request.models import FooModel
 
 
 def create_foo(form: Form) -> Response:
-    return Response.json({"bar": form.fields["bar"].value})
+    return json({"bar": form.fields["bar"].value})
 
 
 def create_foo_validated(form: Form[FooModel]) -> Response:
     if not form.is_valid():
-        return Response.json({"errors": form.errors, "data": form.data})
+        return json({"errors": form.errors, "data": form.data})
 
     assert form.data is not None
 
-    return Response.json({"bar": form.data.bar})
+    return json({"bar": form.data.bar})
 
 
 def test_simple_form_data_are_not_converted_if_no_validation_model(

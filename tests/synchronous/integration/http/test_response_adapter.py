@@ -1,4 +1,4 @@
-from expanse.http.response import Response
+from expanse.http.helpers import respond
 from expanse.http.response_adapter import ResponseAdapter
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
@@ -36,7 +36,7 @@ def test_string_adapter_adapts_response_based_on_request_acceptable_type(
 def test_register_new_adapter(router: Router, client: TestClient) -> None:
     adapter = client.app.make(ResponseAdapter)
     adapter.register_adapter(
-        CustomResponseType, lambda response: Response.text(response.content)
+        CustomResponseType, lambda response: respond().text(response.content)
     )
 
     router.get("/", custom_response)

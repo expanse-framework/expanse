@@ -3,6 +3,7 @@ from typing import Protocol
 from typing import Self
 from typing import TypeVar
 
+from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 
@@ -41,8 +42,13 @@ class ResponseAdapter:
 
         return self
 
-    def _adapt_string(self, request: Request, response: str) -> Response:
-        if request.expects_json():
-            return Response.json(response)
+    async def _adapt_string(
+        self, response: str, request: Request, container: Container
+    ) -> Response:
+        from expanse.asynchronous.routing.responder import Responder
 
-        return Response.text(response)
+        responder = await container.make(Responder)
+        if request.expects_json():
+            return await responder.json(response)
+
+        return await responder.text(response)

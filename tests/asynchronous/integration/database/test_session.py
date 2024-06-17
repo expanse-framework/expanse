@@ -3,13 +3,14 @@ from typing import Annotated
 import pytest
 
 from expanse.asynchronous.contracts.database.session import Session
+from expanse.asynchronous.http.helpers import json
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 
 
 async def default_session(session: Session) -> Response:
-    return Response.json(
+    return await json(
         (
             await session.execute("SELECT id FROM my_table WHERE id = 'sqlite' LIMIT 1")
         ).scalar()
@@ -34,7 +35,7 @@ def test_a_named_session_can_be_injected(
     router: Router, client: TestClient, name: str
 ) -> None:
     async def named_session(connection: Annotated[Session, name]) -> Response:
-        return Response.json(
+        return await json(
             await connection.scalar(
                 "SELECT id FROM my_table WHERE id = :id LIMIT 1", {"id": name}
             )

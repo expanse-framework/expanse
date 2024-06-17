@@ -33,6 +33,10 @@ class Pipeline:
         return self
 
     async def to(self, handler: RequestHandler) -> Response:
+        from expanse.asynchronous.core.helpers import _set_container
+
+        _set_container(self._container)
+
         try:
             pipeline = await self._build_pipeline(handler)
             return await pipeline(self._request)
@@ -49,6 +53,8 @@ class Pipeline:
             await handler.report(e)
 
             return await handler.render(self._request, e)
+        finally:
+            _set_container(None)
 
     async def _build_pipeline(self, handler: RequestHandler) -> RequestHandler:
         stack = handler

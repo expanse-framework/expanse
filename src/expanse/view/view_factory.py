@@ -37,10 +37,10 @@ class ViewFactory:
         return View(view, data, status_code=status_code, headers=headers)
 
     @overload
-    def render(self, view: View, raw: Literal[False]) -> Response: ...
+    def render(self, view: View, raw: Literal[False] = False) -> Response: ...
 
     @overload
-    def render(self, view: View, raw: Literal[True]) -> str: ...
+    def render(self, view: View, raw: Literal[True] = True) -> str: ...
 
     def render(self, view: View, raw: bool = False) -> Response | str:
         template = self._env.get_template(view.identifier)
@@ -52,7 +52,7 @@ class ViewFactory:
 
         return Response(
             content=content,
-            media_type="text/html",
+            content_type="text/html",
             status_code=view.status_code,
             headers=view.headers,
         )

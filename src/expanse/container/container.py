@@ -427,6 +427,11 @@ class ScopedContainer(Container):
         if isinstance(abstract, _AnnotatedAlias):
             actual_abstract, *_ = get_args(abstract)
 
+        # If the abstract is neither bound in the container nor in its base container,
+        # we will resolve it from the scoped container.
+        if not self.bound(abstract):
+            return super()._resolve(abstract)
+
         if not self._directly_bound(actual_abstract):
             return self._base_container._resolve(abstract)
 

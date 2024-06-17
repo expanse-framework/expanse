@@ -1,3 +1,4 @@
+from expanse.asynchronous.http.helpers import json
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
@@ -6,11 +7,11 @@ from tests.asynchronous.integration.http.fixtures.request.models import FooModel
 
 
 async def create_foo(data: JSON) -> Response:
-    return Response.json({"bar": data.data["bar"]})
+    return await json({"bar": data.data["bar"]})
 
 
 async def create_foo_validated(form: JSON[FooModel]) -> Response:
-    return Response.json({"bar": form.data.bar})
+    return await json({"bar": form.data.bar})
 
 
 def test_simple_json_data_are_not_converted_if_no_validation_model(

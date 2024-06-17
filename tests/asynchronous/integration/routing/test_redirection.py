@@ -1,5 +1,7 @@
+from expanse.asynchronous.http.helpers import redirect
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.redirect import Redirect
+from expanse.asynchronous.routing.responder import Responder
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 
@@ -12,16 +14,16 @@ async def destination_with_parameters(name: str) -> str:
     return f"Arrived at {name} destination"
 
 
-async def redirection_to_url(redirect: Redirect) -> Response:
-    return await redirect.to("/destination")
+async def redirection_to_url(responder: Responder) -> Response:
+    return await responder.redirect().to("/destination")
 
 
 async def redirection_to_named_route(redirect: Redirect) -> Response:
     return await redirect.to_route("destination")
 
 
-async def redirection_to_named_route_with_parameters(redirect: Redirect) -> Response:
-    return await redirect.to_route("destination", {"name": "foo"})
+async def redirection_to_named_route_with_parameters() -> Response:
+    return await (await redirect()).to_route("destination", {"name": "foo"})
 
 
 async def redirection_to_named_route_with_parameters_and_query_params(

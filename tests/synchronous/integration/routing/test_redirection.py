@@ -1,5 +1,5 @@
 from expanse.http.response import Response
-from expanse.routing.redirect import Redirect
+from expanse.routing.responder import Responder
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
@@ -12,22 +12,24 @@ def destination_with_parameters(name: str) -> str:
     return f"Arrived at {name} destination"
 
 
-def redirection_to_url(redirect: Redirect) -> Response:
-    return redirect.to("/destination")
+def redirection_to_url(responder: Responder) -> Response:
+    return responder.redirect().to("/destination")
 
 
-def redirection_to_named_route(redirect: Redirect) -> Response:
-    return redirect.to_route("destination")
+def redirection_to_named_route(responder: Responder) -> Response:
+    return responder.redirect().to_route("destination")
 
 
-def redirection_to_named_route_with_parameters(redirect: Redirect) -> Response:
-    return redirect.to_route("destination", {"name": "foo"})
+def redirection_to_named_route_with_parameters(responder: Responder) -> Response:
+    return responder.redirect().to_route("destination", {"name": "foo"})
 
 
 def redirection_to_named_route_with_parameters_and_query_params(
-    redirect: Redirect,
+    responder: Responder,
 ) -> Response:
-    return redirect.to_route("destination", {"name": "foo", "foo": "bar", "bar": 42})
+    return responder.redirect().to_route(
+        "destination", {"name": "foo", "foo": "bar", "bar": 42}
+    )
 
 
 def test_redirect_to_url(router: Router, client: TestClient) -> None:

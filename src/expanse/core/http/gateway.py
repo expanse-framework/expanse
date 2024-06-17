@@ -69,4 +69,4 @@ class Gateway:
     def _prepare_response(
         self, response: Response, environ: Environ, start_response: StartResponse
     ) -> Iterable[bytes]:
-        return response.response(environ, start_response)
+        return response(environ, start_response)

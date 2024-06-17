@@ -1,23 +1,19 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from typing import Any
 from typing import Literal
-from typing import NoReturn
 from typing import Self
 
-from baize.asgi.responses import FileResponse
-from baize.asgi.responses import JSONResponse
 from baize.asgi.responses import PlainTextResponse
 from baize.asgi.responses import Response as BaizeResponse
 from baize.asgi.responses import SmallResponse as BaizeSmallResponse
 
-from expanse.common.core.http.exceptions import HTTPException
-
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from os import PathLike
+    from collections.abc import MutableMapping
+
+    from baize.datastructures import Cookie
 
     from expanse.asynchronous.types import Receive
     from expanse.asynchronous.types import Scope
@@ -29,8 +25,8 @@ class Response:
         self,
         content: bytes | str | None = None,
         status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-        media_type: str | None = None,
+        headers: MutableMapping[str, str] | None = None,
+        content_type: str | None = None,
         *,
         response: BaizeResponse | None = None,
     ) -> None:
@@ -39,89 +35,60 @@ class Response:
                 content=content or "",
                 status_code=status_code,
                 headers=headers,
-                media_type=media_type,
+                media_type=content_type,
             )
 
-        self.response = response
-        self.status_code = response.status_code
-        self.headers = response.headers
-        self.cookies = response.cookies
+        self._response = response
+        self._status_code = response.status_code
+        self._headers = response.headers
+        self._cookies = response.cookies
 
-        if isinstance(response, BaizeSmallResponse):
-            self.media_type = response.media_type
-            self.charset = response.charset
-        else:
-            self.media_type = None
-            self.charset = None
+    @property
+    def status_code(self) -> int:
+        return self._status_code
 
-    @classmethod
-    def json(
-        cls,
-        content: Any = None,
-        status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-        **kwargs: Any,
-    ) -> Self:
-        return cls(
-            response=JSONResponse(
-                content, status_code=status_code, headers=headers, **kwargs
-            )
-        )
+    @property
+    def headers(self) -> MutableMapping[str, str]:
+        return self._response.headers
 
-    @classmethod
-    def html(
-        cls,
-        content: Any = "",
-        status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-    ) -> Self:
-        return cls(
-            response=PlainTextResponse(
-                content,
-                status_code=status_code,
-                headers=headers,
-                media_type="text/html",
-            )
-        )
+    @property
+    def cookies(self) -> list[Cookie]:
+        return self._response.cookies
 
-    @classmethod
-    def text(
-        cls,
-        content: Any = "",
-        status_code: int = 200,
-        headers: Mapping[str, str] | None = None,
-    ) -> Self:
-        return cls(
-            response=PlainTextResponse(
-                content, status_code=status_code, headers=headers
-            )
-        )
+    @property
+    def content_type(self) -> str | None:
+        if isinstance(self._response, BaizeSmallResponse):
+            return self._response.media_type
 
-    @classmethod
-    def file(
-        cls,
-        path: str | PathLike[str],
-        headers: Mapping[str, str] | None = None,
-        media_type: str | None = None,
-        filename: str | None = None,
-    ) -> Self:
-        return cls(
-            response=FileResponse(
-                path,
-                headers=headers,
-                content_type=media_type,
-                download_name=filename,
-            )
-        )
+        if hasattr(self._response, "content_type"):
+            return self._response.content_type
 
-    @classmethod
-    def abort(
-        cls,
-        status_code: int,
-        message: str | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> NoReturn:
-        raise HTTPException(status_code, detail=message, headers=headers)
+        if "Content-Type" in self._response.headers:
+            return self._response.headers["Content-Type"]
+
+        return None
+
+    @property
+    def charset(self) -> str | None:
+        if isinstance(self._response, BaizeSmallResponse):
+            return self._response.charset
+
+        return None
+
+    def with_status(self, status_code: int) -> Self:
+        self._response.status_code = status_code
+
+        return self
+
+    def with_header(self, key: str, value: str) -> Self:
+        self._response.headers[key] = value
+
+        return self
+
+    def with_headers(self, headers: Mapping[str, str]) -> Self:
+        self._response.headers.update(headers)
+
+        return self
 
     def set_cookie(
         self,
@@ -135,7 +102,7 @@ class Response:
         httponly: bool = False,
         samesite: Literal["strict", "lax", "none"] = "lax",
     ) -> None:
-        self.response.set_cookie(
+        self._response.set_cookie(
             key,
             value=value,
             max_age=max_age,
@@ -168,4 +135,4 @@ class Response:
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        return await self.response(scope=scope, receive=receive, send=send)
+        return await self._response(scope=scope, receive=receive, send=send)

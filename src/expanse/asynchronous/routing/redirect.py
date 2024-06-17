@@ -52,7 +52,9 @@ class Redirect:
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
-        response = Response.html(content, status_code=status, headers=headers)
+        response = Response(
+            content, status_code=status, headers=headers, content_type="text/html"
+        )
         response.headers["Location"] = url
 
         return response

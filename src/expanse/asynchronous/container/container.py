@@ -30,8 +30,7 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., None] | Callable[..., Awaitable[None]]
 
 
-class UnboundAbstractError(Exception):
-    ...
+class UnboundAbstractError(Exception): ...
 
 
 class Container(BaseContainer):
@@ -69,12 +68,10 @@ class Container(BaseContainer):
         return await concrete(*positional, **keywords)
 
     @overload
-    async def make(self, abstract: type[T]) -> T:
-        ...
+    async def make(self, abstract: type[T]) -> T: ...
 
     @overload
-    async def make(self, abstract: str) -> Any:
-        ...
+    async def make(self, abstract: str) -> Any: ...
 
     async def make(self, abstract: str | type[T]) -> Any | T:
         return await self._resolve(abstract)
@@ -157,12 +154,10 @@ class Container(BaseContainer):
         return closure
 
     @overload
-    async def _resolve(self, abstract: type[T]) -> T:
-        ...
+    async def _resolve(self, abstract: type[T]) -> T: ...
 
     @overload
-    async def _resolve(self, abstract: str) -> Any:
-        ...
+    async def _resolve(self, abstract: str) -> Any: ...
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
         abstract = self._get_alias(abstract)
@@ -456,6 +451,11 @@ class ScopedContainer(Container):
         actual_abstract: str | type[T] = abstract
         if isinstance(abstract, _AnnotatedAlias):
             actual_abstract, *_ = get_args(abstract)
+
+        # If the abstract is neither bound in the container nor in its base container,
+        # we will resolve it from the scoped container.
+        if not self.bound(abstract):
+            return await super()._resolve(abstract)
 
         if not self._directly_bound(actual_abstract):
             return await self._base_container._resolve(abstract)

@@ -136,6 +136,9 @@ class Router:
             # to handle the request.
             handler = self._default_handler(container)
         else:
+            # Set the route to the request
+            request.set_route(route)
+
             handler = self._route_handler(route, container)
             pipes = [
                 container.make(middleware).handle
@@ -210,8 +213,10 @@ class Router:
 
         return handler
 
-    def _default_handler(self, _: Container) -> RequestHandler:
+    def _default_handler(self, container: Container) -> RequestHandler:
         def handler(request: Request) -> Response:
-            raise Response.abort(404)
+            from expanse.routing.responder import Responder
+
+            container.make(Responder).abort(404)
 
         return handler

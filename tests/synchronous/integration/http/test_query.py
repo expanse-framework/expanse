@@ -1,16 +1,17 @@
 from expanse.common.http.query import Query
 from expanse.http.response import Response
+from expanse.routing.responder import Responder
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from tests.synchronous.integration.http.fixtures.request.models import FooModel
 
 
-def index(query: Query) -> Response:
-    return Response.json({"bar": query.params["bar"]})
+def index(responder: Responder, query: Query) -> Response:
+    return responder.json({"bar": query.params["bar"]})
 
 
-def index_validated(query: Query[FooModel]) -> Response:
-    return Response.json({"bar": query.params.bar})
+def index_validated(responder: Responder, query: Query[FooModel]) -> Response:
+    return responder.json({"bar": query.params.bar})
 
 
 def test_simple_form_data_are_not_converted_if_no_validation_model(

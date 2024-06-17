@@ -6,6 +6,7 @@ from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.core.http.gateway import Gateway
 from expanse.asynchronous.http.middleware.manage_cors import ManageCors
 from expanse.asynchronous.http.response import Response
+from expanse.asynchronous.routing.responder import Responder
 from expanse.asynchronous.testing.client import TestClient
 
 
@@ -19,9 +20,15 @@ async def setup_app(app: Application) -> None:
 
     router: Router = await app.make("router")
 
-    router.post("/api/ping", lambda: Response.json("pong"))
-    router.post("/api/error", lambda: Response.abort(500))
-    router.post("/web/ping", lambda: Response("pong", media_type="text/plain"))
+    async def ping(responder: Responder) -> Response:
+        return await responder.json("pong")
+
+    async def error(responder: Responder) -> Response:
+        return await responder.abort(500)
+
+    router.post("/api/ping", ping)
+    router.post("/api/error", error)
+    router.post("/web/ping", lambda: Response("pong", content_type="text/plain"))
 
     (await app.make("config"))["cors"] = {
         "paths": ["api/*"],

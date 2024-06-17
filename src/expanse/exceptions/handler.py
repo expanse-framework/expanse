@@ -70,7 +70,21 @@ class ExceptionHandler(ExceptionHandlerContract):
         return self._render_response(request, e)
 
     def _render_json_response(self, request: Request, e: Exception) -> Response:
-        return Response.json(
+        from expanse.routing.responder import Responder
+
+        if self._container.has(Responder):
+            responder = self._container.make(Responder)
+        else:
+            from expanse.routing.redirect import Redirect
+            from expanse.routing.router import Router
+            from expanse.view.view_factory import ViewFactory
+
+            responder = Responder(
+                self._container.make(ViewFactory),
+                Redirect(self._container.make(Router), request),
+            )
+
+        return responder.json(
             self._convert_exception_to_dict(e),
             status_code=e.status_code if isinstance(e, HTTPException) else 500,
             indent=2,
@@ -81,11 +95,17 @@ class ExceptionHandler(ExceptionHandlerContract):
             "app.debug"
         ):
             if self._container.has(ExceptionRenderer):
-                return Response.html(
-                    self._container.make(ExceptionRenderer).render(e), status_code=500
+                return Response(
+                    self._container.make(ExceptionRenderer).render(e),
+                    status_code=500,
+                    content_type="text/html",
                 )
 
-            return Response.text(self._render_exception_content(e), status_code=500)
+            return Response(
+                self._render_exception_content(e),
+                status_code=500,
+                content_type="text/plain",
+            )
 
         if not isinstance(e, HTTPException):
             e = HTTPException(500, str(e))
@@ -106,9 +126,10 @@ class ExceptionHandler(ExceptionHandlerContract):
 
             return response
 
-        return Response.text(
+        return Response(
             self._render_exception_content(e),
             status_code=e.status_code,
+            content_type="text/plain",
         )
 
     def _render_validation_exception(
@@ -126,7 +147,17 @@ class ExceptionHandler(ExceptionHandlerContract):
                     }
                 )
 
-            return Response.json(content, status_code=422)
+            from expanse.routing.redirect import Redirect
+            from expanse.routing.responder import Responder
+            from expanse.routing.router import Router
+            from expanse.view.view_factory import ViewFactory
+
+            responder = Responder(
+                self._container.make(ViewFactory),
+                Redirect(self._container.make(Router), request),
+            )
+
+            return responder.json(content, status_code=422)
 
         http_exception = HTTPException(422, str(e))
 
