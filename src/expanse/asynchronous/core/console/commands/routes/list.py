@@ -5,7 +5,7 @@ from expanse.asynchronous.routing.router import Router
 
 
 if TYPE_CHECKING:
-    from expanse.routing.route import Route
+    from expanse.asynchronous.routing.route import Route
 
 METHODS_COLORS: dict[str, str] = {
     "GET": "fg=blue",

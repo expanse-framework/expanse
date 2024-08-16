@@ -220,14 +220,16 @@ class TestClient(BaseTestClient[Application]):
         return self._transport
 
     @contextlib.contextmanager
-    def _portal_factory(self) -> Generator[anyio.abc.BlockingPortal, None, None]:
+    def _portal_factory(
+        self,
+    ) -> Generator[anyio.abc.BlockingPortal, None, None]:
         with anyio.from_thread.start_blocking_portal(**self.async_backend) as portal:
             yield portal
 
     @contextlib.contextmanager
     def handle_exceptions(
         self, handle_exceptions: bool = True
-    ) -> contextlib.AbstractContextManager[None]:
+    ) -> Generator[None, None, None]:
         raise_server_exceptions = self.transport.raise_server_exceptions
         self.transport.raise_server_exceptions = not handle_exceptions
 

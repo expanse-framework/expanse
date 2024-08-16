@@ -1,12 +1,12 @@
 from abc import ABC
 from abc import abstractmethod
-from contextlib import AbstractContextManager
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from cleo.io.outputs.output import Output
 
-from expanse.http.request import Request
-from expanse.http.response import Response
+from expanse.asynchronous.http.request import Request
+from expanse.asynchronous.http.response import Response
 
 
 class ExceptionHandler(ABC):
@@ -53,7 +53,7 @@ class ExceptionHandler(ABC):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> AbstractContextManager[None]:
+    ) -> Generator[None, None, None]:
         """
         Temporarily enable/disable raising unhandled exceptions.
         This is mainly useful for debugging purposes.

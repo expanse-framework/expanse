@@ -17,18 +17,18 @@ class ServiceProvidersList(Generic[T], ABC):
         return self.__class__([*self._providers, *providers])
 
     def without(self, providers: list[type[T] | str]) -> Self:
-        providers = {class_to_name(provider) for provider in providers}
+        provider_names: set[str] = {class_to_name(provider) for provider in providers}
 
-        new_providers = []
+        new_providers: list[str | type] = []
         for current_provider in self._providers:
-            if current_provider in providers:
+            if current_provider in provider_names:
                 continue
 
             new_providers.append(current_provider)
 
         return self.__class__(new_providers)
 
-    def to_list(self) -> list[type[T] | str]:
+    def to_list(self) -> list[str]:
         return self._providers.copy()
 
     @classmethod

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from expanse.asynchronous.container.container import Container
 
 _container: ContextVar[Container | None] = ContextVar("container", default=None)
@@ -28,7 +29,7 @@ def _set_container(container: Container | None) -> None:
 @asynccontextmanager
 async def _use_container(
     container: Container,
-) -> AbstractAsyncContextManager[Container]:
+) -> AsyncGenerator[Container]:
     _set_container(container)
 
     yield container

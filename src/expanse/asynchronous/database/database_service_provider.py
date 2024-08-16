@@ -24,13 +24,13 @@ class DatabaseServiceProvider(ServiceProvider):
         db: DatabaseManagerContract,
         name: str | None = None,
     ) -> Connection:
-        session = db.connection(name)
+        connection = db.connection(name)
 
         container.terminating(self._close_connection(name))
 
-        await session.start()
+        await connection.start()
 
-        return session
+        return connection
 
     async def _create_session(
         self,

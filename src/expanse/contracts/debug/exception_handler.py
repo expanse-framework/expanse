@@ -1,6 +1,6 @@
 from abc import ABC
 from abc import abstractmethod
-from contextlib import AbstractContextManager
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from cleo.io.outputs.output import Output
@@ -53,7 +53,7 @@ class ExceptionHandler(ABC):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> AbstractContextManager[None]:
+    ) -> Generator[None]:
         """
         Temporarily enable/disable raising unhandled exceptions.
         This is mainly useful for debugging purposes.

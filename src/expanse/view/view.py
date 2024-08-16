@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+from collections.abc import MutableMapping
 from typing import Any
 
 
@@ -5,9 +7,9 @@ class View:
     def __init__(
         self,
         identifier: str,
-        data: dict[Any, Any] | None = None,
+        data: Mapping[Any, Any] | None = None,
         status_code: int = 200,
-        headers: dict[str, Any] | None = None,
+        headers: MutableMapping[str, Any] | None = None,
     ) -> None:
         self._identifier = identifier
         self._data = data or {}
@@ -19,7 +21,7 @@ class View:
         return self._identifier
 
     @property
-    def data(self) -> dict[Any, Any]:
+    def data(self) -> Mapping[Any, Any]:
         return self._data
 
     @property
@@ -27,5 +29,5 @@ class View:
         return self._status_code
 
     @property
-    def headers(self) -> dict[str, Any] | None:
+    def headers(self) -> MutableMapping[str, Any] | None:
         return self._headers

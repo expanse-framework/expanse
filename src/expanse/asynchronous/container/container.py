@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Any
 from typing import Self
 from typing import TypeVar
-from typing import _AnnotatedAlias
+from typing import _AnnotatedAlias  # type: ignore[attr-defined]
 from typing import get_args
 from typing import overload
 
@@ -38,6 +38,7 @@ class Container(BaseContainer):
         if args is None:
             args = ()
 
+        function: Callable[..., Any]
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args)
@@ -90,7 +91,7 @@ class Container(BaseContainer):
             class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
             class_: type = callable.__globals__[class_name]
 
-            instance = await self.make(class_)
+            instance: Any = await self.make(class_)
 
             callable = getattr(instance, func_name)
 
@@ -115,7 +116,7 @@ class Container(BaseContainer):
         for callback in self._terminating_callbacks:
             await self.call(callback)
 
-    def create_scoped_container(self) -> Self:
+    def create_scoped_container(self) -> "ScopedContainer":
         container = ScopedContainer(self)
 
         return container
@@ -166,9 +167,9 @@ class Container(BaseContainer):
             return self._instances[abstract]
 
         metadata: tuple = ()
-        actual_abstract: str | type[T] = abstract
+        actual_abstract: str | type = abstract
         if isinstance(abstract, _AnnotatedAlias):
-            actual_abstract, *metadata = get_args(abstract)
+            actual_abstract, *metadata = get_args(abstract)  # type: ignore[assignment]
 
         if actual_abstract in self._bindings:
             concrete = self._bindings[actual_abstract]["concrete"]
@@ -202,9 +203,9 @@ class Container(BaseContainer):
     async def _resolve_callable_dependencies(
         self, callable: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> tuple[list[Any], dict[str, Any]]:
-        positional = []
-        keywords = {}
-        args = list(args)
+        positional: list[Any] = []
+        keywords: dict[str, Any] = {}
+        arguments = list(args)
         _globals = getattr(callable, "__globals__", None)
 
         for name, parameter in inspect.signature(callable).parameters.items():
@@ -215,11 +216,16 @@ class Container(BaseContainer):
 
             if klass is None:
                 await self._resolve_primitive(
-                    parameter, args, kwargs, positional, keywords
+                    parameter, arguments, kwargs, positional, keywords
                 )
             else:
                 await self._resolve_class(
-                    parameter, args, kwargs, positional, keywords, _globals=_globals
+                    parameter,
+                    arguments,
+                    kwargs,
+                    positional,
+                    keywords,
+                    _globals=_globals,
                 )
 
         return positional, keywords
@@ -267,20 +273,16 @@ class Container(BaseContainer):
                 return
 
             case parameter.VAR_KEYWORD:
-                result = kwargs.copy()
+                keywords.update(kwargs.copy())
 
                 kwargs.clear()
-
-                keywords.update(result)
 
                 return
 
             case parameter.VAR_POSITIONAL:
-                result = args.copy()
+                positional.extend(args.copy())
 
                 args.clear()
-
-                result.extend(result)
 
                 return
 
@@ -395,7 +397,7 @@ class Container(BaseContainer):
         callbacks: list[Callable[..., Awaitable[None]]] = []
         abstract = self._get_alias(abstract)
 
-        actual_abstract: str | type[T] = abstract
+        actual_abstract: str | type = abstract
         if isinstance(abstract, _AnnotatedAlias):
             actual_abstract, *_ = get_args(abstract)
 

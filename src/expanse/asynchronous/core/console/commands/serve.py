@@ -20,16 +20,16 @@ class ServeCommand(Command):
         import uvicorn
 
         log_level: str = "info"
-        if self.io.is_verbose():
+        if self._io.is_verbose():
             log_level = "debug"
-        elif self.io.output.is_quiet():
+        elif self._io.output.is_quiet():
             log_level = "error"
 
         parameters: dict[str, Any] = {
             "port": int(self.option("port")),
             "log_level": log_level,
             "reload": self.option("watch"),
-            "use_colors": self.io.is_decorated(),
+            "use_colors": self._io.is_decorated(),
         }
 
         if self.option("watch"):

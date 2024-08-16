@@ -8,8 +8,6 @@ from pydantic import Field
 from pydantic import RootModel
 from pydantic_settings import SettingsConfigDict
 
-from expanse.common.core.helpers import PlaceholderPath
-
 
 class PoolConfig(BaseModel):
     pool_pre_ping: bool | None = None
@@ -22,7 +20,7 @@ class PoolConfig(BaseModel):
 class SQLiteConfig(PoolConfig, BaseModel):
     driver: Literal["sqlite"] = "sqlite"
     url: AnyUrl | None = None
-    database: Path | PlaceholderPath | None = None
+    database: Path | None = None
     foreign_key_constraints: bool = Field(default=True, alias="foreign_keys")
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)

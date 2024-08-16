@@ -1,10 +1,14 @@
 import dataclasses
 
+from collections.abc import MutableMapping
 from typing import Any
 from typing import Generic
 from typing import NotRequired
 from typing import TypeVar
+from typing import cast
 
+from baize.datastructures import FormData
+from baize.datastructures import MultiMapping
 from pydantic import BaseModel
 from pydantic import ValidationError
 from typing_extensions import TypedDict
@@ -38,12 +42,12 @@ class Form(Generic[T]):
     data: T | None
     _model: type[T] | None = None
 
-    def __init__(self, data: dict[str, Any] | None = None) -> None:
+    def __init__(self, data: MutableMapping[str, Any] | FormData | None = None) -> None:
         self._submitted = data
         self.fields: dict[str, Field] = {}
         self.errors: list[ErrorDetails] = []
         self.data: T | None = None
-        form_data: dict[str, Any] = {}
+        form_data: MutableMapping[str, Any] | MultiMapping = {}
         if self._submitted is not None:
             form_data = self._submitted
 
@@ -60,7 +64,7 @@ class Form(Generic[T]):
                     self.errors = e.errors()
 
                     for error in self.errors:
-                        field = self.fields.get(error["loc"][0])
+                        field = self.fields.get(cast(str, error["loc"][0]))
                         if not field:
                             continue
 

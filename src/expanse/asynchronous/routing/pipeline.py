@@ -28,11 +28,14 @@ class Pipeline:
         return self
 
     def send(self, request: Request) -> Self:
-        self._request: Request = request
+        self._request = request
 
         return self
 
     async def to(self, handler: RequestHandler) -> Response:
+        if self._request is None:
+            raise RuntimeError("No request has been set on the pipeline.")
+
         from expanse.asynchronous.core.helpers import _set_container
 
         _set_container(self._container)
@@ -48,11 +51,11 @@ class Pipeline:
             if not self._container.has(ExceptionHandler):
                 raise e
 
-            handler = await self._container.make(ExceptionHandler)
+            exception_handler = await self._container.make(ExceptionHandler)
 
-            await handler.report(e)
+            await exception_handler.report(e)
 
-            return await handler.render(self._request, e)
+            return await exception_handler.render(self._request, e)
         finally:
             _set_container(None)
 

@@ -9,7 +9,7 @@ from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ForwardRef
-from typing import _eval_type
+from typing import _eval_type  # type: ignore[attr-defined]
 
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ def eval_type_lenient(
         value = ForwardRef(value, is_argument=False, is_class=True)
 
     try:
-        return _eval_type(value, globalns, localns)  # type: ignore  # noqa: PGH003
+        return _eval_type(value, globalns, localns)
     except NameError:
         # the point of this function is to be tolerant to this case
         return value

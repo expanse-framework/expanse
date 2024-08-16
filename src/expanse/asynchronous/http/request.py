@@ -30,10 +30,8 @@ class Request(BaseRequest):
 
         self._route: Route | None = None
 
-        self._acceptable_content_types: list[str] | None = None
-
     @property
-    def url(self) -> URL:
+    def url(self) -> URL:  # type: ignore[override]
         if self._url is None:
             self._url = URL(scope=self._scope)
 
@@ -46,7 +44,7 @@ class Request(BaseRequest):
         if not client:
             return ""
 
-        return client.host
+        return client.host or ""
 
     @property
     def acceptable_content_types(self) -> list[str]:
@@ -168,7 +166,7 @@ class Request(BaseRequest):
 
         query_string = ""
         if url.query:
-            query_string = {url.query}
+            query_string = url.query
 
         base_scope["query_string"] = query_string
 

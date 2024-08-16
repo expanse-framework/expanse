@@ -36,6 +36,10 @@ pg8000 = "^1.30.4"
 [tool.poetry.group.dev.dependencies]
 pytest-mock = "^3.14.0"
 
+
+[tool.poetry.group.typing.dependencies]
+types-pygments = "^2.18.0.20240506"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -100,7 +104,13 @@ mypy_path = "src"
 show_error_codes = true
 pretty = true
 warn_unused_ignores = true
-exclude = []
+warn_no_return = false
+exclude = [
+    "src/expanse/common/testing/client.py",
+    "src/expanse/testing/client.py",
+    "src/expanse/asynchronous/testing/client.py",
+]
+disable_error_code = ["type-abstract"]
 
 
 [tool.coverage.run]

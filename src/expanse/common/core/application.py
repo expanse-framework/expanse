@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Self
 
@@ -7,10 +8,7 @@ from expanse.common.core.helpers import PlaceholderPath
 
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from expanse.common.configuration.config import Config
-    from expanse.support.service_provider import ServiceProvider
 
 
 class Application:
@@ -26,7 +24,6 @@ class Application:
 
         self._booted: bool = False
         self._has_been_bootstrapped: bool = False
-        self._service_providers: list[ServiceProvider] = []
         self._config: Config
 
     @property
@@ -69,7 +66,7 @@ class Application:
 
     def resolve_placeholder_path(self, path: str | Path | PlaceholderPath) -> Path:
         if not isinstance(path, PlaceholderPath):
-            return path
+            return Path(path)
 
         app_path: Path = getattr(self, f"{path.app_path}_path")
 

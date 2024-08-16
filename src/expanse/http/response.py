@@ -136,4 +136,4 @@ class Response:
     def __call__(
         self, environ: Environ, start_response: StartResponse
     ) -> Iterable[bytes]:
-        return self._response(environ, start_response)
+        return self._response(environ, start_response)  # type: ignore[arg-type]

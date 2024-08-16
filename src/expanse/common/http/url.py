@@ -114,6 +114,9 @@ class URL:
     def port(self) -> int | None:
         return self.components.port
 
+    def is_secure(self) -> bool:
+        return self.scheme == "https"
+
     def is_(self, pattern: str | list[str]) -> bool:
         """
         Determine if the full URL matches a given pattern.

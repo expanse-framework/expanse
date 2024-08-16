@@ -30,7 +30,11 @@ class DatabaseManager(DatabaseManagerContract):
     def connection(self, name: str | None = None) -> Connection:
         engine = self._configure_engine(name)
 
-        return engine.connect()
+        connection = engine.connect()
+
+        assert isinstance(connection, Connection)
+
+        return connection
 
     def session(self, name: str | None = None) -> Session:
         name = name or self.get_default_connection()
@@ -80,14 +84,17 @@ class DatabaseManager(DatabaseManagerContract):
         if config.url is not None:
             url = make_url(str(config.url))
         else:
-            database = self._app.resolve_placeholder_path(config.database)
-            if isinstance(database, Path):
-                database.parent.mkdir(parents=True, exist_ok=True)
-                database = database.as_posix()
+            database = config.database
+            if database is None:
+                raise ValueError("The SQLite database path is not configured.")
+
+            assert isinstance(database, Path)
+
+            database.parent.mkdir(parents=True, exist_ok=True)
 
             url = URL(
                 drivername="sqlite",
-                database=database,
+                database=database.as_posix(),
                 host=None,
                 port=None,
                 username=None,

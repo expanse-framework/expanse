@@ -30,7 +30,11 @@ class DatabaseManager(DatabaseManagerContract):
     def connection(self, name: str | None = None) -> Connection:
         engine = self._configure_engine(name)
 
-        return engine.connect()
+        connection = engine.connect()
+
+        assert isinstance(connection, Connection)
+
+        return connection
 
     def session(self, name: str | None = None) -> Session:
         name = name or self.get_default_connection()
@@ -81,14 +85,17 @@ class DatabaseManager(DatabaseManagerContract):
             if url.drivername == "sqlite":
                 url = URL("sqlite+aiosqlite", *url[1:])
         else:
-            database = self._app.resolve_placeholder_path(config.database)
-            if isinstance(database, Path):
-                database.parent.mkdir(parents=True, exist_ok=True)
-                database = database.as_posix()
+            assert config.database is not None
+            database_path = self._app.resolve_placeholder_path(config.database)
+            if isinstance(database_path, Path):
+                database_path.parent.mkdir(parents=True, exist_ok=True)
+                database = database_path.as_posix()
+            else:
+                database = database_path
 
             url = URL(
                 drivername="sqlite+aiosqlite",
-                database=database,
+                database=str(database),
                 host=None,
                 port=None,
                 username=None,

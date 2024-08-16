@@ -11,7 +11,6 @@ from jinja2 import UndefinedError
 class FrameDict(TypedDict):
     filepath: str
     filename: str
-    filepath_parts: list[str]
     function: str
     lineno: int
     code: str
@@ -43,12 +42,12 @@ class ExceptionRendererMixin:
             exception_message=inspector.exception_message,
             frames=[],
         )
-        frames = []
+        frames: list[FrameCollection] = []
         frames_count = len(inspector.frames)
 
         i = frames_count
         for collection in reversed(inspector.frames.compact()):
-            frame_collection = {
+            frame_collection: FrameCollection = {
                 "is_repeated": collection.is_repeated(),
                 "repetitions": collection.repetitions,
                 "frames_count": len(collection),
@@ -69,7 +68,7 @@ class ExceptionRendererMixin:
                         "lineno": frame.lineno,
                         "code": self.highlight_frame(frame),
                         "line": frame.line,
-                        "highlighted_line": self.highlight_frame(frame, line=True),
+                        "highlighted_line": self.highlight_frame(frame, line_only=True),
                         "number": i,
                     }
                 )
@@ -81,7 +80,7 @@ class ExceptionRendererMixin:
 
         return trace
 
-    def highlight_frame(self, frame: Frame, line: bool = False) -> str:
+    def highlight_frame(self, frame: Frame, line_only: bool = False) -> str:
         from pygments import highlight
         from pygments.formatters.html import HtmlFormatter
         from pygments.lexers import get_lexer_by_name
@@ -97,7 +96,7 @@ class ExceptionRendererMixin:
 
         lexer = get_lexer_by_name(lexer_name)
 
-        if line:
+        if line_only:
             return highlight(
                 frame.line.strip(),
                 lexer,
@@ -107,7 +106,11 @@ class ExceptionRendererMixin:
         if lexer_name == "html+jinja":
             source = [line + "\n" for line in Path(filename).read_text().splitlines()]
         else:
-            source = inspect.getsourcelines(inspect.getmodule(frame.frame))[0]
+            module = inspect.getmodule(frame.frame)
+
+            assert module is not None
+
+            source = inspect.getsourcelines(module)[0]
 
         lines_before = 5
         lines_after = 5

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class Request(BaseRequest):
     def __init__(self, environ: Environ, start_response: StartResponse | None = None):
-        super().__init__(environ, start_response)
+        super().__init__(environ, start_response)  # type: ignore[arg-type]
 
         self._url: URL | None = None
         self._route: Route | None = None
@@ -26,7 +26,7 @@ class Request(BaseRequest):
         self._acceptable_content_types: list[str] | None = None
 
     @property
-    def url(self) -> URL:
+    def url(self) -> URL:  # type: ignore[override]
         if self._url is None:
             self._url = URL(environ=self._environ)
 
@@ -39,7 +39,7 @@ class Request(BaseRequest):
         if not client:
             return ""
 
-        return client.host
+        return client.host or ""
 
     @property
     def acceptable_content_types(self) -> list[str]:
@@ -153,7 +153,7 @@ class Request(BaseRequest):
 
         query_string = ""
         if url.query:
-            query_string = {url.query}
+            query_string = url.query
 
         base_environ["REQUEST_URI"] = path + (
             "?" + query_string if query_string else ""

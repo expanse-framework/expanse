@@ -1,4 +1,4 @@
-from contextlib import AbstractContextManager
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -136,16 +136,19 @@ class ExceptionHandler(ExceptionHandlerContract):
         self, e: ValidationError, request: Request
     ) -> Response:
         if request.expects_json() or request.is_json():
-            content = {"code": "validation_error", "detail": []}
+            content: dict[str, Any] = {"code": "validation_error"}
+            details: list[dict[str, Any]] = []
 
             for error in e.errors():
-                content["detail"].append(
+                details.append(
                     {
                         "loc": error["loc"],
                         "message": error["msg"],
                         "type": error["type"],
                     }
                 )
+
+            content["detail"] = details
 
             from expanse.routing.redirect import Redirect
             from expanse.routing.responder import Responder
@@ -171,7 +174,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         factory = self._container.make(ViewFactory)
 
         if not factory.exists(view):
-            return
+            return None
 
         return view
 
@@ -225,7 +228,7 @@ class ExceptionHandler(ExceptionHandlerContract):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> AbstractContextManager[None]:
+    ) -> Generator[None]:
         original_value = self._raise_unhandled_exceptions
         self._raise_unhandled_exceptions = raise_exceptions
 

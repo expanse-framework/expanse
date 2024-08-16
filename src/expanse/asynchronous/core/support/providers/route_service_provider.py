@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 class RouteServiceProvider(ServiceProvider):
     async def load_routes_from_file(self, path: Path) -> Router:
+        router: Router = Router(self._app)
+
         module_name = (
             path.resolve()
             .relative_to(self._app.base_path)
@@ -27,15 +29,13 @@ class RouteServiceProvider(ServiceProvider):
         module = module_from_path(path, name=module_name)
 
         if module is None:
-            return
+            return router
 
         # Register route file to sys.modules
         if module_name not in sys.modules:
             sys.modules[module_name] = module
 
         routes: Callable[[Router], None] = module.routes
-
-        router: Router = Router(self._app)
 
         routes(router)
 

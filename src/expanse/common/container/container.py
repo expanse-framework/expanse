@@ -14,7 +14,7 @@ from inspect import Parameter
 from typing import Any
 from typing import Self
 from typing import TypeVar
-from typing import _AnnotatedAlias
+from typing import _AnnotatedAlias  # type: ignore[attr-defined]
 from typing import get_args
 
 from expanse.common.support._utils import eval_type_lenient
@@ -29,7 +29,7 @@ _EMPTY = object()
 
 logger = logging.getLogger(__name__)
 
-_Callback = Callable[..., ...]
+_Callback = Callable[..., Any]
 
 
 class UnboundAbstractError(Exception): ...
@@ -42,7 +42,7 @@ class Container(ABC):
         self._instances: dict[str | type, Any] = {}
         self._aliases: dict[str, str | type] = {}
 
-        self._scoped_bindings: dict[str, Any] = {}
+        self._scoped_bindings: dict[str | type, Any] = {}
 
         self._after_resolving_callbacks: dict[str | type, list[_Callback]] = (
             defaultdict(list)
@@ -113,7 +113,7 @@ class Container(ABC):
     def after_resolving(self, abstract: str | type, callback: _Callback) -> None:
         abstract = self._get_alias(abstract)
 
-        actual_abstract: str | type[T] = abstract
+        actual_abstract: str | type = abstract
         if isinstance(abstract, _AnnotatedAlias):
             actual_abstract, *_ = get_args(abstract)
 
@@ -127,19 +127,19 @@ class Container(ABC):
     @abstractmethod
     def _concrete_closure(
         self, abstract: str | type, concrete: Any
-    ) -> Callable[[Self], ...]: ...
+    ) -> Callable[[Self], Any]: ...
 
-    def _is_buildable(self, abstract: str, concrete: Any) -> bool:
+    def _is_buildable(self, abstract: str | type, concrete: Any) -> bool:
         return abstract == concrete or isinstance(
             concrete, types.FunctionType | types.MethodType
         )
 
-    def _is_cached(self, abstract: str) -> bool:
+    def _is_cached(self, abstract: str | type) -> bool:
         return abstract in self._instances or self._bindings.get(abstract, {}).get(
             "cached", False
         )
 
-    def _mark_as_resolved(self, abstract: str) -> None:
+    def _mark_as_resolved(self, abstract: str | type) -> None:
         self._resolved[abstract] = True
 
     def _get_class(
@@ -190,10 +190,13 @@ class Container(ABC):
 
         return False
 
-    def _get_alias(self, abstract: str | type) -> str:
+    def _get_alias(self, abstract: str | type) -> str | type:
+        if not isinstance(abstract, str):
+            return abstract
+
         return self._aliases.get(abstract, abstract)
 
-    def _is_lambda(self, callable: _Callback) -> None:
+    def _is_lambda(self, callable: _Callback) -> bool:
         return (
             isinstance(callable, types.FunctionType) and callable.__name__ == "<lambda>"
         )

@@ -14,6 +14,9 @@ from expanse.view.view import View
 
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from collections.abc import MutableMapping
+
     from expanse.view.view_finder import ViewFinder
 
 
@@ -30,9 +33,9 @@ class ViewFactory:
     def make(
         self,
         view: str,
-        data: dict[str, Any] | None = None,
+        data: Mapping[str, Any] | None = None,
         status_code: int = 200,
-        headers: dict[str, Any] | None = None,
+        headers: MutableMapping[str, Any] | None = None,
     ) -> View:
         return View(view, data, status_code=status_code, headers=headers)
 

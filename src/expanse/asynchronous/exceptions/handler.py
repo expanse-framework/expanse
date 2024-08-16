@@ -1,6 +1,6 @@
 import logging
 
-from contextlib import AbstractContextManager
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -141,6 +141,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         if request.expects_json() or request.is_json():
             content = {"code": "validation_error", "detail": []}
 
+            assert isinstance(content["detail"], list)
+
             for error in e.errors():
                 content["detail"].append(
                     {
@@ -174,7 +176,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         factory = await self._container.make(ViewFactory)
 
         if not factory.exists(view):
-            return
+            return None
 
         return view
 
@@ -228,7 +230,7 @@ class ExceptionHandler(ExceptionHandlerContract):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> AbstractContextManager[None]:
+    ) -> Generator[None, None, None]:
         original_value = self._raise_unhandled_exceptions
         self._raise_unhandled_exceptions = raise_exceptions
 

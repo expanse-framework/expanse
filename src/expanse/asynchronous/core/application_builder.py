@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 class ApplicationBuilder:
     def __init__(self, base_path: Path) -> None:
         self._base_path: Path = base_path
-        self._register_commands_callback: Callable[
-            [ConsoleKernel], Awaitable[None]
-        ] | None = None
-        self._configure_middleware_stack: Callable[
-            [MiddlewareStack], Awaitable[None]
-        ] | None = None
+        self._register_commands_callback: (
+            Callable[[ConsoleKernel], Awaitable[None]] | None
+        ) = None
+        self._configure_middleware_stack: (
+            Callable[[Gateway], Awaitable[None]] | None
+        ) = None
         self._configure_kernels: Callable[[Application], None] | None = None
 
     def with_kernels(self) -> Self:
@@ -89,6 +89,8 @@ class ApplicationBuilder:
                     Kernel as ConsoleKernel,
                 )
 
+                assert self._register_commands_callback is not None
+
                 await app_.on_resolved(ConsoleKernel, self._register_commands_callback)
 
             app.bootstrapping(_register_commands)
@@ -97,6 +99,8 @@ class ApplicationBuilder:
 
             async def _configure_middleware(app_: Application) -> None:
                 from expanse.asynchronous.core.http.gateway import Gateway
+
+                assert self._configure_middleware_stack is not None
 
                 await app_.on_resolved(Gateway, self._configure_middleware_stack)
 

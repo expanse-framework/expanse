@@ -10,6 +10,7 @@ from sqlalchemy.engine.interfaces import CoreExecuteOptionsParameter
 from sqlalchemy.engine.interfaces import _CoreAnyExecuteParams
 from sqlalchemy.engine.interfaces import _CoreSingleExecuteParams
 from sqlalchemy.ext.asyncio import AsyncConnection as BaseAsyncConnection
+from sqlalchemy.sql.selectable import TypedReturnsRows
 
 
 _T = TypeVar("_T", bound=Any)
@@ -19,7 +20,25 @@ class Connection(BaseAsyncConnection):
     @overload
     async def scalar(
         self,
-        statement: Executable | str,
+        statement: TypedReturnsRows[tuple[_T]],
+        parameters: _CoreSingleExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> _T | None: ...
+
+    @overload
+    async def scalar(
+        self,
+        statement: Executable,
+        parameters: _CoreSingleExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> Any: ...
+
+    @overload
+    async def scalar(
+        self,
+        statement: str,
         parameters: _CoreSingleExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
@@ -27,7 +46,7 @@ class Connection(BaseAsyncConnection):
 
     async def scalar(
         self,
-        statement: Executable,
+        statement: TypedReturnsRows[tuple[_T]] | Executable | str,
         parameters: _CoreSingleExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
@@ -42,7 +61,25 @@ class Connection(BaseAsyncConnection):
     @overload
     async def scalars(
         self,
-        statement: Executable | str,
+        statement: TypedReturnsRows[tuple[_T]],
+        parameters: _CoreAnyExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> ScalarResult[_T]: ...
+
+    @overload
+    async def scalars(
+        self,
+        statement: Executable,
+        parameters: _CoreAnyExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> ScalarResult[Any]: ...
+
+    @overload
+    async def scalars(
+        self,
+        statement: str,
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
@@ -50,7 +87,7 @@ class Connection(BaseAsyncConnection):
 
     async def scalars(
         self,
-        statement: Executable | str,
+        statement: TypedReturnsRows[tuple[_T]] | Executable | str,
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
@@ -65,7 +102,25 @@ class Connection(BaseAsyncConnection):
     @overload
     async def execute(
         self,
-        statement: Executable | str,
+        statement: TypedReturnsRows[_T],
+        parameters: _CoreAnyExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> CursorResult[_T]: ...
+
+    @overload
+    async def execute(
+        self,
+        statement: Executable,
+        parameters: _CoreAnyExecuteParams | None = None,
+        *,
+        execution_options: CoreExecuteOptionsParameter | None = None,
+    ) -> CursorResult[Any]: ...
+
+    @overload
+    async def execute(
+        self,
+        statement: str,
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,
@@ -73,7 +128,7 @@ class Connection(BaseAsyncConnection):
 
     async def execute(
         self,
-        statement: Executable | str,
+        statement: TypedReturnsRows[_T] | Executable | str,
         parameters: _CoreAnyExecuteParams | None = None,
         *,
         execution_options: CoreExecuteOptionsParameter | None = None,

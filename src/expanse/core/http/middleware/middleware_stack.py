@@ -51,7 +51,7 @@ class MiddlewareStack:
 
         return self._groups[name]
 
-    def get_default_middleware(self) -> list[Middleware]:
+    def get_default_middleware(self) -> list[type[Middleware]]:
         from expanse.http.middleware.manage_cors import ManageCors
 
         return [

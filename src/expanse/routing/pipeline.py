@@ -25,12 +25,17 @@ class Pipeline:
         return self
 
     def send(self, request: Request) -> Self:
-        self._request: Request = request
+        self._request = request
 
         return self
 
     def to(self, handler: RequestHandler) -> Response:
         from expanse.core.helpers import _set_container
+
+        if not self._request:
+            raise ValueError("No request has been set")
+
+        assert self._request is not None
 
         _set_container(self._container)
 
@@ -42,11 +47,11 @@ class Pipeline:
             if not self._container.has(ExceptionHandler):
                 raise e
 
-            handler = self._container.make(ExceptionHandler)
+            exception_handler = self._container.make(ExceptionHandler)
 
-            handler.report(e)
+            exception_handler.report(e)
 
-            return handler.render(self._request, e)
+            return exception_handler.render(self._request, e)
         finally:
             _set_container(None)
 

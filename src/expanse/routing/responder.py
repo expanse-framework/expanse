@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from collections.abc import MutableMapping
 from os import PathLike
 from typing import Any
 from typing import NoReturn
@@ -80,7 +81,7 @@ class Responder:
         view: str,
         data: Mapping[str, Any] | None = None,
         status_code: int = 200,
-        headers: Mapping[str, Any] | None = None,
+        headers: MutableMapping[str, Any] | None = None,
     ) -> Response:
         return self._view.render(self._view.make(view, data, status_code, headers))
 
@@ -88,6 +89,6 @@ class Responder:
         self,
         status_code: int,
         message: str | None = None,
-        headers: dict[str, str] | None = None,
+        headers: MutableMapping[str, str] | None = None,
     ) -> NoReturn:
         raise HTTPException(status_code, detail=message, headers=headers)

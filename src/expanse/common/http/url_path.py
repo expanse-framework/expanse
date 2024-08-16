@@ -26,7 +26,7 @@ class URLPath(str):
             scheme = {
                 "http": {True: "https", False: "http"},
                 "websocket": {True: "wss", False: "ws"},
-            }[self.protocol][base_url.is_secure]
+            }[self.protocol][base_url.is_secure()]
 
         else:
             scheme = base_url.scheme

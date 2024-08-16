@@ -39,13 +39,13 @@ class URLGenerator:
         url = await self._router.route(name, parameters)
 
         if absolute:
-            url = str(
+            return str(
                 URL(url).replace(
                     scheme=self._request.url.scheme, netloc=self._request.url.netloc
                 )
             )
 
-        return url
+        return str(url)
 
     def _format_parameters(self, parameters: dict[str, Any] | None) -> str:
         if parameters is None:

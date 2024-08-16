@@ -9,7 +9,6 @@ from collections.abc import Callable
 from typing import Any
 from typing import Self
 from typing import TypeVar
-from typing import _AnnotatedAlias
 from typing import get_args
 from typing import overload
 
@@ -37,6 +36,7 @@ class Container(BaseContainer):
         if args is None:
             args = ()
 
+        function: Callable[..., Any]
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args)
@@ -83,7 +83,7 @@ class Container(BaseContainer):
             class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
             class_: type = callable.__globals__[class_name]
 
-            instance = self.make(class_)
+            instance: Any = self.make(class_)
 
             callable = getattr(instance, func_name)
 
@@ -101,7 +101,7 @@ class Container(BaseContainer):
         for callback in self._terminating_callbacks:
             self.call(callback)
 
-    def create_scoped_container(self) -> Self:
+    def create_scoped_container(self) -> "ScopedContainer":
         container = ScopedContainer(self)
 
         return container
@@ -150,8 +150,8 @@ class Container(BaseContainer):
 
         metadata: tuple = ()
         actual_abstract: str | type[T] = abstract
-        if isinstance(abstract, _AnnotatedAlias):
-            actual_abstract, *metadata = get_args(abstract)
+        if hasattr(abstract, "__metadata__"):
+            actual_abstract, *metadata = get_args(abstract)  # type: ignore[assignment]
 
         if actual_abstract in self._bindings:
             concrete = self._bindings[actual_abstract]["concrete"]
@@ -183,9 +183,9 @@ class Container(BaseContainer):
     def _resolve_callable_dependencies(
         self, callable: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> tuple[list[Any], dict[str, Any]]:
-        positional = []
-        keywords = {}
-        args = list(args)
+        positional: list[Any] = []
+        keywords: dict[str, Any] = {}
+        arguments = list(args)
         _globals = getattr(callable, "__globals__", None)
 
         for name, parameter in inspect.signature(callable).parameters.items():
@@ -195,10 +195,17 @@ class Container(BaseContainer):
                 continue
 
             if klass is None:
-                self._resolve_primitive(parameter, args, kwargs, positional, keywords)
+                self._resolve_primitive(
+                    parameter, arguments, kwargs, positional, keywords
+                )
             else:
                 self._resolve_class(
-                    parameter, args, kwargs, positional, keywords, _globals=_globals
+                    parameter,
+                    arguments,
+                    kwargs,
+                    positional,
+                    keywords,
+                    _globals=_globals,
                 )
 
         return positional, keywords
@@ -246,20 +253,16 @@ class Container(BaseContainer):
                 return
 
             case parameter.VAR_KEYWORD:
-                result = kwargs.copy()
+                keywords.update(kwargs.copy())
 
                 kwargs.clear()
-
-                keywords.update(result)
 
                 return
 
             case parameter.VAR_POSITIONAL:
-                result = args.copy()
+                positional.extend(args.copy())
 
                 args.clear()
-
-                result.extend(result)
 
                 return
 
@@ -373,8 +376,8 @@ class Container(BaseContainer):
         callbacks: list[_Callback] = []
         abstract = self._get_alias(abstract)
 
-        actual_abstract: str | type[T] = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        actual_abstract: str | type = abstract
+        if hasattr(abstract, "__metadata__"):
             actual_abstract, *_ = get_args(abstract)
 
         if abstract in self._after_resolving_callbacks:
@@ -424,7 +427,7 @@ class ScopedContainer(Container):
 
     def _resolve(self, abstract: str | type[T]) -> Any | T:
         actual_abstract: str | type[T] = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        if hasattr(abstract, "__metadata__"):
             actual_abstract, *_ = get_args(abstract)
 
         # If the abstract is neither bound in the container nor in its base container,
