@@ -1,49 +1,92 @@
 from __future__ import annotations
 
+import os
+import sys
+
 from typing import TYPE_CHECKING
 from typing import cast
 
-from cleo.application import Application as BaseApplication
-from cleo.events.console_command_event import ConsoleCommandEvent
-from cleo.events.console_events import COMMAND
-from cleo.events.event_dispatcher import EventDispatcher
-
-from expanse.__version__ import __version__
-from expanse.console.command_loader import CommandLoader
+from expanse.common.console.application import Application as BaseApplication
 from expanse.console.commands.command import Command
+from expanse.console.commands.help import HelpCommand
+from expanse.console.commands.list import ListCommand
 
 
 if TYPE_CHECKING:
-    from cleo.events.event import Event
+    from cleo.io.inputs.input import Input
+    from cleo.io.io import IO
+    from cleo.io.outputs.output import Output
 
     from expanse.core.application import Application as Expanse
 
 
-class Application(BaseApplication):
+class Application(BaseApplication[Command]):
     def __init__(self, expanse: Expanse) -> None:
-        super().__init__("expanse", __version__)
+        super().__init__()
 
         self._expanse = expanse
 
-        dispatcher = EventDispatcher()
-        dispatcher.add_listener(COMMAND, self._set_expanse)
-        self.set_event_dispatcher(dispatcher)
+    def run(
+        self,
+        input: Input | None = None,
+        output: Output | None = None,
+        error_output: Output | None = None,
+    ) -> int:
+        try:
+            io = self.create_io(input, output, error_output)
 
-        command_loader = CommandLoader({})
-        self.set_command_loader(command_loader)
+            self._configure_io(io)
+
+            try:
+                exit_code = self._run(io)
+            except BrokenPipeError:
+                # If we are piped to another process, it may close early and send a
+                # SIGPIPE: https://docs.python.org/3/library/signal.html#note-on-sigpipe
+                devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull, sys.stdout.fileno())
+                exit_code = 0
+            except Exception as e:
+                if not self._catch_exceptions:
+                    raise
+
+                self.render_error(e, io)
+
+                exit_code = 1
+                # TODO: Custom error exit codes
+        except KeyboardInterrupt:
+            exit_code = 1
+
+        if self._auto_exit:
+            sys.exit(exit_code)
+
+        return exit_code
 
     @property
-    def command_loader(self) -> CommandLoader:
-        return self._command_loader
+    def default_commands(self) -> list[Command]:
+        return [HelpCommand(), ListCommand()]
 
-    def _set_expanse(self, event: Event, event_name: str, _: EventDispatcher) -> None:
-        assert isinstance(event, ConsoleCommandEvent)
+    def get_help_command(self, command: Command) -> Command:
+        help_command: HelpCommand = cast(HelpCommand, self.get("help"))
+        help_command.set_command(command)
 
-        command = event.command
+        return help_command
 
-        if not isinstance(command, Command):
-            return
+    def _run(self, io: IO) -> int:
+        if io.input.has_parameter_option(["--version", "-V"], True):
+            io.write_line(self.long_version)
 
-        command = cast(Command, command)
+            return 0
 
+        self._setup_command(io)
+
+        assert self._running_command is not None
+
+        exit_code = self._run_command(self._running_command, io)
+        self._running_command = None
+
+        return exit_code
+
+    def _run_command(self, command: Command, io: IO) -> int:
         command.set_expanse(self._expanse)
+
+        return command.run(io)

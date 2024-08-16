@@ -59,7 +59,7 @@ class Kernel:
         try:
             return self.console.run(input, output, output)
         except Exception as e:
-            handler = self._app.make(ExceptionHandler)
+            handler = self._app.make(ExceptionHandler)  # type: ignore[type-abstract]
 
             handler.report(e)
             handler.render_for_console(output, e)
@@ -85,13 +85,16 @@ class Kernel:
         self._commands.append(command)
 
     def call(
-        self, command: str, parameters: str | None = None, output: Output | None = None
+        self,
+        command_name: str,
+        parameters: str | None = None,
+        output: Output | None = None,
     ) -> int:
         self.bootstrap()
 
         input = StringInput(parameters or "")
         output = output or BufferedOutput()
-        command: Command = self.console.find(command)
+        command: Command = self.console.find(command_name)
 
         return command.run(IO(input, output, output))
 

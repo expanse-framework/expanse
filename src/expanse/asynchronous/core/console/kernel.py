@@ -87,13 +87,16 @@ class Kernel:
         self._commands.append(command)
 
     async def call(
-        self, command: str, parameters: str | None = None, output: Output | None = None
+        self,
+        command_name: str,
+        parameters: str | None = None,
+        output: Output | None = None,
     ) -> int:
         await self.bootstrap()
 
         input = StringInput(parameters or "")
         output = output or BufferedOutput()
-        command: Command = self.console.find(command)
+        command: Command = self.console.find(command_name)
 
         return await command.run(IO(input, output, output))
 
