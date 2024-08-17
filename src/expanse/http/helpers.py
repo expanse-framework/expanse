@@ -25,7 +25,7 @@ def abort(
 
 
 def json(
-    content: str = "",
+    content: Any = "",
     status_code: int = 200,
     headers: MutableMapping[str, Any] | None = None,
     **kwargs: Any,

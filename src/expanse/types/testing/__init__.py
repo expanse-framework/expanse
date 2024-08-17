@@ -5,7 +5,7 @@ from typing import Protocol
 
 
 if TYPE_CHECKING:
-    from expanse.testing.testing_command import TestingCommand
+    from expanse.testing.command_tester import TestingCommand
 
 
 class TestingCommandHelper(Protocol):

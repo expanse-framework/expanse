@@ -38,7 +38,7 @@ class Route(BaseRoute):
 
     @classmethod
     def get(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["GET"], name=name)
+        return cls(path, endpoint, methods=["GET", "HEAD"], name=name)
 
     @classmethod
     def post(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:

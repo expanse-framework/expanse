@@ -1,13 +1,9 @@
 import pytest
 
 from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.testing.testing_command import TestingCommand
-from expanse.asynchronous.types.testing import TestingCommandHelper
+from expanse.asynchronous.testing.command_tester import CommandTester
 
 
 @pytest.fixture()
-def testing_command(app: Application) -> TestingCommandHelper:
-    def _testing_command(command: str, parameters: str | None = None) -> TestingCommand:
-        return TestingCommand(app, command, parameters)
-
-    return _testing_command
+def command_tester(app: Application) -> CommandTester:
+    return CommandTester(app)
