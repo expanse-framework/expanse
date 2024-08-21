@@ -42,19 +42,19 @@ class Route(BaseRoute):
 
     @classmethod
     def post(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["POST", "OPTIONS"], name=name)
+        return cls(path, endpoint, methods=["POST"], name=name)
 
     @classmethod
     def put(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PUT", "OPTIONS"], name=name)
+        return cls(path, endpoint, methods=["PUT"], name=name)
 
     @classmethod
     def patch(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PATCH", "OPTIONS"], name=name)
+        return cls(path, endpoint, methods=["PATCH"], name=name)
 
     @classmethod
     def delete(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["DELETE", "OPTIONS"], name=name)
+        return cls(path, endpoint, methods=["DELETE"], name=name)
 
     @classmethod
     def options(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:

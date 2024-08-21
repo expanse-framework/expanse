@@ -9,7 +9,6 @@ from expanse.routing.route import Route
 
 if TYPE_CHECKING:
     from expanse.core.http.middleware.middleware import Middleware
-    from expanse.routing.router import Router
     from expanse.types.routing import Endpoint
 
 
@@ -23,19 +22,7 @@ class RouteGroup(BaseRouteGroup):
 
         self._middlewares: list[type[Middleware]] = []
 
-    def add_routes(self, routes: list[Route] | Router) -> None:
-        from expanse.routing.router import Router
-
-        if isinstance(routes, Router):
-            for route in routes._routes:
-                self.add_route(route)
-
-            for group in routes._groups:
-                for route in group.routes:
-                    self.add_route(route)
-
-            return
-
+    def add_routes(self, routes: list[Route]) -> None:
         for route in routes:
             self.add_route(route)
 

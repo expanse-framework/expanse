@@ -16,7 +16,8 @@ class SimpleMiddleware(Middleware):
 
 
 def test_route_group_with_middlewares(client: TestClient, router: Router) -> None:
-    with router.group("api").middleware(SimpleMiddleware) as group:
+    with router.group("api") as group:
+        group.middleware(SimpleMiddleware)
         group.get("/", lambda: Response("Hello world!"))
 
     response = client.get("/")

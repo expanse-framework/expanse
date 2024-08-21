@@ -26,22 +26,12 @@ class RoutesListCommand(Command):
 
         max_methods_length = 0
 
-        for route in router._routes:
+        for route in router.routes:
             max_methods_length = max(
                 max_methods_length,
                 sum(len(method) for method in route.methods) + len(route.methods) - 1,
             )
             routes.append(route)
-
-        for group in router._groups:
-            for route in group.routes:
-                max_methods_length = max(
-                    max_methods_length,
-                    sum(len(method) for method in route.methods)
-                    + len(route.methods)
-                    - 1,
-                )
-                routes.append(route)
 
         routes.sort(key=lambda route: route.path)
 

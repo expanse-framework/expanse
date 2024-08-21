@@ -4,7 +4,6 @@ import sys
 
 from typing import TYPE_CHECKING
 
-from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.support.service_provider import ServiceProvider
 from expanse.common.support._utils import module_from_path
 
@@ -13,11 +12,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from expanse.asynchronous.routing.router import Router
+
 
 class RouteServiceProvider(ServiceProvider):
-    async def load_routes_from_file(self, path: Path) -> Router:
-        router: Router = Router(self._app)
-
+    async def load_routes_from_file(self, router: Router, path: Path) -> Router:
         module_name = (
             path.resolve()
             .relative_to(self._app.base_path)

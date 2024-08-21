@@ -88,6 +88,7 @@ class ExceptionHandler(ExceptionHandlerContract):
             self._convert_exception_to_dict(e),
             status_code=e.status_code if isinstance(e, HTTPException) else 500,
             indent=2,
+            headers=e.headers if isinstance(e, HTTPException) else None,
         )
 
     def _render_response(self, request: Request, e: Exception) -> Response:
@@ -130,6 +131,7 @@ class ExceptionHandler(ExceptionHandlerContract):
             self._render_exception_content(e),
             status_code=e.status_code,
             content_type="text/plain",
+            headers=e.headers,
         )
 
     def _render_validation_exception(
