@@ -71,10 +71,10 @@ class WSGITransport(httpx.WSGITransport):
 
         assert isinstance(self.app, Application)
 
-        if not self.app.has(ExceptionHandler):
-            self.app.singleton(ExceptionHandler, ConcreteExceptionHandler)
+        if not self.app.container.has(ExceptionHandler):
+            self.app.container.singleton(ExceptionHandler, ConcreteExceptionHandler)
 
-        handler: ExceptionHandler = self.app.make(ExceptionHandler)
+        handler: ExceptionHandler = self.app.container.make(ExceptionHandler)
         with handler.raise_unhandled_exceptions(self.raise_app_exceptions):
             result = self.app(environ, start_response)
 

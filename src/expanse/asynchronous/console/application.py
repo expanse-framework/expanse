@@ -21,10 +21,10 @@ if TYPE_CHECKING:
 
 
 class Application(BaseApplication[Command]):
-    def __init__(self, expanse: Expanse) -> None:
+    def __init__(self, app: Expanse) -> None:
         super().__init__()
 
-        self._expanse = expanse
+        self._app = app
 
     async def run(
         self,
@@ -87,6 +87,6 @@ class Application(BaseApplication[Command]):
         return exit_code
 
     async def _run_command(self, command: Command, io: IO) -> int:
-        command.set_expanse(self._expanse)
+        command.set_expanse(self._app)
 
         return await command.run(io)

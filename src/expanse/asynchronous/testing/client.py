@@ -157,7 +157,9 @@ class _TestClientTransport(httpx.BaseTransport):
 
         with self.portal_factory() as portal:
             response_complete = portal.call(anyio.Event)
-            handler: ExceptionHandler = portal.call(self.app.make, ExceptionHandler)
+            handler: ExceptionHandler = portal.call(
+                self.app.container.make, ExceptionHandler
+            )
             with handler.raise_unhandled_exceptions(self.raise_server_exceptions):
                 portal.call(self.app, scope, receive, send)
 

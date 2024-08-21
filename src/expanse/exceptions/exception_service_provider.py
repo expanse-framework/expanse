@@ -7,4 +7,4 @@ from expanse.support.service_provider import ServiceProvider
 
 class ExceptionServiceProvider(ServiceProvider):
     def register(self) -> None:
-        self._app.singleton(ExceptionRendererContract, ExceptionRenderer)
+        self._container.singleton(ExceptionRendererContract, ExceptionRenderer)

@@ -10,7 +10,6 @@ from expanse.common.http.url_path import URLPath
 from expanse.common.routing.exceptions import RouteNotFound
 from expanse.common.routing.route_matcher import RouteMatcher
 from expanse.container.container import Container
-from expanse.core.application import Application
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
@@ -27,8 +26,8 @@ if TYPE_CHECKING:
 
 
 class Router:
-    def __init__(self, app: Application) -> None:
-        self._app: Application = app
+    def __init__(self, container: Container) -> None:
+        self._container: Container = container
         self._routes: RouteCollection = RouteCollection()
 
     @property
@@ -113,14 +112,14 @@ class Router:
 
         for route in self._routes:
             if route.name == name:
-                matcher = self._app.make(RouteMatcher)
+                matcher = self._container.make(RouteMatcher)
 
                 return matcher.url(route.path, **parameters)
 
         raise RouteNotFound(f"Route [{name}] is not defined")
 
     def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
-        matcher = self._app.make(RouteMatcher)
+        matcher = self._container.make(RouteMatcher)
 
         parameters = parameters or {}
 

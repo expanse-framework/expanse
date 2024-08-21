@@ -39,7 +39,7 @@ async def app(root: Path) -> Application:
 
 @pytest.fixture()
 async def router(app: Application) -> Router:
-    return await app.make("router")
+    return await app.container.make("router")
 
 
 @pytest.fixture()

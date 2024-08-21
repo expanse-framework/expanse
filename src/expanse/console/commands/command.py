@@ -58,7 +58,7 @@ class Command(BaseCommand[TApplication], ABC):
             if not self._expanse:
                 return self.handle()
 
-            return self._expanse.call(self.handle)
+            return self._expanse.container.call(self.handle)
         except KeyboardInterrupt:
             return 1
 

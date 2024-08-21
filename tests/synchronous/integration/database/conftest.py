@@ -10,7 +10,7 @@ from expanse.database.database_service_provider import DatabaseServiceProvider
 
 @pytest.fixture(autouse=True)
 def setup_databases(app: Application, tmp_path: Path) -> None:
-    config: dict[str, dict[str, Any]] = app.make("config")
+    config: dict[str, dict[str, Any]] = app.container.make("config")
 
     config["database"] = {
         "default": "sqlite",
@@ -39,9 +39,9 @@ def setup_databases(app: Application, tmp_path: Path) -> None:
         },
     }
 
-    app.register(DatabaseServiceProvider(app))
+    app.register(DatabaseServiceProvider(app.container))
 
-    db = app.make(DatabaseManager)
+    db = app.container.make(DatabaseManager)
 
     with db.connection() as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS my_table (id INTEGER)")

@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 
 class RoutingServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        self._app.singleton(Router, lambda app: Router(app))
-        self._app.alias(Router, "router")
-        self._app.scoped(Redirect)
+        self._container.singleton(Router)
+        self._container.alias(Router, "router")
+        self._container.scoped(Redirect)
 
     async def boot(self) -> None:
-        await self._app.on_resolved("view", self._register_view_globals)
+        await self._container.on_resolved("view", self._register_view_globals)
 
     async def _register_view_globals(self, view: ViewFactory) -> None:
-        router = await self._app.make(Router)
+        router = await self._container.make(Router)
 
         async def route(name: str, **parameters) -> URLPath:
             return await router.route(name, parameters)

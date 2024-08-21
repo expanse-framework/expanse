@@ -69,7 +69,7 @@ def test_http_exception_are_displayed_via_renderer_if_configured(
     router, client: TestClient
 ) -> None:
     renderer = ExceptionRenderer()
-    client.app.instance(BaseExceptionRenderer, renderer)
+    client.app.container.instance(BaseExceptionRenderer, renderer)
 
     router.get("/error", error)
 

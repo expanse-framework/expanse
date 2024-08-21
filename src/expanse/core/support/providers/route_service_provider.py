@@ -11,12 +11,15 @@ from expanse.support.service_provider import ServiceProvider
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from expanse.core.application import Application
+
 
 class RouteServiceProvider(ServiceProvider):
     def load_routes_from_file(self, router: Router, path: Path) -> Router:
+        app: Application = self._container.make("app")
         module_name = (
             path.resolve()
-            .relative_to(self._app.base_path)
+            .relative_to(app.base_path)
             .with_suffix("")
             .as_posix()
             .replace("/", ".")

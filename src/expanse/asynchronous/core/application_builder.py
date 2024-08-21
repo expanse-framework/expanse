@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Self
 
+from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.core.http.middleware.middleware_stack import MiddlewareStack
 
 
@@ -20,19 +21,20 @@ if TYPE_CHECKING:
 class ApplicationBuilder:
     def __init__(self, base_path: Path) -> None:
         self._base_path: Path = base_path
+        self._container = Container()
         self._register_commands_callback: (
             Callable[[ConsoleKernel], Awaitable[None]] | None
         ) = None
         self._configure_middleware_stack: (
             Callable[[Gateway], Awaitable[None]] | None
         ) = None
-        self._configure_kernels: Callable[[Application], None] | None = None
+        self._configure_kernels: Callable[[Container], None] | None = None
 
     def with_kernels(self) -> Self:
-        def configure_kernels(app: Application) -> None:
+        def configure_kernels(container: Container) -> None:
             from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
 
-            app.singleton(ConsoleKernel)
+            container.singleton(ConsoleKernel)
 
         self._configure_kernels = configure_kernels
 
@@ -78,31 +80,33 @@ class ApplicationBuilder:
     def create(self) -> Application:
         from expanse.asynchronous.core.application import Application
 
-        app = Application(self._base_path)
+        app = Application(self._base_path, container=self._container)
         if self._configure_kernels is not None:
-            self._configure_kernels(app)
+            self._configure_kernels(self._container)
 
         if self._register_commands_callback is not None:
 
-            async def _register_commands(app_: Application) -> None:
+            async def _register_commands(container: Container) -> None:
                 from expanse.asynchronous.core.console.kernel import (
                     Kernel as ConsoleKernel,
                 )
 
                 assert self._register_commands_callback is not None
 
-                await app_.on_resolved(ConsoleKernel, self._register_commands_callback)
+                await container.on_resolved(
+                    ConsoleKernel, self._register_commands_callback
+                )
 
             app.bootstrapping(_register_commands)
 
         if self._configure_middleware_stack:
 
-            async def _configure_middleware(app_: Application) -> None:
+            async def _configure_middleware(container: Container) -> None:
                 from expanse.asynchronous.core.http.gateway import Gateway
 
                 assert self._configure_middleware_stack is not None
 
-                await app_.on_resolved(Gateway, self._configure_middleware_stack)
+                await container.on_resolved(Gateway, self._configure_middleware_stack)
 
             app.bootstrapping(_configure_middleware)
 

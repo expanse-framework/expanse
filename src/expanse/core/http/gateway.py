@@ -25,7 +25,7 @@ class Gateway:
         self._group_middleware: dict[str, list[type[Middleware]]] = {}
 
     def handle(self, request: Request) -> Response:
-        with self._app.create_scoped_container() as container:
+        with self._app.container.create_scoped_container() as container:
             container.instance(Request, request)
 
             return (

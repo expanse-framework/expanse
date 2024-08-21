@@ -1,4 +1,4 @@
-from expanse.core.application import Application
+from expanse.common.configuration.config import Config
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
 from expanse.support.service_provider import ServiceProvider
@@ -13,28 +13,21 @@ class ViewServiceProvider(ServiceProvider):
         self._register_view_finder()
 
     def boot(self) -> None:
-        self._app.on_resolved(ResponseAdapter, self._register_response_adapters)
+        self._container.on_resolved(ResponseAdapter, self._register_response_adapters)
 
     def _register_factory(self) -> None:
-        self._app.singleton(ViewFactory, self._create_factory)
-        self._app.alias(ViewFactory, "view")
+        self._container.singleton(ViewFactory, self._create_factory)
+        self._container.alias(ViewFactory, "view")
 
-    def _create_factory(self, app: Application) -> ViewFactory:
-        finder: ViewFinder = app.make("view:finder")
-
-        return ViewFactory(finder, debug=app.config.get("app.debug", False))
+    def _create_factory(self, finder: ViewFinder, config: Config) -> ViewFactory:
+        return ViewFactory(finder, debug=config.get("app.debug", False))
 
     def _register_view_finder(self) -> None:
-        def _create_view_finder(app: Application) -> ViewFinder:
-            return ViewFinder(
-                [
-                    app.resolve_placeholder_path(path)
-                    for path in app.config["view"]["paths"]
-                ]
-            )
+        def _create_view_finder(config: Config) -> ViewFinder:
+            return ViewFinder(config["view"]["paths"])
 
-        self._app.singleton(ViewFinder, _create_view_finder)
-        self._app.alias(ViewFinder, "view:finder")
+        self._container.singleton(ViewFinder, _create_view_finder)
+        self._container.alias(ViewFinder, "view:finder")
 
     def _register_response_adapters(self, adapter: ResponseAdapter) -> None:
         def adapt_view(raw_response: View, factory: ViewFactory) -> Response:

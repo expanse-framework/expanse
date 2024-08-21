@@ -14,31 +14,29 @@ if TYPE_CHECKING:
 
 class StaticServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        self._app.singleton(Static, self._register_static)
+        self._container.singleton(Static, self._register_static)
 
     async def boot(self) -> None:
-        await self._app.on_resolved("router", self._add_static_route)
-        await self._app.on_resolved("view", self._register_view_globals)
+        await self._container.on_resolved("router", self._add_static_route)
+        await self._container.on_resolved("view", self._register_view_globals)
 
     def _register_static(self, config: Config) -> Static:
-        paths: list[Path] = [
-            self._app.resolve_placeholder_path(p)
-            for p in config.get("static.paths", [])
-        ]
+        paths: list[Path] = config.get("static.paths", [])
 
         return Static(
             paths, prefix=config.get("static.prefix"), url=config.get("static.url")
         )
 
     async def _add_static_route(self, router: "Router") -> None:
-        if self._app.config.get("app.debug", False):
-            prefix: str = self._app.config["static.prefix"].rstrip("/")
+        config = await self._container.make(Config)
+        if config.get("app.debug", False):
+            prefix: str = config["static.prefix"].rstrip("/")
 
             router.get(
                 f"{prefix}/{{path:path}}",
-                (await self._app.make(Static)).get,
+                (await self._container.make(Static)).get,
                 name="static",
             )
 
     async def _register_view_globals(self, view: ViewFactory) -> None:
-        view.register_global(static=(await self._app.make(Static)).url)
+        view.register_global(static=(await self._container.make(Static)).url)

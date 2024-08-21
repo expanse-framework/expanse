@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def setup_app(app: Application) -> None:
-    gateway = app.make(Gateway)
+    gateway = app.container.make(Gateway)
     gateway.prepend_middleware(ManageCors)
 
-    router: Router = app.make("router")
+    router: Router = app.container.make("router")
 
     def ping(responder: Responder) -> Response:
         return responder.json("pong")

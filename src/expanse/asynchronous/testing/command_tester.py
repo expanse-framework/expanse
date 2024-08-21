@@ -25,7 +25,7 @@ class TestingCommand:
         if parameters:
             full_command += " " + parameters
 
-        kernel = await self._app.make(Kernel)
+        kernel = await self._app.container.make(Kernel)
         self._return_code = await kernel.handle(StringInput(full_command), self._output)
 
         return self._return_code

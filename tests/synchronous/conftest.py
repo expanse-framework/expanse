@@ -35,7 +35,7 @@ def app(root: Path) -> Application:
 
 @pytest.fixture()
 def router(app: Application) -> Router:
-    return app.make("router")
+    return app.container.make("router")
 
 
 @pytest.fixture()

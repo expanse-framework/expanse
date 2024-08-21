@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from expanse.core.application import Application
+    from expanse.container.container import Container
 
 
 class ServiceProvider:
-    def __init__(self, app: Application) -> None:
-        self._app: Application = app
+    def __init__(self, container: Container) -> None:
+        self._container: Container = container
 
     def register(self) -> None:
         """

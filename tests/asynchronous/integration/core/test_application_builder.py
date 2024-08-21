@@ -57,7 +57,7 @@ async def test_middleware_configuration(root: Path, caplog: LogCaptureFixture) -
     app = Application.configure(root).with_middleware(configure_middleware).create()
     await app.bootstrap()
 
-    router: Router = await app.make(Router)
+    router: Router = await app.container.make(Router)
 
     router.get("/", lambda: Response("Hello, World!"))
 

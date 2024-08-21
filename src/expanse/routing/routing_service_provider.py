@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 
 class RoutingServiceProvider(ServiceProvider):
     def register(self) -> None:
-        self._app.singleton(Router, lambda app: Router(app))
-        self._app.alias(Router, "router")
-        self._app.scoped(Redirect)
+        self._container.singleton(Router, lambda container: Router(container))
+        self._container.alias(Router, "router")
+        self._container.scoped(Redirect)
 
     def boot(self) -> None:
-        self._app.on_resolved("view", self._register_view_globals)
+        self._container.on_resolved("view", self._register_view_globals)
 
     def _register_view_globals(self, view: ViewFactory) -> None:
-        router = self._app.make(Router)
+        router = self._container.make(Router)
 
         def route(name: str, **parameters) -> URLPath:
             return router.route(name, parameters)

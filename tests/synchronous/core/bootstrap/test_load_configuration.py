@@ -13,7 +13,7 @@ def app() -> Application:
 def test_loading_configuration_provides_default_values(app: Application) -> None:
     LoadConfiguration.bootstrap(app)
 
-    config = app.make(Config)
+    config = app.container.make(Config)
 
     assert config["app.name"] == "Expanse"
     assert len(config["app.providers"]) > 0

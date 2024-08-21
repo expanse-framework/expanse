@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from expanse.asynchronous.types import Send
 
 
-class Application(BaseApplication, Container):
+class Application(BaseApplication):
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,
@@ -45,22 +45,32 @@ class Application(BaseApplication, Container):
         BootProviders,
     ]
 
-    def __init__(self, base_path: Path | None = None) -> None:
+    def __init__(
+        self, base_path: Path | None = None, container: Container | None = None
+    ) -> None:
         BaseApplication.__init__(
             self,
             base_path
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent,
         )
-        Container.__init__(self)
+
+        if container is None:
+            container = Container()
+
+        self._container = container
 
         self._service_providers: list[ServiceProvider] = []
         self._default_bootstrappers: list[type[Bootstrapper]] = (
             self.__class__._bootstrappers.copy()
         )
-        self._bootstrapping_callbacks: list[Callable[[Self], Awaitable[None]]] = []
+        self._bootstrapping_callbacks: list[Callable[[Container], Awaitable[None]]] = []
 
         self._bind_paths()
         self._register_base_bindings()
+
+    @property
+    def container(self) -> Container:
+        return self._container
 
     @classmethod
     def configure(cls, base_path: Path | None = None) -> ApplicationBuilder:
@@ -73,7 +83,7 @@ class Application(BaseApplication, Container):
 
     def set_config(self, config: Config) -> None:
         super().set_config(config)
-        self.instance(Config, config)
+        self._container.instance(Config, config)
 
     async def boot(self) -> None:
         """
@@ -104,11 +114,11 @@ class Application(BaseApplication, Container):
         await self._register_base_service_providers()
 
         for bootstrapper_class in bootstrappers:
-            bootstrapper: Bootstrapper = await self.make(bootstrapper_class)
+            bootstrapper: Bootstrapper = await self._container.make(bootstrapper_class)
             await bootstrapper.bootstrap(self)
 
         for callback in self._bootstrapping_callbacks:
-            await callback(self)
+            await callback(self._container)
 
         await self.boot()
 
@@ -116,19 +126,19 @@ class Application(BaseApplication, Container):
 
         return self
 
-    def bootstrapping(self, *callback: Callable[[Self], Awaitable[None]]) -> Self:
+    def bootstrapping(self, *callback: Callable[[Container], Awaitable[None]]) -> Self:
         self._bootstrapping_callbacks.extend(callback)
 
         return self
 
     async def register_configured_providers(self) -> None:
-        providers = (await self.make(Config)).get("app.providers", [])
+        providers = (await self._container.make(Config)).get("app.providers", [])
 
         for provider_class in providers:
             if isinstance(provider_class, str):
                 provider_class = string_to_class(provider_class)
 
-            provider = provider_class(self)
+            provider = provider_class(self._container)
 
             await self.register(provider)
 
@@ -144,34 +154,34 @@ class Application(BaseApplication, Container):
     async def handle_command(self, input: Input) -> int:
         from expanse.asynchronous.core.console.kernel import Kernel
 
-        kernel = await self.make(Kernel)
+        kernel = await self._container.make(Kernel)
 
         return await kernel.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None
 
-        self.instance("path", self._base_path)
-        self.instance("path:config", self.config_path)
-        self.instance("path:resources", self.resources_path)
+        self._container.instance("path", self._base_path)
+        self._container.instance("path:config", self.config_path)
+        self._container.instance("path:resources", self.resources_path)
 
     async def _boot_provider(self, provider: ServiceProvider) -> None:
         if hasattr(provider, "boot"):
-            await self.call(provider.boot)
+            await self._container.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
         from expanse.asynchronous.core.http.gateway import Gateway
 
-        self.instance("app", self)
-        self.instance(self.__class__, self)
-        self.instance(Container, self)
+        self._container.instance(self.__class__, self)
+        self._container.alias(self.__class__, "app")
+        self._container.instance(Container, self._container)
         self._config = Config({})
-        self.instance(Config, self._config)
-        self.alias(Config, "config")
+        self._container.instance(Config, self._config)
+        self._container.alias(Config, "config")
 
-        self.singleton(Gateway)
+        self._container.singleton(Gateway)
 
-        self.singleton(ExceptionHandlerContract, ExceptionHandler)
+        self._container.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     async def _register_base_service_providers(self) -> None:
         from expanse.asynchronous.http.http_service_provider import HTTPServiceProvider
@@ -179,8 +189,8 @@ class Application(BaseApplication, Container):
             RoutingServiceProvider,
         )
 
-        await self.register(HTTPServiceProvider(self))
-        await self.register(RoutingServiceProvider(self))
+        await self.register(HTTPServiceProvider(self._container))
+        await self.register(RoutingServiceProvider(self._container))
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -190,12 +200,12 @@ class Application(BaseApplication, Container):
                     await self.bootstrap()
                     await send({"type": "lifespan.startup.complete"})
                 elif message["type"] == "lifespan.shutdown":
-                    await self.terminate()
+                    await self._container.terminate()
                     await send({"type": "lifespan.shutdown.complete"})
                     return
 
         from expanse.asynchronous.core.http.gateway import Gateway
 
-        gateway = await self.make(Gateway)
+        gateway = await self._container.make(Gateway)
 
         await gateway(scope, receive, send)

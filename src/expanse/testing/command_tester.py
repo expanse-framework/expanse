@@ -25,7 +25,7 @@ class TestingCommand:
         if parameters:
             full_command += " " + parameters
 
-        self._return_code = self._app.make(Kernel).handle(
+        self._return_code = self._app.container.make(Kernel).handle(
             StringInput(full_command), self._output
         )
 

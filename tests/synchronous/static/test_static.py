@@ -15,7 +15,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 def test_get_returns_file_content_if_file_exists(app: Application) -> None:
     static = Static([FIXTURES_DIR], prefix="/static")
 
-    with app.create_scoped_container() as container:
+    with app.container.create_scoped_container() as container:
         container.instance(Request, Request.create("http://example.com"))
 
         with _use_container(container):
@@ -27,7 +27,7 @@ def test_get_returns_file_content_if_file_exists(app: Application) -> None:
 def test_get_returns_404_not_found_if_file_does_not_exist(app: Application) -> None:
     static = Static([FIXTURES_DIR], prefix="/static")
 
-    with app.create_scoped_container() as container:
+    with app.container.create_scoped_container() as container:
         container.instance(Request, Request.create("http://example.com"))
 
         with _use_container(container):

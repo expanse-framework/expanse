@@ -1,4 +1,3 @@
-from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.http.response_adapter import ResponseAdapter
 from expanse.asynchronous.support.service_provider import ServiceProvider
@@ -14,30 +13,23 @@ class ViewServiceProvider(ServiceProvider):
         await self._register_view_finder()
 
     async def boot(self) -> None:
-        await self._app.on_resolved(ResponseAdapter, self._register_response_adapters)
-
-    async def _register_factory(self) -> None:
-        self._app.singleton(ViewFactory, self._create_factory)
-        self._app.alias(ViewFactory, "view")
-
-    async def _create_factory(self, app: Application) -> ViewFactory:
-        finder: ViewFinder = await app.make("view:finder")
-
-        return ViewFactory(
-            finder, debug=(await app.make(Config))["app"].get("debug", False)
+        await self._container.on_resolved(
+            ResponseAdapter, self._register_response_adapters
         )
 
-    async def _register_view_finder(self) -> None:
-        async def _create_view_finder(app: Application) -> ViewFinder:
-            return ViewFinder(
-                [
-                    app.resolve_placeholder_path(path)
-                    for path in (await app.make(Config))["view"]["paths"]
-                ]
-            )
+    async def _register_factory(self) -> None:
+        self._container.singleton(ViewFactory, self._create_factory)
+        self._container.alias(ViewFactory, "view")
 
-        self._app.singleton(ViewFinder, _create_view_finder)
-        self._app.alias(ViewFinder, "view:finder")
+    async def _create_factory(self, finder: ViewFinder, config: Config) -> ViewFactory:
+        return ViewFactory(finder, debug=config["app"].get("debug", False))
+
+    async def _register_view_finder(self) -> None:
+        async def _create_view_finder(config: Config) -> ViewFinder:
+            return ViewFinder(config["view"]["paths"])
+
+        self._container.singleton(ViewFinder, _create_view_finder)
+        self._container.alias(ViewFinder, "view:finder")
 
     async def _register_response_adapters(self, adapter: ResponseAdapter) -> None:
         async def adapt_view(raw_response: View, factory: ViewFactory) -> Response:

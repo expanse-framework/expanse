@@ -13,9 +13,9 @@ from expanse.support.service_provider import ServiceProvider
 
 class DatabaseServiceProvider(ServiceProvider):
     def register(self) -> None:
-        self._app.singleton(DatabaseManagerContract, DatabaseManager)
-        self._app.scoped(Session, self._create_session)
-        self._app.scoped(Connection, self._create_connection)
+        self._container.singleton(DatabaseManagerContract, DatabaseManager)
+        self._container.scoped(Session, self._create_session)
+        self._container.scoped(Connection, self._create_connection)
 
     def _create_connection(
         self, container: Container, db: DatabaseManagerContract, name: str | None = None

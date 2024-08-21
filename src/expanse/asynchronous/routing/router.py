@@ -5,7 +5,6 @@ from typing import Any
 from typing import NoReturn
 
 from expanse.asynchronous.container.container import Container
-from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.http.request import Request
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.http.response_adapter import ResponseAdapter
@@ -29,8 +28,8 @@ if TYPE_CHECKING:
 
 
 class Router:
-    def __init__(self, app: Application) -> None:
-        self._app: Application = app
+    def __init__(self, container: Container) -> None:
+        self._container: Container = container
         self._routes: RouteCollection = RouteCollection()
 
     @property
@@ -117,14 +116,14 @@ class Router:
 
         for route in self._routes:
             if route.name == name:
-                matcher = await self._app.make(RouteMatcher)
+                matcher = await self._container.make(RouteMatcher)
 
                 return matcher.url(route.path, **parameters)
 
         raise RouteNotFound(f"Route [{name}] is not defined")
 
     async def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
-        matcher = await self._app.make(RouteMatcher)
+        matcher = await self._container.make(RouteMatcher)
 
         parameters = parameters or {}
 
