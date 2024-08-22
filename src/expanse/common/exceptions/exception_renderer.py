@@ -108,9 +108,10 @@ class ExceptionRendererMixin:
         else:
             module = inspect.getmodule(frame.frame)
 
-            assert module is not None
-
-            source = inspect.getsourcelines(module)[0]
+            if module is None:
+                source = frame.line or ""
+            else:
+                source = inspect.getsourcelines(module)[0]
 
         lines_before = 5
         lines_after = 5
