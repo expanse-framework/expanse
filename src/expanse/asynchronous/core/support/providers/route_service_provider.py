@@ -12,14 +12,16 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from expanse.asynchronous.core.application import Application
     from expanse.asynchronous.routing.router import Router
 
 
 class RouteServiceProvider(ServiceProvider):
     async def load_routes_from_file(self, router: Router, path: Path) -> Router:
+        app: Application = await self._container.make("app")
         module_name = (
             path.resolve()
-            .relative_to(self._app.base_path)
+            .relative_to(app.base_path)
             .with_suffix("")
             .as_posix()
             .replace("/", ".")
