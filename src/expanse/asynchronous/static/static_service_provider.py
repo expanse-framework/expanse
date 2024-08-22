@@ -9,6 +9,7 @@ from expanse.common.configuration.config import Config
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from expanse.asynchronous.core.application import Application
     from expanse.asynchronous.routing.router import Router
 
 
@@ -21,7 +22,9 @@ class StaticServiceProvider(ServiceProvider):
         await self._container.on_resolved("view", self._register_view_globals)
 
     def _register_static(self, config: Config) -> Static:
+        app: Application = self._container.make("app")
         paths: list[Path] = config.get("static.paths", [])
+        paths = [app.path(p) if not p.is_absolute() else p for p in paths]
 
         return Static(
             paths, prefix=config.get("static.prefix"), url=config.get("static.url")
