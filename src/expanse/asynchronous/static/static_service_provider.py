@@ -24,7 +24,7 @@ class StaticServiceProvider(ServiceProvider):
     async def _register_static(self, config: Config) -> Static:
         app: Application = await self._container.make("app")
         paths: list[Path] = config.get("static.paths", [])
-        paths = [app.path(p) if not p.is_absolute() else p for p in paths]
+        paths = [app.base_path / p if not p.is_absolute() else p for p in paths]
 
         return Static(
             paths, prefix=config.get("static.prefix"), url=config.get("static.url")

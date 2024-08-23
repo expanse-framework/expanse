@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import URL
@@ -85,17 +84,19 @@ class DatabaseManager(DatabaseManagerContract):
             if url.drivername == "sqlite":
                 url = URL("sqlite+aiosqlite", *url[1:])
         else:
-            assert config.database is not None
-            database_path = self._app.resolve_placeholder_path(config.database)
-            if isinstance(database_path, Path):
-                database_path.parent.mkdir(parents=True, exist_ok=True)
-                database = database_path.as_posix()
-            else:
-                database = database_path
+            if config.database is None:
+                raise ValueError("The SQLite database path is not configured.")
+
+            database_path = config.database
+
+            if not database_path.is_absolute():
+                database_path = self._app.base_path / database_path
+
+            database_path.parent.mkdir(parents=True, exist_ok=True)
 
             url = URL(
                 drivername="sqlite+aiosqlite",
-                database=str(database),
+                database=str(database_path),
                 host=None,
                 port=None,
                 username=None,
