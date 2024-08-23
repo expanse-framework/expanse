@@ -7,6 +7,8 @@ import types
 
 from collections.abc import Awaitable
 from collections.abc import Callable
+from inspect import isasyncgenfunction
+from inspect import isgeneratorfunction
 from typing import Any
 from typing import Self
 from typing import TypeVar
@@ -34,17 +36,19 @@ class UnboundAbstractError(Exception): ...
 
 
 class Container(BaseContainer):
-    async def build(self, concrete: type | str, args: tuple | None = None) -> Any:
+    async def build(
+        self, concrete: type | str, args: tuple | None = None
+    ) -> tuple[Any, _Callback | None]:
         if args is None:
             args = ()
 
         function: Callable[..., Any]
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
-                return concrete(self, *args)
+                return concrete(self, *args), None
 
             if concrete.__name__ == "_container_concrete":
-                return await concrete(self)
+                return await concrete(self), None
 
             function = concrete
         elif isinstance(concrete, types.MethodType):
@@ -63,10 +67,26 @@ class Container(BaseContainer):
             keywords,
         ) = await self._resolve_callable_dependencies(function, *args)
 
-        if not asyncio.iscoroutinefunction(concrete):
-            return await run_in_threadpool(concrete, *positional, **keywords)
+        if isasyncgenfunction(concrete):
+            generator = concrete(*positional, **keywords)
 
-        return await concrete(*positional, **keywords)
+            async def terminating_callback() -> None:
+                await anext(generator, None)
+
+            return await anext(generator), terminating_callback
+
+        if isgeneratorfunction(concrete):
+            generator = concrete(*positional, **keywords)
+
+            def terminating_callback() -> None:
+                next(generator, None)
+
+            return next(generator), terminating_callback
+
+        if not asyncio.iscoroutinefunction(concrete):
+            return await run_in_threadpool(concrete, *positional, **keywords), None
+
+        return await concrete(*positional, **keywords), None
 
     @overload
     async def make(self, abstract: type[T]) -> T: ...
@@ -148,7 +168,9 @@ class Container(BaseContainer):
 
         async def closure(container: Container) -> Any:
             if abstract == original_concrete:
-                return await container.build(original_concrete)
+                obj, _ = await container.build(original_concrete)
+
+                return obj
 
             return await container._resolve(original_concrete)
 
@@ -181,9 +203,10 @@ class Container(BaseContainer):
         else:
             concrete = abstract
 
+        terminating_callback: _Callback | None = None
         if self._is_buildable(actual_abstract, concrete):
             try:
-                obj = await self.build(concrete, metadata)
+                obj, terminating_callback = await self.build(concrete, metadata)
             except Exception:
                 logger.exception('Unable to build the "%s" dependency', abstract)
 
@@ -195,6 +218,8 @@ class Container(BaseContainer):
             self._instances[abstract] = obj
 
         self._mark_as_resolved(actual_abstract)
+        if terminating_callback is not None:
+            self.terminating(terminating_callback)
 
         await self._execute_after_resolving_callbacks(abstract, obj)
 

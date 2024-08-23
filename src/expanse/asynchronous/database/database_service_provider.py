@@ -1,8 +1,5 @@
-from collections.abc import Awaitable
-from collections.abc import Callable
-from typing import Annotated
+from collections.abc import AsyncGenerator
 
-from expanse.asynchronous.container.container import Container
 from expanse.asynchronous.contracts.database.connection import Connection
 from expanse.asynchronous.contracts.database.database_manager import (
     DatabaseManager as DatabaseManagerContract,
@@ -20,54 +17,24 @@ class DatabaseServiceProvider(ServiceProvider):
 
     async def _create_connection(
         self,
-        container: Container,
         db: DatabaseManagerContract,
         name: str | None = None,
-    ) -> Connection:
+    ) -> AsyncGenerator[Connection]:
         connection = db.connection(name)
-
-        container.terminating(self._close_connection(name))
 
         await connection.start()
 
-        return connection
+        yield connection
+
+        await connection.close()
 
     async def _create_session(
         self,
-        container: Container,
         db: DatabaseManagerContract,
         name: str | None = None,
-    ) -> Session:
+    ) -> AsyncGenerator[Session]:
         session = db.session(name)
 
-        container.terminating(self._close_session(name))
+        yield session
 
-        return session
-
-    def _close_session(self, name: str | None) -> Callable[[Session], Awaitable[None]]:
-        if name is not None:
-
-            async def close(session: Annotated[Session, name]) -> None:
-                await session.close()
-
-        else:
-
-            async def close(session: Session) -> None:
-                await session.close()
-
-        return close
-
-    def _close_connection(
-        self, name: str | None
-    ) -> Callable[[Connection], Awaitable[None]]:
-        if name is not None:
-
-            async def close(connection: Annotated[Connection, name]) -> None:
-                await connection.close()
-
-        else:
-
-            async def close(connection: Connection) -> None:
-                await connection.close()
-
-        return close
+        await session.close()

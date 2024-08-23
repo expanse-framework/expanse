@@ -6,6 +6,7 @@ import types
 
 from collections.abc import Awaitable
 from collections.abc import Callable
+from inspect import isgeneratorfunction
 from typing import Any
 from typing import Self
 from typing import TypeVar
@@ -32,14 +33,16 @@ class UnboundAbstractError(Exception): ...
 
 
 class Container(BaseContainer):
-    def build(self, concrete: type | str, args: tuple | None = None) -> Any:
+    def build(
+        self, concrete: type | str, args: tuple | None = None
+    ) -> tuple[Any, _Callback | None]:
         if args is None:
             args = ()
 
         function: Callable[..., Any]
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
-                return concrete(self, *args)
+                return concrete(self, *args), None
 
             function = concrete
         elif isinstance(concrete, types.MethodType):
@@ -58,7 +61,15 @@ class Container(BaseContainer):
             keywords,
         ) = self._resolve_callable_dependencies(function, *args)
 
-        return concrete(*positional, **keywords)
+        if isgeneratorfunction(concrete):
+            generator = concrete(*positional, **keywords)
+
+            def terminating_callback() -> None:
+                next(generator, None)
+
+            return next(generator), terminating_callback
+
+        return concrete(*positional, **keywords), None
 
     @overload
     def make(self, abstract: type[T]) -> T: ...
@@ -130,7 +141,8 @@ class Container(BaseContainer):
 
         def closure(container: Container) -> Any:
             if abstract == original_concrete:
-                return container.build(original_concrete)
+                obj, _ = container.build(original_concrete)
+                return obj
 
             return container._resolve(original_concrete)
 
@@ -163,10 +175,12 @@ class Container(BaseContainer):
         else:
             concrete = abstract
 
+        terminating_callback: _Callback | None = None
         if self._is_buildable(actual_abstract, concrete):
             try:
-                obj = self.build(concrete, metadata)
+                obj, terminating_callback = self.build(concrete, metadata)
             except Exception as e:
+                raise
                 raise ValueError(f'Unable to build the "{abstract}" dependency') from e
         else:
             obj = self.make(concrete)
@@ -175,6 +189,8 @@ class Container(BaseContainer):
             self._instances[abstract] = obj
 
         self._mark_as_resolved(actual_abstract)
+        if terminating_callback is not None:
+            self.terminating(terminating_callback)
 
         self._execute_after_resolving_callbacks(abstract, obj)
 
@@ -188,7 +204,12 @@ class Container(BaseContainer):
         arguments = list(args)
         _globals = getattr(callable, "__globals__", None)
 
-        for name, parameter in inspect.signature(callable).parameters.items():
+        try:
+            signature = inspect.signature(callable)
+        except ValueError:
+            return positional, keywords
+
+        for name, parameter in signature.parameters.items():
             klass = self._get_class(parameter)
 
             if name == "self":

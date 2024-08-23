@@ -3,6 +3,7 @@ from __future__ import annotations
 import traceback
 
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING
 from typing import ClassVar
 from typing import Self
@@ -50,6 +51,8 @@ class Application(BaseApplication):
             base_path
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent,
         )
+        self._lock = Lock()
+
         if container is None:
             container = Container()
 
@@ -195,6 +198,7 @@ class Application(BaseApplication):
     ) -> Iterable[bytes]:
         from expanse.core.http.gateway import Gateway
 
-        self.bootstrap()
+        with self._lock:
+            self.bootstrap()
 
         return self._container.make(Gateway)(environ, start_response)

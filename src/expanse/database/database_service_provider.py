@@ -1,7 +1,5 @@
-from collections.abc import Callable
-from typing import Annotated
+from collections.abc import Generator
 
-from expanse.container.container import Container
 from expanse.contracts.database.connection import Connection
 from expanse.contracts.database.database_manager import (
     DatabaseManager as DatabaseManagerContract,
@@ -18,45 +16,21 @@ class DatabaseServiceProvider(ServiceProvider):
         self._container.scoped(Connection, self._create_connection)
 
     def _create_connection(
-        self, container: Container, db: DatabaseManagerContract, name: str | None = None
-    ) -> Connection:
-        session = db.connection(name)
+        self, db: DatabaseManagerContract, name: str | None = None
+    ) -> Generator[Connection]:
+        connection = db.connection(name)
 
-        container.terminating(self._close_connection(name))
+        yield connection
 
-        return session
+        connection.close()
 
     def _create_session(
-        self, container: Container, db: DatabaseManagerContract, name: str | None = None
-    ) -> Session:
+        self, db: DatabaseManagerContract, name: str | None = None
+    ) -> Generator[Session]:
         session = db.session(name)
 
-        container.terminating(self._close_session(name))
+        yield session
 
-        return session
+        print("Closing session")
 
-    def _close_session(self, name: str | None) -> Callable[[Session], None]:
-        if name is not None:
-
-            def close(session: Annotated[Session, name]) -> None:
-                session.close()
-
-        else:
-
-            def close(session: Session) -> None:
-                session.close()
-
-        return close
-
-    def _close_connection(self, name: str | None) -> Callable[[Connection], None]:
-        if name is not None:
-
-            def close(connection: Annotated[Connection, name]) -> None:
-                connection.close()
-
-        else:
-
-            def close(connection: Connection) -> None:
-                connection.close()
-
-        return close
+        session.close()
