@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
@@ -20,19 +21,15 @@ class Request(BaseRequest):
     def __init__(self, environ: Environ, start_response: StartResponse | None = None):
         super().__init__(environ, start_response)  # type: ignore[arg-type]
 
-        self._url: URL | None = None
         self._route: Route | None = None
 
         self._acceptable_content_types: list[str] | None = None
 
-    @property
+    @cached_property
     def url(self) -> URL:  # type: ignore[override]
-        if self._url is None:
-            self._url = URL(environ=self._environ)
+        return URL(environ=self._environ)
 
-        return self._url
-
-    @property
+    @cached_property
     def host(self) -> str:
         client = self.client
 
@@ -41,17 +38,12 @@ class Request(BaseRequest):
 
         return client.host or ""
 
-    @property
+    @cached_property
     def acceptable_content_types(self) -> list[str]:
-        if self._acceptable_content_types is None:
-            self._acceptable_content_types = [
-                item.value
-                for item in AcceptHeader.from_string(
-                    self.headers.get("Accept", "")
-                ).all()
-            ]
-
-        return self._acceptable_content_types
+        return [
+            item.value
+            for item in AcceptHeader.from_string(self.headers.get("Accept", "")).all()
+        ]
 
     def accepts_any_content_type(self) -> bool:
         """
@@ -150,6 +142,8 @@ class Request(BaseRequest):
         path = url.path
         if not path:
             path = "/"
+
+        base_environ["PATH_INFO"] = path
 
         query_string = ""
         if url.query:

@@ -31,6 +31,4 @@ class DatabaseServiceProvider(ServiceProvider):
 
         yield session
 
-        print("Closing session")
-
         session.close()

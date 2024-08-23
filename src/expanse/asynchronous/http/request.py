@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
@@ -25,19 +26,13 @@ class Request(BaseRequest):
     ):
         super().__init__(scope=scope, receive=receive, send=send)
 
-        self._acceptable_content_types: list[str] | None = None
-        self._url: URL | None = None
-
         self._route: Route | None = None
 
-    @property
+    @cached_property
     def url(self) -> URL:  # type: ignore[override]
-        if self._url is None:
-            self._url = URL(scope=self._scope)
+        return URL(scope=self._scope)
 
-        return self._url
-
-    @property
+    @cached_property
     def host(self) -> str:
         client = self.client
 
@@ -46,17 +41,12 @@ class Request(BaseRequest):
 
         return client.host or ""
 
-    @property
+    @cached_property
     def acceptable_content_types(self) -> list[str]:
-        if self._acceptable_content_types is None:
-            self._acceptable_content_types = [
-                item.value
-                for item in AcceptHeader.from_string(
-                    self.headers.get("Accept", "")
-                ).all()
-            ]
-
-        return self._acceptable_content_types
+        return [
+            item.value
+            for item in AcceptHeader.from_string(self.headers.get("Accept", "")).all()
+        ]
 
     @property
     def route(self) -> Route | None:

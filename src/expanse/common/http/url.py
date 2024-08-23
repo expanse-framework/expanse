@@ -53,7 +53,7 @@ class URL:
         self,
         scheme: str,
         path: str,
-        query_string: bytes = b"",
+        query_string: bytes | str = b"",
         server: tuple[str, int | None] | None = None,
         host_header: str | None = None,
     ) -> str:
@@ -70,7 +70,12 @@ class URL:
                 url = f"{scheme}://{host}:{port}{path}"
 
         if query_string:
-            url = f"{url}?{query_string.decode()}"
+            query_string = (
+                query_string.decode()
+                if isinstance(query_string, bytes)
+                else query_string
+            )
+            url = f"{url}?{query_string}"
 
         return url
 
@@ -79,40 +84,46 @@ class URL:
         return self._components
 
     @property
+    def full(self) -> str:
+        return self._url
+
+    @property
     def scheme(self) -> str:
-        return self.components.scheme
+        return self._components.scheme
 
     @property
     def netloc(self) -> str:
-        return self.components.netloc
+        return self._components.netloc
 
     @property
     def path(self) -> str:
-        return URLPath(self.components.path)
+        p = URLPath(self._components.path)
+
+        return p
 
     @property
     def query(self) -> str:
-        return self.components.query
+        return self._components.query
 
     @property
     def fragment(self) -> str:
-        return self.components.fragment
+        return self._components.fragment
 
     @property
     def username(self) -> str | None:
-        return self.components.username
+        return self._components.username
 
     @property
     def password(self) -> str | None:
-        return self.components.password
+        return self._components.password
 
     @property
     def hostname(self) -> str | None:
-        return self.components.hostname
+        return self._components.hostname
 
     @property
     def port(self) -> int | None:
-        return self.components.port
+        return self._components.port
 
     def is_secure(self) -> bool:
         return self.scheme == "https"
@@ -159,7 +170,7 @@ class URL:
 
             kwargs["netloc"] = netloc
 
-        components = self.components._replace(**kwargs)
+        components = self._components._replace(**kwargs)
         return self.__class__(components.geturl())
 
     def __eq__(self, other: typing.Any) -> bool:
