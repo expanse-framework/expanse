@@ -1,5 +1,4 @@
 import pytest
-import sqlalchemy
 
 from sqlalchemy import URL
 from sqlalchemy.orm import Session
@@ -7,10 +6,12 @@ from sqlalchemy.util import immutabledict
 from treat.mock import Mockery
 
 from expanse.common.configuration.config import Config
+from expanse.common.database._utils import create_engine
 from expanse.core.application import Application
 from expanse.database import database_manager
 from expanse.database.connection import Connection
 from expanse.database.database_manager import DatabaseManager
+from expanse.database.engine import Engine
 
 
 @pytest.fixture()
@@ -155,9 +156,9 @@ def test_database_manager_builds_a_correct_engine_url(
     manager: DatabaseManager, connection_name: str, expected_url: str, mockery: Mockery
 ):
     # Create a valid engine first
-    engine = sqlalchemy.create_engine("sqlite://")
+    engine = create_engine("sqlite://", engine_class=Engine)
     mockery.mock(database_manager).should_receive("create_engine").times(1).with_(
-        expected_url
+        expected_url, engine_class=Engine
     ).and_return(engine)
 
     manager.connection(connection_name)

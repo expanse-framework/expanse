@@ -24,7 +24,7 @@ def setup_kernel(app: Application) -> Kernel:
     kernel.add_command_paths([Path(__file__).parent.joinpath("fixtures/commands")])
     kernel.bootstrap()
 
-    yield kernel
+    return kernel
 
 
 def test_external_command_can_be_called(command_tester: CommandTester, app) -> None:

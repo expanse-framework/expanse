@@ -1,5 +1,4 @@
 import pytest
-import sqlalchemy.ext.asyncio
 
 from sqlalchemy import URL
 from sqlalchemy.util import immutabledict
@@ -11,6 +10,7 @@ from expanse.asynchronous.database.connection import Connection
 from expanse.asynchronous.database.database_manager import DatabaseManager
 from expanse.asynchronous.database.session import Session
 from expanse.common.configuration.config import Config
+from expanse.common.database._utils import create_engine
 
 
 @pytest.fixture()
@@ -147,7 +147,7 @@ async def test_database_manager_builds_a_correct_engine_url(
     mockery: Mockery,
 ):
     # Create a valid engine first
-    engine = sqlalchemy.create_engine("sqlite+aiosqlite://")
+    engine = create_engine("sqlite+aiosqlite://")
     mockery.mock(database_manager).should_receive("create_engine").times(1).with_(
         expected_url
     ).and_return(engine)

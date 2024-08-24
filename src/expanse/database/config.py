@@ -20,7 +20,7 @@ class PoolConfig(BaseModel):
 class SQLiteConfig(PoolConfig, BaseModel):
     driver: Literal["sqlite"] = "sqlite"
     url: AnyUrl | None = None
-    database: Path | None = None
+    database: Path | Literal[":memory:"] | None = None
     foreign_key_constraints: bool = Field(default=True, alias="foreign_keys")
 
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)

@@ -48,10 +48,6 @@ class Container(ABC):
             defaultdict(list)
         )
 
-        self._terminating_callbacks: list[_Callback] = []
-
-        self._scoped_terminating_callbacks: list[_Callback] = []
-
     def bind(
         self,
         abstract: type | str,
@@ -92,12 +88,6 @@ class Container(ABC):
 
     def has(self, abstract: str | type) -> bool:
         return self.bound(abstract)
-
-    def terminating(self, callback: _Callback, scoped: bool = False) -> None:
-        if scoped:
-            self._scoped_terminating_callbacks.append(callback)
-        else:
-            self._terminating_callbacks.append(callback)
 
     @abstractmethod
     def create_scoped_container(self) -> Self: ...

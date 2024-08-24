@@ -24,12 +24,12 @@ class Abstract(ABC):
     @abstractmethod
     def run(
         self, foo: str, bar: str, baz: str | None = None
-    ) -> tuple[str, str, str]: ...
+    ) -> tuple[str, str, str | None]: ...
 
     @abstractmethod
     def run2(
         self, something: Something, foo: str, bar: str, baz: str | None = None
-    ) -> tuple[str, str, str]: ...
+    ) -> tuple[str, str, str | None]: ...
 
     @abstractmethod
     def run3(
@@ -40,19 +40,21 @@ class Abstract(ABC):
         callback: Callable[[int], int],
         bar: str,
         baz: str | None = None,
-    ) -> tuple[str, str, int, str, str]: ...
+    ) -> tuple[str, str, int, str, str | None]: ...
 
 
 class Concrete(Abstract):
     def foo(self) -> str:
         return f"bar {id(self)}"
 
-    def run(self, foo: str, bar: str, baz: str | None = None) -> tuple[str, str, str]:
+    def run(
+        self, foo: str, bar: str, baz: str | None = None
+    ) -> tuple[str, str, str | None]:
         return foo, bar, baz
 
     def run2(
         self, something: Something, foo: str, bar: str, baz: str | None = None
-    ) -> tuple[str, str, str]:
+    ) -> tuple[str, str, str | None]:
         return foo, bar, baz
 
     def run3(
@@ -63,7 +65,7 @@ class Concrete(Abstract):
         callback: Callable[[int], int],
         bar: str,
         baz: str | None = None,
-    ) -> tuple[str, str, int, str, str]:
+    ) -> tuple[str, str, int, str, str | None]:
         return foo, another_thing.value, callback(3), bar, baz
 
 

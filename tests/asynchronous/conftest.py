@@ -10,6 +10,8 @@ from expanse.asynchronous.testing.client import TestClient
 
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from expanse.asynchronous.core.http.middleware.middleware_stack import (
         MiddlewareStack,
     )
@@ -43,6 +45,6 @@ async def router(app: Application) -> Router:
 
 
 @pytest.fixture()
-def client(app: Application) -> TestClient:
+def client(app: Application) -> Generator[TestClient]:
     with TestClient(app, raise_server_exceptions=True) as client:
         yield client

@@ -1,10 +1,10 @@
-from expanse.http.response import Response
 from expanse.routing.router import Router
 from expanse.testing.client import TestClient
+from expanse.view.view import View
 from expanse.view.view_factory import ViewFactory
 
 
-def simple_view(view: ViewFactory) -> Response:
+def simple_view(view: ViewFactory) -> View:
     return view.make("simple")
 
 

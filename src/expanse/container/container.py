@@ -14,7 +14,9 @@ from typing import get_args
 from typing import overload
 
 from expanse.common.container.container import Container as BaseContainer
+from expanse.common.container.exceptions import ContainerException
 from expanse.common.container.exceptions import ResolutionException
+from expanse.common.container.exceptions import UnboundAbstractException
 from expanse.common.support._utils import string_to_class
 
 
@@ -29,10 +31,13 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., None]
 
 
-class UnboundAbstractError(Exception): ...
-
-
 class Container(BaseContainer):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._terminating_callbacks: list[_Callback] = []
+        self._scoped_terminating_callbacks: list[_Callback] = []
+
     def build(
         self, concrete: type | str, args: tuple | None = None
     ) -> tuple[Any, _Callback | None]:
@@ -106,7 +111,10 @@ class Container(BaseContainer):
         return callable(*positional, **keywords)
 
     def terminating(self, callback: _Callback, scoped: bool = False) -> None:
-        return super().terminating(callback)
+        if scoped:
+            self._scoped_terminating_callbacks.append(callback)
+        else:
+            self._terminating_callbacks.append(callback)
 
     def terminate(self) -> None:
         for callback in self._terminating_callbacks:
@@ -169,7 +177,7 @@ class Container(BaseContainer):
             concrete = self._bindings[actual_abstract]["concrete"]
         elif isinstance(abstract, str):
             # Unbound strings cannot be resolved
-            raise UnboundAbstractError(
+            raise UnboundAbstractException(
                 f"Unbound abstract [{abstract}] cannot be resolved"
             )
         else:
@@ -180,8 +188,9 @@ class Container(BaseContainer):
             try:
                 obj, terminating_callback = self.build(concrete, metadata)
             except Exception as e:
-                raise
-                raise ValueError(f'Unable to build the "{abstract}" dependency') from e
+                raise ContainerException(
+                    f'Unable to build the "{abstract}" dependency'
+                ) from e
         else:
             obj = self.make(concrete)
 
@@ -220,14 +229,21 @@ class Container(BaseContainer):
                     parameter, arguments, kwargs, positional, keywords
                 )
             else:
-                self._resolve_class(
-                    parameter,
-                    arguments,
-                    kwargs,
-                    positional,
-                    keywords,
-                    _globals=_globals,
-                )
+                try:
+                    self._resolve_class(
+                        parameter,
+                        arguments,
+                        kwargs,
+                        positional,
+                        keywords,
+                        _globals=_globals,
+                    )
+                except ContainerException as e:
+                    raise ResolutionException(
+                        f'Unable to resolve dependency with name "{parameter.name}" '
+                        f'(type: {klass.__module__ + "." + klass.__qualname__}) '
+                        f'in "{callable.__module__ + "." + callable.__qualname__}"'
+                    ) from e
 
         return positional, keywords
 

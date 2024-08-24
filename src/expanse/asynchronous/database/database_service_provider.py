@@ -1,17 +1,17 @@
 from collections.abc import AsyncGenerator
 
-from expanse.asynchronous.contracts.database.connection import Connection
-from expanse.asynchronous.contracts.database.database_manager import (
+from expanse.asynchronous.database.connection import Connection
+from expanse.asynchronous.database.database_manager import DatabaseManager
+from expanse.asynchronous.database.database_manager import (
     DatabaseManager as DatabaseManagerContract,
 )
-from expanse.asynchronous.contracts.database.session import Session
-from expanse.asynchronous.database.database_manager import DatabaseManager
+from expanse.asynchronous.database.session import Session
 from expanse.asynchronous.support.service_provider import ServiceProvider
 
 
 class DatabaseServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        self._container.singleton(DatabaseManagerContract, DatabaseManager)
+        self._container.singleton(DatabaseManager)
         self._container.scoped(Session, self._create_session)
         self._container.scoped(Connection, self._create_connection)
 

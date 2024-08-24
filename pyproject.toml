@@ -105,10 +105,11 @@ show_error_codes = true
 pretty = true
 warn_unused_ignores = true
 warn_no_return = false
+follow_imports = "silent"
 exclude = [
-    "src/expanse/common/testing/client.py",
-    "src/expanse/testing/client.py",
-    "src/expanse/asynchronous/testing/client.py",
+    "^src/expanse/common/testing/client.py",
+    "^src/expanse/testing/client.py",
+    "^src/expanse/asynchronous/testing/client.py",
 ]
 disable_error_code = ["type-abstract"]
 

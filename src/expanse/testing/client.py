@@ -21,6 +21,7 @@ from expanse.exceptions.handler import ExceptionHandler as ConcreteExceptionHand
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from collections.abc import Generator
 
     from _typeshed import OptExcInfo
 
@@ -128,9 +129,7 @@ class TestClient(BaseTestClient[Application]):
         return self._transport
 
     @contextlib.contextmanager
-    def handle_exceptions(
-        self, handle_exceptions: bool = True
-    ) -> contextlib.AbstractContextManager[None]:
+    def handle_exceptions(self, handle_exceptions: bool = True) -> Generator[None]:
         raise_app_exceptions = self.transport.raise_app_exceptions
         self.transport.raise_app_exceptions = not handle_exceptions
 

@@ -2,7 +2,7 @@ from typing import Annotated
 
 import pytest
 
-from expanse.asynchronous.contracts.database.connection import Connection
+from expanse.asynchronous.database.connection import Connection
 from expanse.asynchronous.http.helpers import json
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router

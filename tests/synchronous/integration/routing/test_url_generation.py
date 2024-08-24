@@ -3,7 +3,6 @@ from typing import Any
 import pytest
 
 from expanse.common.routing.exceptions import NotEnoughURLParameters
-from expanse.http.response import Response
 from expanse.routing.router import Router
 
 
@@ -61,7 +60,7 @@ def test_url_generation_with_missing_parameters(
 def test_route_url_generation(
     router: Router, path: str, parameters: dict[str, Any], expected: str
 ) -> None:
-    router.get("/foo", lambda: Response.text("foo"), name="foo")
-    router.get("/foo/{bar}", lambda: Response.text("foo"), name="foo.bar")
-    router.get("/foo/{bar}/{baz:int}", lambda: Response.text("foo"), name="foo.bar.baz")
+    router.get("/foo", lambda: "foo", name="foo")
+    router.get("/foo/{bar}", lambda: "foo", name="foo.bar")
+    router.get("/foo/{bar}/{baz:int}", lambda: "foo", name="foo.bar.baz")
     assert router.route(path, parameters) == expected

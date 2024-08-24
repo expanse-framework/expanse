@@ -18,7 +18,9 @@ from typing import overload
 
 from expanse.asynchronous.support._concurrency import run_in_threadpool
 from expanse.common.container.container import Container as BaseContainer
+from expanse.common.container.exceptions import ContainerException
 from expanse.common.container.exceptions import ResolutionException
+from expanse.common.container.exceptions import UnboundAbstractException
 from expanse.common.support._utils import string_to_class
 
 
@@ -36,6 +38,12 @@ class UnboundAbstractError(Exception): ...
 
 
 class Container(BaseContainer):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._terminating_callbacks: list[_Callback] = []
+        self._scoped_terminating_callbacks: list[_Callback] = []
+
     async def build(
         self, concrete: type | str, args: tuple | None = None
     ) -> tuple[Any, _Callback | None]:
@@ -78,10 +86,10 @@ class Container(BaseContainer):
         if isgeneratorfunction(concrete):
             generator = concrete(*positional, **keywords)
 
-            def terminating_callback() -> None:
+            def sync_terminating_callback() -> None:
                 next(generator, None)
 
-            return next(generator), terminating_callback
+            return next(generator), sync_terminating_callback
 
         if not asyncio.iscoroutinefunction(concrete):
             return await run_in_threadpool(concrete, *positional, **keywords), None
@@ -125,12 +133,11 @@ class Container(BaseContainer):
 
         return await run_in_threadpool(callable, *positional, **keywords)
 
-    def terminating(
-        self,
-        callback: _Callback,
-        scoped: bool = False,
-    ) -> None:
-        return super().terminating(callback)
+    def terminating(self, callback: _Callback, scoped: bool = False) -> None:
+        if scoped:
+            self._scoped_terminating_callbacks.append(callback)
+        else:
+            self._terminating_callbacks.append(callback)
 
     async def terminate(self) -> None:
         for callback in self._terminating_callbacks:
@@ -197,7 +204,7 @@ class Container(BaseContainer):
             concrete = self._bindings[actual_abstract]["concrete"]
         elif isinstance(abstract, str):
             # Unbound strings cannot be resolved
-            raise UnboundAbstractError(
+            raise UnboundAbstractException(
                 f"Unbound abstract [{abstract}] cannot be resolved"
             )
         else:
@@ -208,9 +215,7 @@ class Container(BaseContainer):
             try:
                 obj, terminating_callback = await self.build(concrete, metadata)
             except Exception:
-                logger.exception('Unable to build the "%s" dependency', abstract)
-
-                raise
+                raise ContainerException(f'Unable to build the "{abstract}" dependency')
         else:
             obj = await self.make(concrete)
 
@@ -244,14 +249,21 @@ class Container(BaseContainer):
                     parameter, arguments, kwargs, positional, keywords
                 )
             else:
-                await self._resolve_class(
-                    parameter,
-                    arguments,
-                    kwargs,
-                    positional,
-                    keywords,
-                    _globals=_globals,
-                )
+                try:
+                    await self._resolve_class(
+                        parameter,
+                        arguments,
+                        kwargs,
+                        positional,
+                        keywords,
+                        _globals=_globals,
+                    )
+                except ContainerException as e:
+                    raise ResolutionException(
+                        f'Unable to resolve dependency with name "{parameter.name}" '
+                        f'(type: {klass.__module__ + "." + klass.__qualname__}) '
+                        f'in "{callable.__module__ + "." + callable.__qualname__}"'
+                    ) from e
 
         return positional, keywords
 

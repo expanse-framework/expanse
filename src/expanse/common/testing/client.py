@@ -21,4 +21,4 @@ class TestClient(BaseClient, Generic[T]):
 
     @property
     def transport(self) -> BaseTransport | None:
-        return
+        return None

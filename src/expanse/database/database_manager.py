@@ -1,26 +1,22 @@
 from typing import Any
 
 from sqlalchemy import URL
-from sqlalchemy import Engine
-from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.util import immutabledict
 
-from expanse.contracts.database.connection import Connection
-from expanse.contracts.database.database_manager import (
-    DatabaseManager as DatabaseManagerContract,
-)
+from expanse.common.database._utils import create_engine
 from expanse.core.application import Application
 from expanse.database.config import DatabaseConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig
-from expanse.database.connection import Connection as ConcreteConnection
+from expanse.database.connection import Connection
+from expanse.database.engine import Engine
 from expanse.database.session import Session
 
 
-class DatabaseManager(DatabaseManagerContract):
+class DatabaseManager:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
         self._engines: dict[str, Engine] = {}
@@ -30,8 +26,6 @@ class DatabaseManager(DatabaseManagerContract):
         engine = self._configure_engine(name)
 
         connection = engine.connect()
-
-        assert isinstance(connection, Connection)
 
         return connection
 
@@ -49,8 +43,7 @@ class DatabaseManager(DatabaseManagerContract):
         return self._factories[name]()
 
     def create_base_engine(self, url: URL, **kwargs) -> Engine:
-        engine = create_engine(url, **kwargs)
-        engine._connection_cls = ConcreteConnection
+        engine = create_engine(url, engine_class=Engine, **kwargs)
 
         return engine
 
@@ -88,14 +81,20 @@ class DatabaseManager(DatabaseManagerContract):
 
             database_path = config.database
 
-            if not database_path.is_absolute():
-                database_path = self._app.base_path / database_path
+            database: str
+            if database_path == ":memory:":
+                database = database_path
+            else:
+                if not database_path.is_absolute():
+                    database_path = self._app.base_path / database_path
 
-            database_path.parent.mkdir(parents=True, exist_ok=True)
+                database_path.parent.mkdir(parents=True, exist_ok=True)
+
+                database = database_path.as_posix()
 
             url = URL(
                 drivername="sqlite",
-                database=database_path.as_posix(),
+                database=database,
                 host=None,
                 port=None,
                 username=None,

@@ -1,15 +1,16 @@
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from expanse.contracts.database.database_manager import DatabaseManager
 from expanse.core.application import Application
+from expanse.database.database_manager import DatabaseManager
 from expanse.database.database_service_provider import DatabaseServiceProvider
 
 
 @pytest.fixture(autouse=True)
-def setup_databases(app: Application, tmp_path: Path) -> None:
+def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
     config: dict[str, dict[str, Any]] = app.container.make("config")
 
     config["database"] = {

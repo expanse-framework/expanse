@@ -1,10 +1,10 @@
-from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
+from expanse.asynchronous.view.view import View
 from expanse.asynchronous.view.view_factory import ViewFactory
 
 
-async def simple_view(view: ViewFactory) -> Response:
+async def simple_view(view: ViewFactory) -> View:
     return await view.make("simple")
 
 

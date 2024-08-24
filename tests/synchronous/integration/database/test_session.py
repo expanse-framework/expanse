@@ -2,7 +2,7 @@ from typing import Annotated
 
 import pytest
 
-from expanse.contracts.database.session import Session
+from expanse.database.session import Session
 from expanse.http.helpers import json
 from expanse.http.response import Response
 from expanse.routing.router import Router
