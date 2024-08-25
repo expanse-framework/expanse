@@ -16,7 +16,7 @@ creates the project with a convention-based structure that lets you start implem
 Before creating your first project, make sure that you have Python (minimum version: 3.10) installed on your machine
 along with [`pipx`](https://pipx.pypa.io/stable/).
 
-Once both are installed, you can use the official [Expanse installer](https://github.com/python-expanse/installer)
+Once both are installed, you can use the official [Expanse installer](https://github.com/expanse-framework/installer)
 to create your project:
 
 ```bash
@@ -30,7 +30,7 @@ Now that you project is created, you can start the development server via the Cr
 ```bash
 cd my-app
 
-./craft serve
+./beam serve
 ```
 
 Your application is now available at [http://localhost:8000](http://localhost:8000), and you are ready to start building
@@ -39,7 +39,7 @@ you project.
 ## Documentation
 
 [Documentation] for the current version of Expanse (as well as the development branch and recently out of support
-versions) is available from the [official website](https://python-expanse.org).
+versions) is available from the [official website](https://expanse-framework.com).
 
 ## Contribute
 
@@ -58,20 +58,21 @@ provides helpful guidance.
 
   [PyPI Releases]: https://pypi.org/project/expanse/#history
 
-  [Official Website]: https://python-expanse.org
+  [Official Website]: https://expanse-framework.com
 
-  [Documentation]: https://python-expanse.org/docs
+  [Documentation]: https://expanse-framework.com/docs
 
-  [Issue Tracker]: https://github.com/python-expanse/expanse/issues
+  [Issue Tracker]: https://github.com/expanse-framework/expanse/issues
 
-  [Suggested Issues]: https://github.com/python-expanse/expanse/contribute
+  [Suggested Issues]: https://github.com/expanse-framework/expanse/contribute
 
-  [Contributing Documentation]: https://python-expanse.org/docs/contributing
+  [Contributing Documentation]: https://expanse-framework.com/docs/contributing
 
-  [Installation Documentation]: https://python-expanse.org/docs/#installation
+  [Installation Documentation]: https://expanse-framework.com/docs/#installation
 
 ## Related Projects
 
-* [expanse-installer](https://github.com/python-expanse/installer): The official installer for Expanse projects. It will
+* [expanse-installer](https://github.com/expanse-framework/installer): The official installer for Expanse projects. It
+  will
   setup a ready-to-be-used project for you.
-* [website](https://github.com/python-expanse/python-expanse.org): The official Poetry website.
+* [website](https://github.com/expanse-framework/expanse-framework.com): The official Poetry website.

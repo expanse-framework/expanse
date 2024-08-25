@@ -3,7 +3,13 @@ name = "expanse"
 version = "0.1.0"
 description = ""
 authors = ["Sébastien Eustace <sebastien@eustace.io>"]
+license = "MIT"
 readme = "README.md"
+include = [{ path = "tests", format = "sdist" }]
+homepage = "https://expanse-framework.com/"
+repository = "https://github.com/expanse-framework/expanse"
+documentation = "https://expanse-framework.com/docs"
+keywords = ["expanse", "framework", "poetry"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
