@@ -2,7 +2,7 @@ from cleo.io.inputs.string_input import StringInput
 from cleo.io.outputs.buffered_output import BufferedOutput
 
 from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.core.console.kernel import Kernel
+from expanse.asynchronous.core.console.gateway import Gateway
 
 
 class TestingCommand:
@@ -25,7 +25,7 @@ class TestingCommand:
         if parameters:
             full_command += " " + parameters
 
-        kernel = await self._app.container.make(Kernel)
+        kernel = await self._app.container.make(Gateway)
         self._return_code = await kernel.handle(StringInput(full_command), self._output)
 
         return self._return_code

@@ -6,7 +6,7 @@ import sys
 from typing import TYPE_CHECKING
 from typing import cast
 
-from expanse.common.console.application import Application as BaseApplication
+from expanse.common.console.console import Console as BaseApplication
 from expanse.console.commands.command import Command
 from expanse.console.commands.help import HelpCommand
 from expanse.console.commands.list import ListCommand
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from expanse.core.application import Application as Expanse
 
 
-class Application(BaseApplication[Command]):
+class Console(BaseApplication[Command]):
     def __init__(self, app: Expanse) -> None:
         super().__init__()
 
@@ -87,6 +87,6 @@ class Application(BaseApplication[Command]):
         return exit_code
 
     def _run_command(self, command: Command, io: IO) -> int:
-        command.set_expanse(self._app)
+        command.set_application(self._app)
 
         return command.run(io)

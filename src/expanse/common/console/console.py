@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 TCommand = TypeVar("TCommand", bound=Command)
 
 
-class Application(Generic[TCommand], ABC):
+class Console(Generic[TCommand], ABC):
     def __init__(self) -> None:
         self._name = "Craft"
         self._version = __version__
@@ -157,7 +157,7 @@ class Application(Generic[TCommand], ABC):
     def add(self, command: TCommand) -> TCommand | None:
         self._init()
 
-        command.set_application(self)
+        command.set_console(self)
 
         if not command.enabled:
             command.set_application()

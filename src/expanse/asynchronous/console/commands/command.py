@@ -15,23 +15,23 @@ from expanse.common.console.command import Command as BaseCommand
 if TYPE_CHECKING:
     from cleo.io.io import IO
 
-    from expanse.asynchronous.console.application import Application  # noqa: TID
-    from expanse.asynchronous.core.application import Application as Expanse
+    from expanse.asynchronous.console.console import Console  # noqa: TID
+    from expanse.asynchronous.core.application import Application
 
-TApplication = TypeVar("TApplication", bound="Application")
+TApplication = TypeVar("TApplication", bound="Console")
 
 
 class Command(BaseCommand[TApplication], ABC):
     def __init__(self) -> None:
         super().__init__()
 
-        self._expanse: Expanse | None = None
+        self._application: Application | None = None
 
     @abstractmethod
     async def handle(self, *args, **kwargs) -> int | None: ...
 
     async def run(self, io: IO) -> int:
-        self.merge_application_definition()
+        self.merge_console_definition()
 
         try:
             io.input.bind(self.definition)
@@ -55,15 +55,15 @@ class Command(BaseCommand[TApplication], ABC):
         self._io = io
 
         try:
-            if not self._expanse:
+            if not self._application:
                 return await self.handle()
 
-            return await self._expanse.container.call(self.handle)
+            return await self._application.container.call(self.handle)
         except KeyboardInterrupt:
             return 1
 
-    def set_expanse(self, expanse: Expanse) -> None:
-        self._expanse = expanse
+    def set_application(self, application: Application) -> None:
+        self._application = application
 
     async def call(self, name: str, args: str | None = None) -> int:
         """
@@ -73,10 +73,10 @@ class Command(BaseCommand[TApplication], ABC):
             args = ""
 
         input = StringInput(args)
-        assert self.application is not None
-        command = self.application.get(name)
+        assert self._console is not None
+        command = self._console.get(name)
 
-        return await self.application._run_command(command, self._io.with_input(input))
+        return await self._console._run_command(command, self._io.with_input(input))
 
     async def call_silent(self, name: str, args: str | None = None) -> int:
         """
@@ -86,7 +86,7 @@ class Command(BaseCommand[TApplication], ABC):
             args = ""
 
         input = StringInput(args)
-        assert self.application is not None
-        command = self.application.get(name)
+        assert self._console is not None
+        command = self._console.get(name)
 
-        return await self.application._run_command(command, NullIO(input))
+        return await self._console._run_command(command, NullIO(input))

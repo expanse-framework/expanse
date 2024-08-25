@@ -12,21 +12,23 @@ from cleo.io.outputs.buffered_output import BufferedOutput
 from cleo.io.outputs.output import Output
 from cleo.io.outputs.stream_output import StreamOutput
 
-from expanse.asynchronous.console.application import Application as ConsoleApplication
-from expanse.asynchronous.console.commands.command import Command
-from expanse.asynchronous.contracts.debug.exception_handler import ExceptionHandler
-from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.core.bootstrap.boot_providers import BootProviders
-from expanse.asynchronous.core.bootstrap.bootstrapper import Bootstrapper
-from expanse.asynchronous.core.bootstrap.load_configuration import LoadConfiguration
-from expanse.asynchronous.core.bootstrap.load_environment_variables import (
-    LoadEnvironmentVariables,
-)
-from expanse.asynchronous.core.bootstrap.register_providers import RegisterProviders
 from expanse.common.support._utils import string_to_class
+from expanse.console.commands.command import Command
+from expanse.console.console import Console
+from expanse.contracts.debug.exception_handler import ExceptionHandler
+from expanse.core.application import Application
+from expanse.core.bootstrap.boot_providers import BootProviders
+from expanse.core.bootstrap.bootstrapper import Bootstrapper
+from expanse.core.bootstrap.load_configuration import LoadConfiguration
+from expanse.core.bootstrap.load_environment_variables import LoadEnvironmentVariables
+from expanse.core.bootstrap.register_providers import RegisterProviders
 
 
-class Kernel:
+class Gateway:
+    """
+    The gateway is the layer between the command line and Expanse internal architecture.
+    """
+
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,
@@ -36,44 +38,58 @@ class Kernel:
 
     def __init__(self, app: Application) -> None:
         self._app = app
-        self._console: ConsoleApplication | None = None
+        self._console: Console | None = None
         self._commands: list[type[Command]] = []
         self._command_paths: list[Path] = []
         self._commands_loaded: bool = False
 
     @property
-    def console(self) -> ConsoleApplication:
+    def console(self) -> Console:
         if self._console is not None:
             return self._console
 
-        self._console = ConsoleApplication(self._app)
+        self._console = Console(self._app)
         self._console.auto_exits(False)
         self._console.catch_exceptions(False)
 
         return self._console
 
-    async def handle(self, input: Input, output: Output | None = None) -> int:
-        await self.bootstrap()
+    def handle(self, input: Input, output: Output | None = None) -> int:
+        try:
+            self.bootstrap()
+        except Exception as e:
+            io = IO(
+                input,
+                output or StreamOutput(sys.stdout),
+                output or StreamOutput(sys.stderr),
+            )
+
+            from cleo.ui.exception_trace import ExceptionTrace
+
+            trace = ExceptionTrace(e)
+            trace.render(io)
+
+            return 1
 
         if output is None:
             output = StreamOutput(sys.stdout)
 
         try:
-            return await self.console.run(input, output, output)
+            return self.console.run(input, output, output)
         except Exception as e:
-            handler = await self._app.container.make(ExceptionHandler)
+            handler = self._app.container.make(ExceptionHandler)  # type: ignore[type-abstract]
 
-            await handler.report(e)
-            await handler.render_for_console(output, e)
+            handler.report(e)
+            handler.render_for_console(output, e)
 
             return 1
 
-    async def bootstrap(self) -> None:
+    def bootstrap(self) -> None:
         if not self._app.has_been_bootstrapped():
-            await self._app.bootstrap_with(self._bootstrappers)
+            self._app.bootstrap_with(self._bootstrappers)
 
         if not self._commands_loaded:
-            await self._discover_commands()
+            self._discover_commands()
 
             self._commands_loaded = True
 
@@ -86,28 +102,28 @@ class Kernel:
     def add_command(self, command: type[Command]) -> None:
         self._commands.append(command)
 
-    async def call(
+    def call(
         self,
         command_name: str,
         parameters: str | None = None,
         output: Output | None = None,
     ) -> int:
-        await self.bootstrap()
+        self.bootstrap()
 
         input = StringInput(parameters or "")
         output = output or BufferedOutput()
         command: Command = self.console.find(command_name)
 
-        return await command.run(IO(input, output, output))
+        return command.run(IO(input, output, output))
 
-    async def _discover_commands(self) -> None:
+    def _discover_commands(self) -> None:
         for path in self._command_paths:
-            await self._load_path(path)
+            self._load_path(path)
 
         for command in self._commands:
             self.console.add(command())
 
-    async def _load_path(self, path: Path) -> None:
+    def _load_path(self, path: Path) -> None:
         if path.is_dir():
             for filepath in path.rglob("*.py"):
                 if filepath.name.startswith("_"):
@@ -116,12 +132,12 @@ class Kernel:
                 (
                     command_name,
                     command_factory,
-                ) = await self._create_command_factory_from_path(filepath)
+                ) = self._create_command_factory_from_path(filepath)
                 self.console.command_loader.register_factory(
                     command_name, command_factory
                 )
 
-    async def _create_command_factory_from_path(
+    def _create_command_factory_from_path(
         self, path: Path
     ) -> tuple[str, Callable[[], Command]]:
         path = path.resolve().relative_to(self._app.base_path.resolve())

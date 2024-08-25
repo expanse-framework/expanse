@@ -155,9 +155,9 @@ class Application(BaseApplication):
         return provider
 
     def handle_command(self, input: Input) -> int:
-        from expanse.core.console.kernel import Kernel
+        from expanse.core.console.gateway import Gateway
 
-        kernel = self._container.make(Kernel)
+        kernel = self._container.make(Gateway)
 
         return kernel.handle(input)
 

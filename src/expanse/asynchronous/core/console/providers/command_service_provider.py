@@ -3,7 +3,7 @@ from importlib import import_module
 from typing import ClassVar
 
 from expanse.asynchronous.console.commands.command import Command
-from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
+from expanse.asynchronous.core.console.gateway import Gateway as ConsoleKernel
 from expanse.asynchronous.support.service_provider import ServiceProvider
 
 

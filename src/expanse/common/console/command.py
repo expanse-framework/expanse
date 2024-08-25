@@ -29,12 +29,12 @@ if TYPE_CHECKING:
     from cleo.ui.table import Table
     from cleo.ui.table_separator import TableSeparator
 
-    from expanse.common.console.application import Application  # noqa: TID
+    from expanse.common.console.console import Console  # noqa: TID
 
-TApplication = TypeVar("TApplication", bound="Application")
+TConsole = TypeVar("TConsole", bound="Console")
 
 
-class Command(Generic[TApplication]):
+class Command(Generic[TConsole]):
     name: str | None = None
 
     description: str = ""
@@ -53,7 +53,7 @@ class Command(Generic[TApplication]):
     def __init__(self) -> None:
         self._definition = Definition()
         self._full_definition: Definition | None = None
-        self._application: TApplication | None = None
+        self._console: TConsole | None = None
         self._ignore_validation_errors = False
         self._synopsis: dict[str, str] = {}
 
@@ -66,8 +66,8 @@ class Command(Generic[TApplication]):
         self._io: IO = NullIO()
 
     @property
-    def application(self) -> TApplication | None:
-        return self._application
+    def console(self) -> TConsole | None:
+        return self._console
 
     @property
     def definition(self) -> Definition:
@@ -82,12 +82,9 @@ class Command(Generic[TApplication]):
         if not self.help:
             help_text = self.description
 
-        is_single_command = self._application and self._application.is_single_command()
+        is_single_command = self._console and self._console.is_single_command()
 
-        if self._application:
-            current_script = self._application.name
-        else:
-            current_script = inspect.stack()[-1][1]
+        current_script = self._console.name if self._console else inspect.stack()[-1][1]
 
         return help_text.format(
             command_name=self.name,
@@ -356,21 +353,21 @@ class Command(Generic[TApplication]):
     def ignore_validation_errors(self) -> None:
         self._ignore_validation_errors = True
 
-    def set_application(self, application: TApplication | None = None) -> None:
-        self._application = application
+    def set_console(self, console: TConsole | None = None) -> None:
+        self._console = console
 
         self._full_definition = None
 
-    def merge_application_definition(self, merge_args: bool = True) -> None:
-        if self._application is None:
+    def merge_console_definition(self, merge_args: bool = True) -> None:
+        if self._console is None:
             return
 
         self._full_definition = Definition()
         self._full_definition.add_options(self._definition.options)
-        self._full_definition.add_options(self._application.definition.options)
+        self._full_definition.add_options(self._console.definition.options)
 
         if merge_args:
-            self._full_definition.set_arguments(self._application.definition.arguments)
+            self._full_definition.set_arguments(self._console.definition.arguments)
             self._full_definition.add_arguments(self._definition.arguments)
         else:
             self._full_definition.set_arguments(self._definition.arguments)

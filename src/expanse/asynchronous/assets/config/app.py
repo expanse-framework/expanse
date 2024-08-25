@@ -24,7 +24,7 @@ class Config(BaseSettings):
             )
             .merge(
                 [
-                    # Application-specific providers
+                    # Console-specific providers
                 ]
             )
             .to_list()

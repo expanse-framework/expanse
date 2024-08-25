@@ -9,7 +9,7 @@ from typing import cast
 from expanse.asynchronous.console.commands.command import Command
 from expanse.asynchronous.console.commands.help import HelpCommand
 from expanse.asynchronous.console.commands.list import ListCommand
-from expanse.common.console.application import Application as BaseApplication
+from expanse.common.console.console import Console as BaseConsole
 
 
 if TYPE_CHECKING:
@@ -17,11 +17,11 @@ if TYPE_CHECKING:
     from cleo.io.io import IO
     from cleo.io.outputs.output import Output
 
-    from expanse.asynchronous.core.application import Application as Expanse
+    from expanse.asynchronous.core.application import Application
 
 
-class Application(BaseApplication[Command]):
-    def __init__(self, app: Expanse) -> None:
+class Console(BaseConsole[Command]):
+    def __init__(self, app: Application) -> None:
         super().__init__()
 
         self._app = app
@@ -87,6 +87,6 @@ class Application(BaseApplication[Command]):
         return exit_code
 
     async def _run_command(self, command: Command, io: IO) -> int:
-        command.set_expanse(self._app)
+        command.set_application(self._app)
 
         return await command.run(io)

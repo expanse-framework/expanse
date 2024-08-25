@@ -152,9 +152,9 @@ class Application(BaseApplication):
         return provider
 
     async def handle_command(self, input: Input) -> int:
-        from expanse.asynchronous.core.console.kernel import Kernel
+        from expanse.asynchronous.core.console.gateway import Gateway
 
-        kernel = await self._container.make(Kernel)
+        kernel = await self._container.make(Gateway)
 
         return await kernel.handle(input)
 

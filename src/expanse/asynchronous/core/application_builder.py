@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
     from expanse.asynchronous.console.commands.command import Command
     from expanse.asynchronous.core.application import Application
-    from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
-    from expanse.asynchronous.core.http.gateway import Gateway
+    from expanse.asynchronous.core.console.gateway import Gateway as ConsoleKernel
+    from expanse.asynchronous.core.http.gateway import Gateway as HTTPGateway
 
 
 class ApplicationBuilder:
@@ -26,15 +26,15 @@ class ApplicationBuilder:
             Callable[[ConsoleKernel], Awaitable[None]] | None
         ) = None
         self._configure_middleware_stack: (
-            Callable[[Gateway], Awaitable[None]] | None
+            Callable[[HTTPGateway], Awaitable[None]] | None
         ) = None
         self._configure_kernels: Callable[[Container], None] | None = None
 
     def with_kernels(self) -> Self:
         def configure_kernels(container: Container) -> None:
-            from expanse.asynchronous.core.console.kernel import Kernel as ConsoleKernel
+            from expanse.asynchronous.core.console.gateway import Gateway
 
-            container.singleton(ConsoleKernel)
+            container.singleton(Gateway)
 
         self._configure_kernels = configure_kernels
 
@@ -66,7 +66,7 @@ class ApplicationBuilder:
     def with_middleware(
         self, callback: Callable[[MiddlewareStack], Awaitable[None]]
     ) -> Self:
-        async def configure_middleware(gateway: Gateway) -> None:
+        async def configure_middleware(gateway: HTTPGateway) -> None:
             stack = MiddlewareStack()
 
             await callback(stack)
@@ -87,14 +87,14 @@ class ApplicationBuilder:
         if self._register_commands_callback is not None:
 
             async def _register_commands(container: Container) -> None:
-                from expanse.asynchronous.core.console.kernel import (
-                    Kernel as ConsoleKernel,
+                from expanse.asynchronous.core.console.gateway import (
+                    Gateway as ConsoleGateway,
                 )
 
                 assert self._register_commands_callback is not None
 
                 await container.on_resolved(
-                    ConsoleKernel, self._register_commands_callback
+                    ConsoleGateway, self._register_commands_callback
                 )
 
             app.bootstrapping(_register_commands)

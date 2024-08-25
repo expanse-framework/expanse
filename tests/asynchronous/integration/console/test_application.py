@@ -4,7 +4,7 @@ import pytest
 
 from expanse.asynchronous.console.commands.command import Command
 from expanse.asynchronous.core.application import Application
-from expanse.asynchronous.core.console.kernel import Kernel
+from expanse.asynchronous.core.console.gateway import Gateway
 from expanse.asynchronous.testing.command_tester import CommandTester
 
 
@@ -18,11 +18,11 @@ class FooCommand(Command):
 
 
 @pytest.fixture(autouse=True)
-async def setup_kernel(app: Application) -> Kernel:
-    kernel = await app.container.make(Kernel)
+async def setup_kernel(app: Application) -> Gateway:
+    kernel = await app.container.make(Gateway)
     kernel.add_command(FooCommand)
 
-    kernel = await app.container.make(Kernel)
+    kernel = await app.container.make(Gateway)
     kernel.add_command_paths([Path(__file__).parent.joinpath("fixtures/commands")])
     await kernel.bootstrap()
 

@@ -33,7 +33,7 @@ You can also display the commands for a specific namespace:
         descriptor._io = self._io
 
         descriptor._describe_application(
-            self.application,  # type: ignore[arg-type]
+            self._console,  # type: ignore[arg-type]
             namespace=self.argument("namespace"),
         )
 
