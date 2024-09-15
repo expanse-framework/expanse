@@ -17,6 +17,7 @@ from cleo.exceptions import CleoError
 from cleo.exceptions import CleoLogicError
 from cleo.exceptions import CleoNamespaceNotFoundError
 from cleo.exceptions import CleoUserError
+from cleo.formatters.style import Style
 from cleo.io.inputs.argument import Argument
 from cleo.io.inputs.argv_input import ArgvInput
 from cleo.io.inputs.definition import Definition
@@ -160,7 +161,7 @@ class Console(Generic[TCommand], ABC):
         command.set_console(self)
 
         if not command.enabled:
-            command.set_application()
+            command.set_console()
 
             return None
 
@@ -383,7 +384,19 @@ class Console(Generic[TCommand], ABC):
         if error_output is None:
             error_output = StreamOutput(sys.stderr)
 
-        return IO(input, output, error_output)
+        io = IO(input, output, error_output)
+
+        # Set our own CLI styles
+        formatter = io.output.formatter
+        formatter.set_style("c1", Style("cyan"))
+        formatter.set_style("c2", Style("default", options=["bold"]))
+        formatter.set_style("info", Style("blue"))
+        formatter.set_style("comment", Style("green"))
+        formatter.set_style("warning", Style("yellow"))
+        formatter.set_style("debug", Style("default", options=["dark"]))
+        formatter.set_style("success", Style("green"))
+
+        return io
 
     def render_error(self, error: Exception, io: IO) -> None:
         from cleo.ui.exception_trace import ExceptionTrace

@@ -23,7 +23,7 @@ class DatabaseManager:
         self._factories: dict[str, async_sessionmaker] = {}
 
     def connection(self, name: str | None = None) -> Connection:
-        engine = self._configure_engine(name)
+        engine = self.configure_engine(name)
 
         connection = engine.connect()
 
@@ -37,7 +37,7 @@ class DatabaseManager:
         if name in self._factories:
             return self._factories[name]()
 
-        engine = self._configure_engine(name)
+        engine = self.configure_engine(name)
         factory = async_sessionmaker(engine, class_=Session)
 
         self._factories[name] = factory
@@ -49,7 +49,7 @@ class DatabaseManager:
 
         return Engine(sync_engine)
 
-    def _configure_engine(self, name: str | None = None) -> Engine:
+    def configure_engine(self, name: str | None = None) -> Engine:
         name = name or self.get_default_connection()
 
         if name in self._engines:

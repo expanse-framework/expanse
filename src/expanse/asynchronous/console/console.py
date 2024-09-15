@@ -87,6 +87,7 @@ class Console(BaseConsole[Command]):
         return exit_code
 
     async def _run_command(self, command: Command, io: IO) -> int:
-        command.set_application(self._app)
+        async with self._app.container.create_scoped_container() as container:
+            command.set_container(container)
 
-        return await command.run(io)
+            return await command.run(io)

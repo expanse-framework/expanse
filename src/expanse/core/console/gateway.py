@@ -12,6 +12,8 @@ from cleo.io.outputs.buffered_output import BufferedOutput
 from cleo.io.outputs.output import Output
 from cleo.io.outputs.stream_output import StreamOutput
 
+import expanse
+
 from expanse.common.support._utils import string_to_class
 from expanse.console.commands.command import Command
 from expanse.console.console import Console
@@ -118,12 +120,12 @@ class Gateway:
 
     def _discover_commands(self) -> None:
         for path in self._command_paths:
-            self._load_path(path)
+            self.load_path(path)
 
         for command in self._commands:
             self.console.add(command())
 
-    def _load_path(self, path: Path) -> None:
+    def load_path(self, path: Path) -> None:
         if path.is_dir():
             for filepath in path.rglob("*.py"):
                 if filepath.name.startswith("_"):
@@ -140,7 +142,13 @@ class Gateway:
     def _create_command_factory_from_path(
         self, path: Path
     ) -> tuple[str, Callable[[], Command]]:
-        path = path.resolve().relative_to(self._app.base_path.resolve())
+        try:
+            path = path.resolve().relative_to(self._app.base_path.resolve())
+        except ValueError:
+            path = path.resolve().relative_to(
+                Path(expanse.__file__).resolve().parent.parent
+            )
+
         name = path.stem.removesuffix("_command")
         classname = re.sub(r"(_)+", " ", name).title().replace(" ", "")
         command_name = " ".join(name.split("_"))
@@ -155,6 +163,6 @@ class Gateway:
             class_full_name = ".".join(components)
             class_: type[Command] = string_to_class(class_full_name)
 
-            return class_()
+            return self._app.container.call(class_)
 
         return command_name, factory

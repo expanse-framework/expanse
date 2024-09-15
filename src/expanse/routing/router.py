@@ -100,7 +100,7 @@ class Router:
         self,
         name: str | None = None,
         prefix: str | None = None,
-    ) -> Generator[RouteGroup]:
+    ) -> Generator[RouteGroup, None, None]:
         group = RouteGroup(name=name, prefix=prefix)
 
         yield group

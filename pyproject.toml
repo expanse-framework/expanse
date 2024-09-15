@@ -25,6 +25,9 @@ crashtest = "^0.4.1"
 anyio = "^4.2.0"
 httpx = "^0.26.0"
 async-chain = "^0.1.2"
+alembic = "^1.13.2"
+pygments = "^2.18.0"
+inflection = "^0.5.1"
 
 
 [tool.poetry.group.test.dependencies]
@@ -114,6 +117,7 @@ warn_no_return = false
 follow_imports = "silent"
 exclude = [
     "^src/expanse/common/testing/client.py",
+    "^src/expanse/common/database/migration/templates/default/env.py",
     "^src/expanse/testing/client.py",
     "^src/expanse/asynchronous/testing/client.py",
 ]

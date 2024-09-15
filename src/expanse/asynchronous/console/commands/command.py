@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from cleo.io.io import IO
 
     from expanse.asynchronous.console.console import Console  # noqa: TID
-    from expanse.asynchronous.core.application import Application
+    from expanse.asynchronous.container.container import Container
 
 TApplication = TypeVar("TApplication", bound="Console")
 
@@ -25,7 +25,7 @@ class Command(BaseCommand[TApplication], ABC):
     def __init__(self) -> None:
         super().__init__()
 
-        self._application: Application | None = None
+        self._container: Container | None = None
 
     @abstractmethod
     async def handle(self, *args, **kwargs) -> int | None: ...
@@ -55,15 +55,15 @@ class Command(BaseCommand[TApplication], ABC):
         self._io = io
 
         try:
-            if not self._application:
+            if not self._container:
                 return await self.handle()
 
-            return await self._application.container.call(self.handle)
+            return await self._container.call(self.handle)
         except KeyboardInterrupt:
             return 1
 
-    def set_application(self, application: Application) -> None:
-        self._application = application
+    def set_container(self, container: Container) -> None:
+        self._container = container
 
     async def call(self, name: str, args: str | None = None) -> int:
         """

@@ -460,6 +460,9 @@ class ScopedContainer(Container):
             *self._base_container._scoped_terminating_callbacks
         ]
 
+        # Copy instances from the base container
+        self._instances.update(self._base_container._instances)
+
         self.instance(Container, self)
 
     def bound(self, abstract: str | type) -> bool:

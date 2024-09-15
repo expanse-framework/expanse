@@ -25,6 +25,7 @@ class Console(BaseApplication[Command]):
         super().__init__()
 
         self._app = app
+        self._container = app.container
 
     def run(
         self,
@@ -53,6 +54,7 @@ class Console(BaseApplication[Command]):
 
                 exit_code = 1
                 # TODO: Custom error exit codes
+
         except KeyboardInterrupt:
             exit_code = 1
 
@@ -87,6 +89,7 @@ class Console(BaseApplication[Command]):
         return exit_code
 
     def _run_command(self, command: Command, io: IO) -> int:
-        command.set_application(self._app)
+        with self._app.container.create_scoped_container() as container:
+            command.set_container(container)
 
-        return command.run(io)
+            return command.run(io)

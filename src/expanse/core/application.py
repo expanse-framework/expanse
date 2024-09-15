@@ -166,7 +166,6 @@ class Application(BaseApplication):
 
         self._container.instance("path", self._base_path)
         self._container.instance("path:config", self.config_path)
-        self._container.instance("path:resources", self.resources_path)
 
     def _boot_provider(self, provider: ServiceProvider) -> None:
         if hasattr(provider, "boot"):
@@ -176,6 +175,7 @@ class Application(BaseApplication):
         from expanse.core.http.gateway import Gateway
 
         self._container.instance(self.__class__, self)
+        self._container.instance(BaseApplication, self)
         self._container.alias(self.__class__, "app")
         self._container.instance(Container, self._container)
         self._config = Config({})

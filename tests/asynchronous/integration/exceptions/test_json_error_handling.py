@@ -21,12 +21,12 @@ def test_unhandled_exceptions_are_returned_with_debug_information_if_debug_mode(
         response = client.get("/error", headers=[("Accept", "application/json")])
 
     assert response.status_code == 500
-    assert response.json() == {
-        "message": "Internal error",
-        "exception": "Exception",
-        "file": str(__file__),
-        "line": 8,
-    }
+    data = response.json()
+    assert data["message"] == "Internal error"
+    assert data["exception"] == "Exception"
+    assert data["file"] == str(__file__)
+    assert data["line"] == 8
+    assert "traceback" in data
 
 
 def test_unhandled_exceptions_are_returned_with_basic_information_if_not_debug_mode(

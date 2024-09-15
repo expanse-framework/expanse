@@ -6,7 +6,6 @@ import pytest
 
 from expanse.core.application import Application
 from expanse.database.database_manager import DatabaseManager
-from expanse.database.database_service_provider import DatabaseServiceProvider
 
 
 @pytest.fixture(autouse=True)
@@ -37,16 +36,28 @@ def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
                 "driver": "postgresql",
                 "url": "postgresql+pg8000://postgres:password@localhost:5432/expanse",
             },
+            "test": {"driver": "sqlite", "database": tmp_path.joinpath("test.sqlite")},
         },
     }
 
-    app.register(DatabaseServiceProvider(app.container))
-
     db = app.container.make(DatabaseManager)
 
-    with db.connection() as connection:
+    with db.connection("sqlite") as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS my_table (id INTEGER)")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER NOT NULL,
+                first_name VARCHAR NOT NULL,
+                last_name VARCHAR,
+                email VARCHAR NOT NULL,
+                PRIMARY KEY (id)
+            );"""
+        )
         connection.execute("INSERT INTO my_table (id) VALUES (:id)", {"id": "sqlite"})
+        connection.execute(
+            "INSERT INTO users (first_name, last_name, email) VALUES ('John', 'Doe', 'john@doe.com')"
+        )
         connection.commit()
 
     with db.connection("sqlite2") as connection:

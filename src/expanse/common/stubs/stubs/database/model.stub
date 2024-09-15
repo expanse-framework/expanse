@@ -1,0 +1,6 @@
+from app.models.model import Model
+
+
+class {model_name}(Model):
+
+    __tablename__: str = "{table_name}"

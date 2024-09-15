@@ -15,6 +15,4 @@ class Config(BaseSettings):
         default={"sqlite": SQLiteConfig(database=Path("database/database.sqlite"))}
     )
 
-    model_config = SettingsConfigDict(
-        env_prefix="DB_", env_nested_delimiter="__", arbitrary_types_allowed=True
-    )
+    model_config = SettingsConfigDict(env_prefix="DB_", env_nested_delimiter="__")

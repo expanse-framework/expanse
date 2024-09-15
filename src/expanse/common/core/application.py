@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Self
 
-from expanse.common.core.helpers import PlaceholderPath
-
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from expanse.common.configuration.config import Config
 
 
@@ -35,23 +34,25 @@ class Application:
         return self._config_path or self._base_path.joinpath("config")
 
     @property
-    def resources_path(self) -> Path:
-        return self._resources_path or self._base_path.joinpath("resources")
-
-    @property
-    def static_path(self) -> Path:
-        return self._static_path or self._base_path.joinpath("static")
-
-    @property
-    def database_path(self) -> Path:
-        return self._database_path or self._base_path.joinpath("database")
-
-    @property
     def environment_path(self) -> Path:
         return self._environment_path or self._base_path
 
-    def path(self, path: str | Path) -> Path:
-        return self._base_path.joinpath("app").joinpath(path)
+    def path(self, path: str | Path, relative: bool = False) -> Path:
+        path = self._base_path.joinpath("app").joinpath(path)
+
+        if relative:
+            path = path.relative_to(self._base_path)
+
+        return path
+
+    def named_path(self, name: str) -> Path:
+        path_key = f"paths.{name}"
+        if path_key not in self._config:
+            raise ValueError(f"Named path {name} is not configured.")
+
+        path: Path = self._config[path_key]
+
+        return self._base_path.joinpath(path)
 
     @property
     def environment_file(self) -> str:
@@ -63,14 +64,6 @@ class Application:
 
     def set_config(self, config: Config) -> None:
         self._config = config
-
-    def resolve_placeholder_path(self, path: str | Path | PlaceholderPath) -> Path:
-        if not isinstance(path, PlaceholderPath):
-            return Path(path)
-
-        app_path: Path = getattr(self, f"{path.app_path}_path")
-
-        return app_path.joinpath(path.relative_path)
 
     def is_booted(self) -> bool:
         return self._booted

@@ -1,6 +1,7 @@
 from cleo.io.inputs.string_input import StringInput
 from cleo.io.outputs.buffered_output import BufferedOutput
 
+from expanse.asynchronous.contracts.debug.exception_handler import ExceptionHandler
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.core.console.gateway import Gateway
 
@@ -26,7 +27,11 @@ class TestingCommand:
             full_command += " " + parameters
 
         kernel = await self._app.container.make(Gateway)
-        self._return_code = await kernel.handle(StringInput(full_command), self._output)
+        handler = await self._app.container.make(ExceptionHandler)
+        with handler.raise_unhandled_exceptions():
+            self._return_code = await kernel.handle(
+                StringInput(full_command), self._output
+            )
 
         return self._return_code
 

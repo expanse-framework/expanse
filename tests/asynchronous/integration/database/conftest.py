@@ -6,9 +6,6 @@ import pytest
 
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.database_manager import DatabaseManager
-from expanse.asynchronous.database.database_service_provider import (
-    DatabaseServiceProvider,
-)
 
 
 @pytest.fixture(autouse=True)
@@ -35,17 +32,29 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
                 "driver": "postgresql",
                 "url": "postgresql+asyncpg://postgres:password@127.0.0.1:5432/expanse",
             },
+            "test": {"driver": "sqlite", "database": tmp_path.joinpath("test.sqlite")},
         },
     }
-
-    await app.register(DatabaseServiceProvider(app.container))
 
     db = await app.container.make(DatabaseManager)
 
     async with db.connection("sqlite") as connection:
         await connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")
         await connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER NOT NULL,
+                first_name VARCHAR NOT NULL,
+                last_name VARCHAR,
+                email VARCHAR NOT NULL,
+                PRIMARY KEY (id)
+            );"""
+        )
+        await connection.execute(
             "INSERT INTO my_table (id) VALUES (:id)", {"id": "sqlite"}
+        )
+        await connection.execute(
+            "INSERT INTO users (first_name, last_name, email) VALUES ('John', 'Doe', 'john@doe.com')"
         )
         await connection.commit()
 

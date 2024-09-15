@@ -1,8 +1,13 @@
+import logging
+
+from collections.abc import Callable
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
+from typing import TypeVar
 
 from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
@@ -19,12 +24,21 @@ from expanse.http.request import Request
 from expanse.http.response import Response
 
 
+if TYPE_CHECKING:
+    from crashtest.frame import Frame
+
+_TError = TypeVar("_TError", bound=Exception)
+
+logger = logging.getLogger(__name__)
+
+
 class ExceptionHandler(ExceptionHandlerContract):
     def __init__(self, container: Container) -> None:
         self._container = container
 
         self._dont_report: set[type[Exception]] = {HTTPException, ValidationError}
         self._raise_unhandled_exceptions: bool = False
+        self._exception_preparers: dict[type, Callable[[Any], Exception]] = {}
 
     def report(self, e: Exception) -> None:
         if not self.should_report(e):
@@ -35,6 +49,8 @@ class ExceptionHandler(ExceptionHandlerContract):
     def _report_exception(self, e: Exception) -> None:
         if self._raise_unhandled_exceptions:
             raise e
+
+        logger.exception(e)
 
     def should_report(self, e: Exception) -> bool:
         return not any(isinstance(e, klass) for klass in self._dont_report)
@@ -51,6 +67,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         return self
 
     def render(self, request: Request, e: Exception) -> Response:
+        e = self._prepare_exception(e)
+
         if isinstance(e, ValidationError):
             return self._render_validation_exception(e, request)
 
@@ -62,6 +80,28 @@ class ExceptionHandler(ExceptionHandlerContract):
         trace = ExceptionTrace(e)
 
         trace.render(output)
+
+    def prepare_using(
+        self, exception_class: type[_TError], preparer: Callable[[_TError], Exception]
+    ) -> None:
+        self._exception_preparers[exception_class] = preparer
+
+    def _prepare_exception(self, e: Exception) -> Exception:
+        classes = (e.__class__, *e.__class__.__bases__)
+
+        preparer = next(
+            (
+                preparer
+                for klass, preparer in self._exception_preparers.items()
+                if klass in classes
+            ),
+            None,
+        )
+
+        if not preparer:
+            return e
+
+        return preparer(e)
 
     def _render_exception_response(self, request: Request, e: Exception) -> Response:
         if request.expects_json():
@@ -203,13 +243,32 @@ class ExceptionHandler(ExceptionHandlerContract):
         debug = self._container.make(Config).get("app.debug", False)
         if debug:
             inspector = Inspector(e)
+            frame: Frame | None = None
+            trace: list[dict[str, Any]] = []
+            if inspector.frames:
+                frame = inspector.frames[-1]
+                trace = [
+                    {
+                        "file": frame.filename,
+                        "line": frame.lineno,
+                        "function": frame.function,
+                    }
+                    for frame in reversed(inspector.frames)
+                ]
 
-            return {
+            response: dict[str, Any] = {
                 "message": inspector.exception_message,
                 "exception": inspector.exception_name,
-                "file": inspector.frames[-1].filename,
-                "line": inspector.frames[-1].lineno,
             }
+
+            if frame:
+                response["file"] = frame.filename
+                response["line"] = frame.lineno
+
+            if trace:
+                response["traceback"] = trace
+
+            return response
 
         return {"message": e.detail if isinstance(e, HTTPException) else "Server error"}
 

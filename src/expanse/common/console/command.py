@@ -372,6 +372,9 @@ class Command(Generic[TConsole]):
         else:
             self._full_definition.set_arguments(self._definition.arguments)
 
+    # Compatibility with Cleo's descriptors
+    merge_application_definition = merge_console_definition
+
     def synopsis(self, short: bool = False) -> str:
         key = "short" if short else "long"
 

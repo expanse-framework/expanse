@@ -12,6 +12,8 @@ from cleo.io.outputs.buffered_output import BufferedOutput
 from cleo.io.outputs.output import Output
 from cleo.io.outputs.stream_output import StreamOutput
 
+import expanse
+
 from expanse.asynchronous.console.commands.command import Command
 from expanse.asynchronous.console.console import Console as ConsoleApplication
 from expanse.asynchronous.contracts.debug.exception_handler import ExceptionHandler
@@ -116,12 +118,12 @@ class Gateway:
 
     async def _discover_commands(self) -> None:
         for path in self._command_paths:
-            await self._load_path(path)
+            await self.load_path(path)
 
         for command in self._commands:
             self.console.add(command())
 
-    async def _load_path(self, path: Path) -> None:
+    async def load_path(self, path: Path) -> None:
         if path.is_dir():
             for filepath in path.rglob("*.py"):
                 if filepath.name.startswith("_"):
@@ -138,7 +140,13 @@ class Gateway:
     async def _create_command_factory_from_path(
         self, path: Path
     ) -> tuple[str, Callable[[], Command]]:
-        path = path.resolve().relative_to(self._app.base_path.resolve())
+        try:
+            path = path.resolve().relative_to(self._app.base_path.resolve())
+        except ValueError:
+            path = path.resolve().relative_to(
+                Path(expanse.__file__).resolve().parent.parent
+            )
+
         name = path.stem.removesuffix("_command")
         classname = re.sub(r"(_)+", " ", name).title().replace(" ", "")
         command_name = " ".join(name.split("_"))

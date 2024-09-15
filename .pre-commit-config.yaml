@@ -6,6 +6,11 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        exclude: |
+          (?x)(
+               ^tests/asynchronous/integration/database/console/commands/.*
+             | ^tests/synchronous/integration/database/console/commands/.*
+          )
       - id: end-of-file-fixer
       - id: check-merge-conflict
       - id: check-case-conflict

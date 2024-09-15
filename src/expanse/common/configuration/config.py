@@ -48,5 +48,17 @@ class Config:
 
         return value
 
+    def __contains__(self, item: Any) -> bool:
+        config: dict[str, Any] = self._config
+
+        parts = item.split(".")
+        for part in parts:
+            if part not in config:
+                return False
+
+            config = config[part]
+
+        return True
+
     def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}({self._config!r})"
