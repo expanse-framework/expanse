@@ -9,11 +9,12 @@ from collections.abc import Awaitable
 from collections.abc import Callable
 from inspect import isasyncgenfunction
 from inspect import isgeneratorfunction
+from typing import Annotated
 from typing import Any
 from typing import Self
 from typing import TypeVar
-from typing import _AnnotatedAlias  # type: ignore[attr-defined]
 from typing import get_args
+from typing import get_origin
 from typing import overload
 
 from expanse.asynchronous.support._concurrency import run_in_threadpool
@@ -51,6 +52,7 @@ class Container(BaseContainer):
             args = ()
 
         function: Callable[..., Any]
+        is_class: bool = False
         if isinstance(concrete, types.FunctionType):
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args), None
@@ -68,7 +70,10 @@ class Container(BaseContainer):
             if isinstance(concrete, types.MethodType):
                 function = concrete
             else:
+                # What we are trying to build is a class,
+                # so we need to resolve the parameters of the __init__ method.
                 function = concrete.__init__  # type: ignore[misc]
+                is_class = True
 
         (
             positional,
@@ -90,6 +95,11 @@ class Container(BaseContainer):
                 next(generator, None)
 
             return next(generator), sync_terminating_callback
+
+        # If we are trying to build a class, we want to instantiate it directly
+        # without executing it in a worker thread since it has an impact on performance.
+        if is_class:
+            return concrete(*positional, **keywords), None
 
         if not asyncio.iscoroutinefunction(concrete):
             return await run_in_threadpool(concrete, *positional, **keywords), None
@@ -197,7 +207,8 @@ class Container(BaseContainer):
 
         metadata: tuple = ()
         actual_abstract: str | type = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *metadata = get_args(abstract)  # type: ignore[assignment]
 
         if actual_abstract in self._bindings:
@@ -435,7 +446,8 @@ class Container(BaseContainer):
         abstract = self._get_alias(abstract)
 
         actual_abstract: str | type = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *_ = get_args(abstract)
 
         if abstract in self._after_resolving_callbacks:
@@ -488,7 +500,8 @@ class ScopedContainer(Container):
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
         actual_abstract: str | type[T] = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *_ = get_args(abstract)
 
         # If the abstract is neither bound in the container nor in its base container,

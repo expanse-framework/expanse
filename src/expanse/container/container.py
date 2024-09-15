@@ -7,10 +7,12 @@ import types
 from collections.abc import Awaitable
 from collections.abc import Callable
 from inspect import isgeneratorfunction
+from typing import Annotated
 from typing import Any
 from typing import Self
 from typing import TypeVar
 from typing import get_args
+from typing import get_origin
 from typing import overload
 
 from expanse.common.container.container import Container as BaseContainer
@@ -59,6 +61,8 @@ class Container(BaseContainer):
             if isinstance(concrete, types.MethodType):
                 function = concrete
             else:
+                # What we are trying to build is a class,
+                # so we need to resolve the parameters of the __init__ method.
                 function = concrete.__init__  # type: ignore[misc]
 
         (
@@ -170,7 +174,8 @@ class Container(BaseContainer):
 
         metadata: tuple = ()
         actual_abstract: str | type[T] = abstract
-        if hasattr(abstract, "__metadata__"):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *metadata = get_args(abstract)  # type: ignore[assignment]
 
         if actual_abstract in self._bindings:
@@ -414,7 +419,8 @@ class Container(BaseContainer):
         abstract = self._get_alias(abstract)
 
         actual_abstract: str | type = abstract
-        if hasattr(abstract, "__metadata__"):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *_ = get_args(abstract)
 
         if abstract in self._after_resolving_callbacks:
