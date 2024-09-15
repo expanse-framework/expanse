@@ -6,7 +6,10 @@ from expanse.asynchronous.core.http.middleware.middleware_group import Middlewar
 
 class MiddlewareStack:
     def __init__(self, middlewares: list[type[Middleware]] | None = None) -> None:
-        self._middlewares: list[type[Middleware]] = middlewares or []
+        if middlewares is None:
+            middlewares = self.get_default_middleware()
+
+        self._middlewares: list[type[Middleware]] = middlewares
         self._groups: dict[str, MiddlewareGroup] = {}
 
     @property
@@ -47,3 +50,10 @@ class MiddlewareStack:
             self._groups[name] = MiddlewareGroup()
 
         return self._groups[name]
+
+    def get_default_middleware(self) -> list[type[Middleware]]:
+        from expanse.asynchronous.http.middleware.manage_cors import ManageCors
+
+        return [
+            ManageCors,
+        ]

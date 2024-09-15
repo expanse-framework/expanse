@@ -201,15 +201,16 @@ class Cors:
 
 
 class ManageCors(Middleware):
-    def __init__(self, container: Container) -> None:
+    def __init__(self, container: Container, config: Config) -> None:
         self._container: Container = container
         self._cors: Cors = Cors()
+        self._config: Config = config
 
     async def handle(self, request: Request, next_call: RequestHandler) -> Response:
         """
         Handle the incoming request.
         """
-        if not (await self._has_matching_path(request)):
+        if not self._has_matching_path(request):
             return await next_call(request)
 
         self._cors.set_options(**(await self._container.make(Config)).get("cors", {}))
@@ -230,10 +231,8 @@ class ManageCors(Middleware):
 
         return response
 
-    async def _has_matching_path(self, request: Request) -> bool:
-        paths: list[str] = (
-            (await self._container.make(Config)).get("cors", {}).get("paths", [])
-        )
+    def _has_matching_path(self, request: Request) -> bool:
+        paths: list[str] = self._config.get("cors", {}).get("paths", [])
 
         for path in paths:
             if path != "/":
