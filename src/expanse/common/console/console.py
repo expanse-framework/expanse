@@ -351,16 +351,18 @@ class Console(Generic[TCommand], ABC):
             if io.input.script_name is not None:
                 argv.insert(0, io.input.script_name)
 
-            namespace = name.split(" ")[0]
+            namespace = name.split(" ")[:-1]
             index = None
             for i, arg in enumerate(argv):
-                if arg == namespace and i > 0:
+                if namespace and arg == namespace[0] and len(namespace) == 1:
                     argv[i] = name
-                    index = i
                     break
+                elif namespace and arg == namespace[0]:
+                    namespace.pop(0)
+                    index = i
 
             if index is not None:
-                del argv[index + 1 : index + 1 + name.count(" ")]
+                del argv[index + 1 : index + 1 + len(namespace) + 1]
 
             stream = io.input.stream
             interactive = io.input.is_interactive()

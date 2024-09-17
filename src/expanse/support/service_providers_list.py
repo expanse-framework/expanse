@@ -16,5 +16,6 @@ class ServiceProvidersList(BaseServiceProvidersList[ServiceProvider]):
                 "expanse.database.database_service_provider.DatabaseServiceProvider",
                 "expanse.view.view_service_provider.ViewServiceProvider",
                 "expanse.static.static_service_provider.StaticServiceProvider",
+                "expanse.encryption.encryption_service_provider.EncryptionServiceProvider",
             ]
         )

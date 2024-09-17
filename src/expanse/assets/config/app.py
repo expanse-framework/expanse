@@ -10,10 +10,30 @@ from expanse.support.service_providers_list import ServiceProvidersList
 class Config(BaseSettings):
     name: str = "Expanse"
 
+    # Application environment
+    #
+    # The environment the application is running in.
     env: str = "production"
 
+    # Debug mode
+    #
+    # The debug mode mostly controls how the application behaves when an error
+    # occurs. When debug mode is enabled, the application will display detailed
+    # messages about the error, including a stack trace. When debug mode is disabled,
+    # the application will display a generic error message instead.
     debug: bool = False
 
+    # Encryption key
+    #
+    # This key is used by the application for encryption and should be set
+    # to a random, 32-character string or a base64-encoded 32 bytes prefixed with `base64:`.
+    # This must be set prior to deploying the application.
+    secret_key: str = ""
+
+    # Service providers
+    #
+    # You can list here the service providers that you want to register automatically
+    # in your application.
     providers: list[str] = Field(
         default=(
             ServiceProvidersList.default()
@@ -24,7 +44,8 @@ class Config(BaseSettings):
             )
             .merge(
                 [
-                    # Console-specific providers
+                    # Application service providers
+                    # "app.providers.app_service_provider.AppServiceProvider",
                 ]
             )
             .to_list()
