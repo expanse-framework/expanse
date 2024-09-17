@@ -22,7 +22,7 @@ class RoutingServiceProvider(ServiceProvider):
         await self._container.on_resolved("view", self._register_view_globals)
 
     async def _register_view_globals(self, view: ViewFactory) -> None:
-        router = await self._container.make(Router)
+        router = await self._container.get(Router)
 
         async def route(name: str, **parameters) -> URLPath:
             return await router.route(name, parameters)

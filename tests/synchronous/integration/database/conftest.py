@@ -10,7 +10,7 @@ from expanse.database.database_manager import DatabaseManager
 
 @pytest.fixture(autouse=True)
 def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
-    config: dict[str, dict[str, Any]] = app.container.make("config")
+    config: dict[str, dict[str, Any]] = app.container.get("config")
 
     config["database"] = {
         "default": "sqlite",
@@ -40,7 +40,7 @@ def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
         },
     }
 
-    db = app.container.make(DatabaseManager)
+    db = app.container.get(DatabaseManager)
 
     with db.connection("sqlite") as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS my_table (id INTEGER)")

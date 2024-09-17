@@ -22,7 +22,7 @@ class StaticServiceProvider(ServiceProvider):
         self._container.on_resolved("view", self._register_view_globals)
 
     def _register_static(self, config: Config) -> Static:
-        app: Application = self._container.make("app")
+        app: Application = self._container.get("app")
         paths: list[Path] = config.get("static.paths", [])
         paths = [app.base_path / p if not p.is_absolute() else p for p in paths]
 
@@ -31,15 +31,15 @@ class StaticServiceProvider(ServiceProvider):
         )
 
     def _add_static_route(self, router: "Router") -> None:
-        config = self._container.make(Config)
+        config = self._container.get(Config)
         if config.get("app.debug", False):
             prefix: str = config["static.prefix"].rstrip("/")
 
             router.get(
                 f"{prefix}/{{path:path}}",
-                self._container.make(Static).get,
+                self._container.get(Static).get,
                 name="static",
             )
 
     def _register_view_globals(self, view: ViewFactory) -> None:
-        view.register_global(static=self._container.make(Static).url)
+        view.register_global(static=self._container.get(Static).url)

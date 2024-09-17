@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class RouteServiceProvider(ServiceProvider):
     async def load_routes_from_file(self, router: Router, path: Path) -> Router:
-        app: Application = await self._container.make("app")
+        app: Application = await self._container.get("app")
         module_name = (
             path.resolve()
             .relative_to(app.base_path)

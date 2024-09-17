@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def setup_app_config(app: Application) -> None:
-    config: dict[str, dict[str, Any]] = app.container.make("config")
+    config: dict[str, dict[str, Any]] = app.container.get("config")
 
     config["view"] = {
         "paths": [Path(__file__).parent.joinpath("fixtures/resources/views")]

@@ -12,9 +12,9 @@ from tests.synchronous.exceptions.fixtures.exceptions import foo
 def test_the_correct_stack_trace_representation_is_passed_to_view(
     app: Application, mocker: MockerFixture
 ) -> None:
-    view = app.container.make(ViewFactory)
+    view = app.container.get(ViewFactory)
 
-    renderer = ExceptionRenderer(view, app.container.make(ViewFinder))
+    renderer = ExceptionRenderer(view, app.container.get(ViewFinder))
 
     make = mocker.spy(view, "make")
 

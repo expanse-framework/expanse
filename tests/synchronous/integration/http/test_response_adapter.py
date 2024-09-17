@@ -34,7 +34,7 @@ def test_string_adapter_adapts_response_based_on_request_acceptable_type(
 
 
 def test_register_new_adapter(router: Router, client: TestClient) -> None:
-    adapter = client.app.container.make(ResponseAdapter)
+    adapter = client.app.container.get(ResponseAdapter)
     adapter.register_adapter(
         CustomResponseType, lambda response: respond().text(response.content)
     )

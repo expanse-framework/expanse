@@ -13,7 +13,7 @@ class CommandServiceProvider(ServiceProvider):
     def register(self) -> None:
         # TODO: register commands only on starting event once implemented
 
-        console = self._container.make(ConsoleKernel).console
+        console = self._container.get(ConsoleKernel).console
 
         for command in self.COMMANDS:
             console.command_loader.register_factory(

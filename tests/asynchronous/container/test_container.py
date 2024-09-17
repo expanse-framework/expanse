@@ -85,8 +85,8 @@ async def test_singleton_returns_same_instance() -> None:
     container = Container()
     container.singleton(Abstract, Concrete)
 
-    instance1 = await container.make(Abstract)
-    instance2 = await container.make(Abstract)
+    instance1 = await container.get(Abstract)
+    instance2 = await container.get(Abstract)
 
     assert instance1 is instance2
 
@@ -94,15 +94,15 @@ async def test_singleton_returns_same_instance() -> None:
 async def test_concrete_is_resolved_directly() -> None:
     container = Container()
 
-    assert isinstance(await container.make(Concrete), Concrete)
+    assert isinstance(await container.get(Concrete), Concrete)
 
 
 async def test_concrete_is_resolved_directly_and_shared() -> None:
     container = Container()
     container.singleton(Concrete)
 
-    instance1 = await container.make(Concrete)
-    instance2 = await container.make(Concrete)
+    instance1 = await container.get(Concrete)
+    instance2 = await container.get(Concrete)
 
     assert instance1 is instance2
 
@@ -147,7 +147,7 @@ def test_bound() -> None:
 
 async def test_scoped_dependencies() -> None:
     async def foo(container: Container) -> str:
-        return await container.make("scoped")
+        return await container.get("scoped")
 
     container = Container()
     container.instance(Container, container)
@@ -156,11 +156,11 @@ async def test_scoped_dependencies() -> None:
     assert container.has_scoped_bindings()
 
     async with container.create_scoped_container() as c1:
-        result1 = await c1.make("scoped")
-        result2 = await c1.make("scoped")
+        result1 = await c1.get("scoped")
+        result2 = await c1.get("scoped")
 
     async with container.create_scoped_container() as c2:
-        result3 = await c2.make("scoped")
+        result3 = await c2.get("scoped")
 
     assert result1 == result2
     assert result1 != result3
@@ -169,12 +169,12 @@ async def test_scoped_dependencies() -> None:
 async def test_scoped_container_can_resolve_base_container_dependencies() -> None:
     container = Container()
     container.instance(Container, container)
-    container.bind(Abstract, Concrete)
+    container.register(Abstract, Concrete)
     container.scoped(uuid.UUID, uuid.uuid4)
 
     scoped = container.create_scoped_container()
 
-    result = await scoped.make(Abstract)
+    result = await scoped.get(Abstract)
 
     assert isinstance(result, Concrete)
 
@@ -183,7 +183,7 @@ async def test_call_resolves_dependencies_and_parameters_if_parameters_only() ->
     container = Container()
     container.singleton(Abstract, Concrete)
 
-    concrete = await container.make(Abstract)
+    concrete = await container.get(Abstract)
 
     result = await container.call(concrete.run, "foo", "bar")
     assert result == ("foo", "bar", None)
@@ -197,7 +197,7 @@ async def test_call_resolves_deps_and_params_with_mix_of_deps_and_params() -> No
     container.singleton(Abstract, Concrete)
     container.singleton(Something)
 
-    concrete = await container.make(Abstract)
+    concrete = await container.get(Abstract)
 
     result = await container.call(concrete.run2, "foo", "bar")
     assert result == ("foo", "bar", None)
@@ -216,7 +216,7 @@ async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type
     def callback(i: int) -> int:
         return i
 
-    concrete = await container.make(Abstract)
+    concrete = await container.get(Abstract)
 
     result = await container.call(
         concrete.run3, AnotherThing("Value 1"), "foo", callback, "bar"
@@ -232,7 +232,7 @@ async def test_call_resolves_dependencies_and_parameters_with_any_parameter_type
 async def test_call_can_call_instance_methods() -> None:
     container = Container()
     container.instance(Container, container)
-    container.bind(Abstract, Concrete)
+    container.register(Abstract, Concrete)
 
     id1 = await container.call(Foo.get_id)
 
@@ -244,6 +244,6 @@ async def test_call_can_call_instance_methods() -> None:
     assert id1 != id2
 
     container.singleton(Foo)
-    await container.make(Foo)
+    await container.get(Foo)
 
     assert (await container.call(Foo.get_id)) == (await container.call(Foo.get_id))

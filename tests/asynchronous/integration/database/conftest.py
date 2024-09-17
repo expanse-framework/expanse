@@ -10,7 +10,7 @@ from expanse.asynchronous.database.database_manager import DatabaseManager
 
 @pytest.fixture(autouse=True)
 async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[None]:
-    config: dict[str, dict[str, Any]] = await app.container.make("config")
+    config: dict[str, dict[str, Any]] = await app.container.get("config")
 
     config["database"] = {
         "default": "sqlite",
@@ -36,7 +36,7 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
         },
     }
 
-    db = await app.container.make(DatabaseManager)
+    db = await app.container.get(DatabaseManager)
 
     async with db.connection("sqlite") as connection:
         await connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")

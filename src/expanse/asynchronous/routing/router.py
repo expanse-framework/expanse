@@ -116,14 +116,14 @@ class Router:
 
         for route in self._routes:
             if route.name == name:
-                matcher = await self._container.make(RouteMatcher)
+                matcher = await self._container.get(RouteMatcher)
 
                 return matcher.url(route.path, **parameters)
 
         raise RouteNotFound(f"Route [{name}] is not defined")
 
     async def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
-        matcher = await self._container.make(RouteMatcher)
+        matcher = await self._container.get(RouteMatcher)
 
         parameters = parameters or {}
 
@@ -144,7 +144,7 @@ class Router:
 
             handler = self._route_handler(route, container)
             pipes = [
-                (await container.make(middleware)).handle
+                (await container.get(middleware)).handle
                 for middleware in route.get_middleware()
             ]
 
@@ -178,7 +178,7 @@ class Router:
                 return raw_response
 
             return await container.call(
-                (await container.make(ResponseAdapter)).adapter(raw_response),
+                (await container.get(ResponseAdapter)).adapter(raw_response),
                 raw_response,
             )
 
@@ -188,7 +188,7 @@ class Router:
         async def handler(request: Request) -> NoReturn:
             from expanse.asynchronous.routing.responder import Responder
 
-            responder = await container.make(Responder)
+            responder = await container.get(Responder)
 
             await responder.abort(404)
 

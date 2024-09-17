@@ -32,7 +32,7 @@ class Gateway:
                 Pipeline(container)
                 .use(
                     [
-                        container.make(middleware).handle
+                        container.get(middleware).handle
                         for middleware in self._middleware
                     ]
                 )

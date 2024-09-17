@@ -22,7 +22,7 @@ class RoutingServiceProvider(ServiceProvider):
         self._container.on_resolved("view", self._register_view_globals)
 
     def _register_view_globals(self, view: ViewFactory) -> None:
-        router = self._container.make(Router)
+        router = self._container.get(Router)
 
         def route(name: str, **parameters) -> URLPath:
             return router.route(name, parameters)

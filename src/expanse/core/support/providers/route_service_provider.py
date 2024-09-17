@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class RouteServiceProvider(ServiceProvider):
     def load_routes_from_file(self, router: Router, path: Path) -> Router:
-        app: Application = self._container.make("app")
+        app: Application = self._container.get("app")
         module_name = (
             path.resolve()
             .relative_to(app.base_path)

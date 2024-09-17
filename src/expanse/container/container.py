@@ -81,12 +81,12 @@ class Container(BaseContainer):
         return concrete(*positional, **keywords), None
 
     @overload
-    def make(self, abstract: type[T]) -> T: ...
+    def get(self, abstract: type[T]) -> T: ...
 
     @overload
-    def make(self, abstract: str) -> Any: ...
+    def get(self, abstract: str) -> Any: ...
 
-    def make(self, abstract: str | type[T]) -> Any | T:
+    def get(self, abstract: str | type[T]) -> Any | T:
         return self._resolve(abstract)
 
     def call(
@@ -103,7 +103,7 @@ class Container(BaseContainer):
             class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
             class_: type = callable.__globals__[class_name]
 
-            instance: Any = self.make(class_)
+            instance: Any = self.get(class_)
 
             callable = getattr(instance, func_name)
 
@@ -135,7 +135,7 @@ class Container(BaseContainer):
         callback: _Callback,
     ) -> None:
         if self.resolved(abstract):
-            callback(self.make(abstract))
+            callback(self.get(abstract))
 
         self.after_resolving(abstract, callback)
 
@@ -189,7 +189,7 @@ class Container(BaseContainer):
             concrete = abstract
 
         terminating_callback: _Callback | None = None
-        if self._is_buildable(actual_abstract, concrete):
+        if self._can_build(actual_abstract, concrete):
             try:
                 obj, terminating_callback = self.build(concrete, metadata)
             except Exception as e:
@@ -197,7 +197,7 @@ class Container(BaseContainer):
                     f'Unable to build the "{abstract}" dependency'
                 ) from e
         else:
-            obj = self.make(concrete)
+            obj = self.get(concrete)
 
         if self._is_cached(actual_abstract):
             self._instances[abstract] = obj
@@ -332,10 +332,10 @@ class Container(BaseContainer):
                 assert klass is not None
 
                 if self.has(self._get_alias(klass)):
-                    result = self.make(self._get_alias(klass))
+                    result = self.get(self._get_alias(klass))
                 else:
                     try:
-                        result = self.make(self._get_alias(klass))
+                        result = self.get(self._get_alias(klass))
                     except Exception as e:
                         if not args:
                             raise e
@@ -360,10 +360,10 @@ class Container(BaseContainer):
                     assert klass is not None
 
                     if self.has(self._get_alias(klass)):
-                        result = self.make(self._get_alias(klass))
+                        result = self.get(self._get_alias(klass))
                     else:
                         try:
-                            result = self.make(self._get_alias(klass))
+                            result = self.get(self._get_alias(klass))
                         except Exception as e:
                             if not args:
                                 raise e
@@ -389,7 +389,7 @@ class Container(BaseContainer):
 
                     assert klass is not None
 
-                    result = self.make(self._get_alias(klass))
+                    result = self.get(self._get_alias(klass))
                     keywords[parameter.name] = result
                 return
 
@@ -398,7 +398,7 @@ class Container(BaseContainer):
 
                 assert klass is not None
 
-                result = self.make(self._get_alias(klass))
+                result = self.get(self._get_alias(klass))
 
                 result = [result] if not isinstance(result, tuple) else result
 

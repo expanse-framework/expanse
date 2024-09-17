@@ -113,15 +113,15 @@ class ExceptionHandler(ExceptionHandlerContract):
         from expanse.routing.responder import Responder
 
         if self._container.has(Responder):
-            responder = self._container.make(Responder)
+            responder = self._container.get(Responder)
         else:
             from expanse.routing.redirect import Redirect
             from expanse.routing.router import Router
             from expanse.view.view_factory import ViewFactory
 
             responder = Responder(
-                self._container.make(ViewFactory),
-                Redirect(self._container.make(Router), request),
+                self._container.get(ViewFactory),
+                Redirect(self._container.get(Router), request),
             )
 
         return responder.json(
@@ -132,12 +132,12 @@ class ExceptionHandler(ExceptionHandlerContract):
         )
 
     def _render_response(self, request: Request, e: Exception) -> Response:
-        if not isinstance(e, HTTPException) and self._container.make(Config).get(
+        if not isinstance(e, HTTPException) and self._container.get(Config).get(
             "app.debug"
         ):
             if self._container.has(ExceptionRenderer):
                 return Response(
-                    self._container.make(ExceptionRenderer).render(e),
+                    self._container.get(ExceptionRenderer).render(e),
                     status_code=500,
                     content_type="text/html",
                 )
@@ -159,7 +159,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         if view := self._get_http_exception_view(e):
             from expanse.view.view_factory import ViewFactory
 
-            factory = self._container.make(ViewFactory)
+            factory = self._container.get(ViewFactory)
 
             response = factory.render(
                 factory.make(view, {"exception": e}, status_code=e.status_code)
@@ -198,8 +198,8 @@ class ExceptionHandler(ExceptionHandlerContract):
             from expanse.view.view_factory import ViewFactory
 
             responder = Responder(
-                self._container.make(ViewFactory),
-                Redirect(self._container.make(Router), request),
+                self._container.get(ViewFactory),
+                Redirect(self._container.get(Router), request),
             )
 
             return responder.json(content, status_code=422)
@@ -213,7 +213,7 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         from expanse.view.view_factory import ViewFactory
 
-        factory = self._container.make(ViewFactory)
+        factory = self._container.get(ViewFactory)
 
         if not factory.exists(view):
             return None
@@ -221,7 +221,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         return view
 
     def _render_exception_content(self, e: Exception) -> str:
-        config = self._container.make(Config)
+        config = self._container.get(Config)
         if config.get("app.debug", False):
             inspector = Inspector(e)
 
@@ -240,7 +240,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         return e.detail if isinstance(e, HTTPException) else "Server Error"
 
     def _convert_exception_to_dict(self, e: Exception) -> dict[str, Any]:
-        debug = self._container.make(Config).get("app.debug", False)
+        debug = self._container.get(Config).get("app.debug", False)
         if debug:
             inspector = Inspector(e)
             frame: Frame | None = None
@@ -277,7 +277,7 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         from expanse.view.view_finder import ViewFinder
 
-        self._container.make(ViewFinder).add_paths(
+        self._container.get(ViewFinder).add_paths(
             [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]
         )
 

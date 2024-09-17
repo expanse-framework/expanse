@@ -42,7 +42,7 @@ def respond() -> Responder:
 
     from expanse.routing.responder import Responder
 
-    return container.make(Responder)
+    return container.get(Responder)
 
 
 def response(

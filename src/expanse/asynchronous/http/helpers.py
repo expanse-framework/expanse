@@ -41,7 +41,7 @@ async def respond() -> Responder:
 
     from expanse.asynchronous.routing.responder import Responder
 
-    return await container.make(Responder)
+    return await container.get(Responder)
 
 
 async def response(

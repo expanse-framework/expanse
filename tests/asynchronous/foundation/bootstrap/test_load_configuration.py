@@ -13,7 +13,7 @@ def app() -> Application:
 async def test_loading_configuration_provides_default_values(app: Application) -> None:
     await LoadConfiguration.bootstrap(app)
 
-    config = await app.container.make(Config)
+    config = await app.container.get(Config)
 
     assert config["app.name"] == "Expanse"
     assert len(config["app.providers"]) > 0

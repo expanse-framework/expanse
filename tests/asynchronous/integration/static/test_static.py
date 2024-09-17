@@ -50,7 +50,7 @@ async def test_view_static_function_is_registered_successfully(
     async def foo() -> Response:
         return await view("foo")
 
-    (await client.app.container.make(Router)).add_route(Route.get("/foo", foo))
+    (await client.app.container.get(Router)).add_route(Route.get("/foo", foo))
 
     response = client.get("/foo")
     assert response.status_code == 200
@@ -71,7 +71,7 @@ async def test_static_url_includes_base_url(client: TestClient) -> None:
     async def foo() -> Response:
         return await view("foo")
 
-    (await client.app.container.make(Router)).add_route(Route.get("/foo", foo))
+    (await client.app.container.get(Router)).add_route(Route.get("/foo", foo))
 
     response = client.get("/foo")
     assert response.status_code == 200

@@ -57,7 +57,7 @@ def test_middleware_configuration(root: Path, caplog: LogCaptureFixture) -> None
     app = Application.configure(root).with_middleware(configure_middleware).create()
     app.bootstrap()
 
-    router: Router = app.container.make(Router)
+    router: Router = app.container.get(Router)
 
     router.get("/", lambda: Response("Hello, World!"))
 

@@ -213,7 +213,7 @@ class ManageCors(Middleware):
         if not self._has_matching_path(request):
             return await next_call(request)
 
-        self._cors.set_options(**(await self._container.make(Config)).get("cors", {}))
+        self._cors.set_options(**(await self._container.get(Config)).get("cors", {}))
 
         if self._cors.is_preflight_request(request):
             response = self._cors.handle_preflight_request(request)

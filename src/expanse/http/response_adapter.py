@@ -31,7 +31,7 @@ class ResponseAdapter:
     ) -> Response:
         from expanse.routing.responder import Responder
 
-        responder = container.make(Responder)
+        responder = container.get(Responder)
 
         if request.expects_json():
             return responder.json(response)

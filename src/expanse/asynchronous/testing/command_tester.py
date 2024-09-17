@@ -35,8 +35,8 @@ class TestingCommand:
         if parameters:
             full_command += " " + parameters
 
-        gateway = await self._app.container.make(Gateway)
-        handler = await self._app.container.make(ExceptionHandler)
+        gateway = await self._app.container.get(Gateway)
+        handler = await self._app.container.get(ExceptionHandler)
 
         input = StringInput(full_command)
         input.set_stream(StringIO())

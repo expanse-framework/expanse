@@ -75,7 +75,7 @@ class WSGITransport(httpx.WSGITransport):
         if not self.app.container.has(ExceptionHandler):
             self.app.container.singleton(ExceptionHandler, ConcreteExceptionHandler)
 
-        handler: ExceptionHandler = self.app.container.make(ExceptionHandler)
+        handler: ExceptionHandler = self.app.container.get(ExceptionHandler)
         with handler.raise_unhandled_exceptions(self.raise_app_exceptions):
             result = self.app(environ, start_response)
 

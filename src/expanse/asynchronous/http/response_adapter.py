@@ -34,7 +34,7 @@ class ResponseAdapter:
     ) -> Response:
         from expanse.asynchronous.routing.responder import Responder
 
-        responder = await container.make(Responder)
+        responder = await container.get(Responder)
         if request.expects_json():
             return await responder.json(response)
 

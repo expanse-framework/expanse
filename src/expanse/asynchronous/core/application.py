@@ -114,7 +114,7 @@ class Application(BaseApplication):
         await self._register_base_service_providers()
 
         for bootstrapper_class in bootstrappers:
-            bootstrapper: Bootstrapper = await self._container.make(bootstrapper_class)
+            bootstrapper: Bootstrapper = await self._container.get(bootstrapper_class)
             await bootstrapper.bootstrap(self)
 
         for callback in self._bootstrapping_callbacks:
@@ -132,7 +132,7 @@ class Application(BaseApplication):
         return self
 
     async def register_configured_providers(self) -> None:
-        providers = (await self._container.make(Config)).get("app.providers", [])
+        providers = (await self._container.get(Config)).get("app.providers", [])
 
         for provider_class in providers:
             if isinstance(provider_class, str):
@@ -154,7 +154,7 @@ class Application(BaseApplication):
     async def handle_command(self, input: Input) -> int:
         from expanse.asynchronous.core.console.gateway import Gateway
 
-        kernel = await self._container.make(Gateway)
+        kernel = await self._container.get(Gateway)
 
         return await kernel.handle(input)
 
@@ -206,6 +206,6 @@ class Application(BaseApplication):
 
         from expanse.asynchronous.core.http.gateway import Gateway
 
-        gateway = await self._container.make(Gateway)
+        gateway = await self._container.get(Gateway)
 
         await gateway(scope, receive, send)

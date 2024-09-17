@@ -85,8 +85,8 @@ def test_singleton_returns_same_instance() -> None:
     container = Container()
     container.singleton(Abstract, Concrete)
 
-    instance1 = container.make(Abstract)
-    instance2 = container.make(Abstract)
+    instance1 = container.get(Abstract)
+    instance2 = container.get(Abstract)
 
     assert instance1 is instance2
 
@@ -94,15 +94,15 @@ def test_singleton_returns_same_instance() -> None:
 def test_concrete_is_resolved_directly() -> None:
     container = Container()
 
-    assert isinstance(container.make(Concrete), Concrete)
+    assert isinstance(container.get(Concrete), Concrete)
 
 
 def test_concrete_is_resolved_directly_and_shared() -> None:
     container = Container()
     container.singleton(Concrete)
 
-    instance1 = container.make(Concrete)
-    instance2 = container.make(Concrete)
+    instance1 = container.get(Concrete)
+    instance2 = container.get(Concrete)
 
     assert instance1 is instance2
 
@@ -132,7 +132,7 @@ def test_bound() -> None:
 
 def test_scoped_dependencies() -> None:
     def foo(container: Container) -> str:
-        return container.make("scoped")
+        return container.get("scoped")
 
     container = Container()
     container.instance(Container, container)
@@ -141,11 +141,11 @@ def test_scoped_dependencies() -> None:
     assert container.has_scoped_bindings()
 
     with container.create_scoped_container() as c1:
-        result1 = c1.make("scoped")
-        result2 = c1.make("scoped")
+        result1 = c1.get("scoped")
+        result2 = c1.get("scoped")
 
     with container.create_scoped_container() as c2:
-        result3 = c2.make("scoped")
+        result3 = c2.get("scoped")
 
     assert result1 == result2
     assert result1 != result3
@@ -154,12 +154,12 @@ def test_scoped_dependencies() -> None:
 def test_scoped_container_can_resolve_base_container_dependencies() -> None:
     container = Container()
     container.instance(Container, container)
-    container.bind(Abstract, Concrete)
+    container.register(Abstract, Concrete)
     container.scoped(uuid.UUID, uuid.uuid4)
 
     scoped = container.create_scoped_container()
 
-    result = scoped.make(Abstract)
+    result = scoped.get(Abstract)
 
     assert isinstance(result, Concrete)
 
@@ -168,7 +168,7 @@ def test_call_resolves_dependencies_and_parameters_if_parameters_only() -> None:
     container = Container()
     container.singleton(Abstract, Concrete)
 
-    concrete = container.make(Abstract)
+    concrete = container.get(Abstract)
 
     result = container.call(concrete.run, "foo", "bar")
     assert result == ("foo", "bar", None)
@@ -182,7 +182,7 @@ def test_call_resolves_deps_and_params_with_mix_of_deps_and_params() -> None:
     container.singleton(Abstract, Concrete)
     container.singleton(Something)
 
-    concrete = container.make(Abstract)
+    concrete = container.get(Abstract)
 
     result = container.call(concrete.run2, "foo", "bar")
     assert result == ("foo", "bar", None)
@@ -199,7 +199,7 @@ def test_call_resolves_dependencies_and_parameters_with_any_parameter_type() -> 
     def callback(i: int) -> int:
         return i
 
-    concrete = container.make(Abstract)
+    concrete = container.get(Abstract)
 
     result = container.call(
         concrete.run3, AnotherThing("Value 1"), "foo", callback, "bar"
@@ -215,7 +215,7 @@ def test_call_resolves_dependencies_and_parameters_with_any_parameter_type() -> 
 def test_call_can_call_instance_methods() -> None:
     container = Container()
     container.instance(Container, container)
-    container.bind(Abstract, Concrete)
+    container.register(Abstract, Concrete)
 
     id1 = container.call(Foo.get_id)
 
@@ -227,6 +227,6 @@ def test_call_can_call_instance_methods() -> None:
     assert id1 != id2
 
     container.singleton(Foo)
-    container.make(Foo)
+    container.get(Foo)
 
     assert container.call(Foo.get_id) == container.call(Foo.get_id)

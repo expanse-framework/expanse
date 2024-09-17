@@ -47,7 +47,7 @@ class Pipeline:
             if not self._container.has(ExceptionHandler):
                 raise e
 
-            exception_handler = self._container.make(ExceptionHandler)
+            exception_handler = self._container.get(ExceptionHandler)
 
             exception_handler.report(e)
 

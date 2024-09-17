@@ -107,12 +107,12 @@ class Container(BaseContainer):
         return await concrete(*positional, **keywords), None
 
     @overload
-    async def make(self, abstract: type[T]) -> T: ...
+    async def get(self, abstract: type[T]) -> T: ...
 
     @overload
-    async def make(self, abstract: str) -> Any: ...
+    async def get(self, abstract: str) -> Any: ...
 
-    async def make(self, abstract: str | type[T]) -> Any | T:
+    async def get(self, abstract: str | type[T]) -> Any | T:
         return await self._resolve(abstract)
 
     async def call(
@@ -129,7 +129,7 @@ class Container(BaseContainer):
             class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
             class_: type = callable.__globals__[class_name]
 
-            instance: Any = await self.make(class_)
+            instance: Any = await self.get(class_)
 
             callable = getattr(instance, func_name)
 
@@ -165,9 +165,9 @@ class Container(BaseContainer):
     ) -> None:
         if self.resolved(abstract):
             if asyncio.iscoroutinefunction(callback):
-                await callback(await self.make(abstract))
+                await callback(await self.get(abstract))
             else:
-                callback(await self.make(abstract))
+                callback(await self.get(abstract))
 
         self.after_resolving(abstract, callback)
 
@@ -222,13 +222,13 @@ class Container(BaseContainer):
             concrete = abstract
 
         terminating_callback: _Callback | None = None
-        if self._is_buildable(actual_abstract, concrete):
+        if self._can_build(actual_abstract, concrete):
             try:
                 obj, terminating_callback = await self.build(concrete, metadata)
             except Exception:
                 raise ContainerException(f'Unable to build the "{abstract}" dependency')
         else:
-            obj = await self.make(concrete)
+            obj = await self.get(concrete)
 
         if self._is_cached(actual_abstract):
             self._instances[abstract] = obj
@@ -358,10 +358,10 @@ class Container(BaseContainer):
                 assert klass is not None
 
                 if self.has(self._get_alias(klass)):
-                    result = await self.make(self._get_alias(klass))
+                    result = await self.get(self._get_alias(klass))
                 else:
                     try:
-                        result = await self.make(self._get_alias(klass))
+                        result = await self.get(self._get_alias(klass))
                     except Exception as e:
                         if not args:
                             raise e
@@ -386,10 +386,10 @@ class Container(BaseContainer):
                     assert klass is not None
 
                     if self.has(self._get_alias(klass)):
-                        result = await self.make(self._get_alias(klass))
+                        result = await self.get(self._get_alias(klass))
                     else:
                         try:
-                            result = await self.make(self._get_alias(klass))
+                            result = await self.get(self._get_alias(klass))
                         except Exception as e:
                             if not args:
                                 raise e
@@ -415,7 +415,7 @@ class Container(BaseContainer):
 
                     assert klass is not None
 
-                    result = await self.make(self._get_alias(klass))
+                    result = await self.get(self._get_alias(klass))
 
                     keywords[parameter.name] = result
                 return
@@ -425,7 +425,7 @@ class Container(BaseContainer):
 
                 assert klass is not None
 
-                result = await self.make(self._get_alias(klass))
+                result = await self.get(self._get_alias(klass))
 
                 result = [result] if not isinstance(result, tuple) else result
 

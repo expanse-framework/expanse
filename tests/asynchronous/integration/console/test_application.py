@@ -19,10 +19,10 @@ class FooCommand(Command):
 
 @pytest.fixture(autouse=True)
 async def setup_kernel(app: Application) -> Gateway:
-    kernel = await app.container.make(Gateway)
+    kernel = await app.container.get(Gateway)
     kernel.add_command(FooCommand)
 
-    kernel = await app.container.make(Gateway)
+    kernel = await app.container.get(Gateway)
     kernel.add_command_paths([Path(__file__).parent.joinpath("fixtures/commands")])
     await kernel.bootstrap()
 

@@ -38,7 +38,7 @@ async def test_register_new_adapter(router: Router, client: TestClient) -> None:
     async def adapt_response(response: CustomResponseType) -> Response:
         return await (await respond()).text(response.content)
 
-    adapter = await client.app.container.make(ResponseAdapter)
+    adapter = await client.app.container.get(ResponseAdapter)
     adapter.register_adapter(CustomResponseType, adapt_response)
 
     router.get("/", custom_response)

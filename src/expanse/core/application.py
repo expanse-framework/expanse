@@ -114,7 +114,7 @@ class Application(BaseApplication):
         self._register_base_service_providers()
 
         for bootstrapper_class in bootstrappers:
-            bootstrapper: Bootstrapper = self._container.make(bootstrapper_class)
+            bootstrapper: Bootstrapper = self._container.get(bootstrapper_class)
             bootstrapper.bootstrap(self)
 
         for callback in self._bootstrapping_callbacks:
@@ -132,7 +132,7 @@ class Application(BaseApplication):
         return self
 
     def register_configured_providers(self) -> None:
-        providers = self._container.make(Config).get("app.providers", [])
+        providers = self._container.get(Config).get("app.providers", [])
 
         for provider_class in providers:
             if isinstance(provider_class, str):
@@ -157,7 +157,7 @@ class Application(BaseApplication):
     def handle_command(self, input: Input) -> int:
         from expanse.core.console.gateway import Gateway
 
-        kernel = self._container.make(Gateway)
+        kernel = self._container.get(Gateway)
 
         return kernel.handle(input)
 
@@ -201,4 +201,4 @@ class Application(BaseApplication):
         with self._lock:
             self.bootstrap()
 
-        return self._container.make(Gateway)(environ, start_response)
+        return self._container.get(Gateway)(environ, start_response)

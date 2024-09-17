@@ -48,7 +48,7 @@ def test_view_static_function_is_registered_successfully(client: TestClient) -> 
     def foo(view: ViewFactory) -> View:
         return view.make("foo")
 
-    client.app.container.make(Router).get("/foo", foo)
+    client.app.container.get(Router).get("/foo", foo)
 
     response = client.get("/foo")
     assert response.status_code == 200
@@ -69,7 +69,7 @@ def test_static_url_includes_base_url(client: TestClient) -> None:
     def foo(view: ViewFactory) -> View:
         return view.make("foo")
 
-    client.app.container.make(Router).add_route(Route.get("/foo", foo))
+    client.app.container.get(Router).add_route(Route.get("/foo", foo))
 
     response = client.get("/foo")
     assert response.status_code == 200

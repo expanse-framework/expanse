@@ -79,7 +79,7 @@ class Gateway:
         try:
             return self.console.run(input, output, output)
         except Exception as e:
-            handler = self._app.container.make(ExceptionHandler)  # type: ignore[type-abstract]
+            handler = self._app.container.get(ExceptionHandler)  # type: ignore[type-abstract]
 
             handler.report(e)
             handler.render_for_console(output, e)

@@ -11,11 +11,12 @@ from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Callable
 from inspect import Parameter
+from typing import Annotated
 from typing import Any
 from typing import Self
 from typing import TypeVar
-from typing import _AnnotatedAlias  # type: ignore[attr-defined]
 from typing import get_args
+from typing import get_origin
 
 from expanse.common.support._utils import eval_type_lenient
 
@@ -32,9 +33,6 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., Any]
 
 
-class UnboundAbstractError(Exception): ...
-
-
 class Container(ABC):
     def __init__(self) -> None:
         self._bindings: dict[str | type, Any] = {}
@@ -48,7 +46,7 @@ class Container(ABC):
             defaultdict(list)
         )
 
-    def bind(
+    def register(
         self,
         abstract: type | str,
         concrete: Any = None,
@@ -70,7 +68,7 @@ class Container(ABC):
     def singleton(
         self, abstract: type | str, concrete: Any = None, *, scoped: bool = False
     ) -> None:
-        self.bind(abstract, concrete, cached=True, scoped=scoped)
+        self.register(abstract, concrete, cached=True, scoped=scoped)
 
     def scoped(self, abstract: type | str, concrete: Any = None) -> None:
         self.singleton(abstract, concrete, scoped=True)
@@ -104,7 +102,8 @@ class Container(ABC):
         abstract = self._get_alias(abstract)
 
         actual_abstract: str | type = abstract
-        if isinstance(abstract, _AnnotatedAlias):
+        origin = get_origin(abstract)
+        if origin is Annotated:
             actual_abstract, *_ = get_args(abstract)
 
         if abstract in self._bindings:
@@ -119,7 +118,7 @@ class Container(ABC):
         self, abstract: str | type, concrete: Any
     ) -> Callable[[Self], Any]: ...
 
-    def _is_buildable(self, abstract: str | type, concrete: Any) -> bool:
+    def _can_build(self, abstract: str | type, concrete: Any) -> bool:
         return abstract == concrete or isinstance(
             concrete, types.FunctionType | types.MethodType
         )

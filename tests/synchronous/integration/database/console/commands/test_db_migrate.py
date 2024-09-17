@@ -26,7 +26,7 @@ def test_migrate(
 
     assert command.output.fetch() == expected
 
-    with app.container.make(DatabaseManager).connection() as connection:
+    with app.container.get(DatabaseManager).connection() as connection:
         result = connection.execute("SELECT * FROM users")
         assert result.fetchall() == [(1, "John", "Doe", "john@doe.com", "true")]
 
