@@ -43,7 +43,6 @@ class Container(BaseContainer):
         super().__init__()
 
         self._terminating_callbacks: list[_Callback] = []
-        self._scoped_terminating_callbacks: list[_Callback] = []
 
     async def build(
         self, concrete: type | str, args: tuple | None = None
@@ -145,7 +144,7 @@ class Container(BaseContainer):
 
     def terminating(self, callback: _Callback, scoped: bool = False) -> None:
         if scoped:
-            self._scoped_terminating_callbacks.append(callback)
+            self._scoped["terminating_callbacks"].append(callback)
         else:
             self._terminating_callbacks.append(callback)
 
@@ -163,20 +162,13 @@ class Container(BaseContainer):
         abstract: str | type,
         callback: _Callback,
     ) -> None:
-        if self.resolved(abstract):
+        if not self._is_scoped(abstract) and self.resolved(abstract):
             if asyncio.iscoroutinefunction(callback):
                 await callback(await self.get(abstract))
             else:
                 callback(await self.get(abstract))
 
         self.after_resolving(abstract, callback)
-
-    def after_resolving(
-        self,
-        abstract: str | type,
-        callback: _Callback,
-    ) -> None:
-        super().after_resolving(abstract, callback)
 
     def _concrete_closure(
         self, abstract: str | type, concrete: Any
@@ -225,8 +217,10 @@ class Container(BaseContainer):
         if self._can_build(actual_abstract, concrete):
             try:
                 obj, terminating_callback = await self.build(concrete, metadata)
-            except Exception:
-                raise ContainerException(f'Unable to build the "{abstract}" dependency')
+            except Exception as e:
+                raise ContainerException(
+                    f'Unable to build the "{abstract}" dependency'
+                ) from e
         else:
             obj = await self.get(concrete)
 
@@ -235,7 +229,9 @@ class Container(BaseContainer):
 
         self._mark_as_resolved(actual_abstract)
         if terminating_callback is not None:
-            self.terminating(terminating_callback)
+            self.terminating(
+                terminating_callback, scoped=self._is_scoped(actual_abstract)
+            )
 
         await self._execute_after_resolving_callbacks(abstract, obj)
 
@@ -452,8 +448,7 @@ class Container(BaseContainer):
 
         if abstract in self._after_resolving_callbacks:
             callbacks += self._after_resolving_callbacks[abstract]
-
-        if actual_abstract in self._after_resolving_callbacks[actual_abstract]:
+        elif actual_abstract in self._after_resolving_callbacks:
             callbacks += self._after_resolving_callbacks[actual_abstract]
 
         for callback in callbacks:
@@ -482,13 +477,21 @@ class ScopedContainer(Container):
 
         # Bind scoped bindings from the base container
         self._bindings.update(
-            {k: {**v} for k, v in self._base_container._scoped_bindings.items()}
+            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
         )
 
         # Setup terminating callbacks
         self._terminating_callbacks = [
-            *self._base_container._scoped_terminating_callbacks
+            *self._base_container._scoped["terminating_callbacks"]
         ]
+
+        # Setup resolving callbacks
+        self._after_resolving_callbacks = {
+            **self._base_container._scoped["after_resolving_callbacks"]
+        }
+
+        # Copy instances from the base container
+        self._instances.update(self._base_container._instances)
 
         self.instance(Container, self)
 

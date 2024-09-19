@@ -33,6 +33,14 @@ def json(
     return respond().json(content, status_code, headers, **kwargs)
 
 
+def text(
+    content: Any = "",
+    status_code: int = 200,
+    headers: MutableMapping[str, Any] | None = None,
+) -> Response:
+    return respond().text(content, status_code, headers)
+
+
 def redirect() -> Redirect:
     return respond().redirect()
 

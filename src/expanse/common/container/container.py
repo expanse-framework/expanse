@@ -14,6 +14,7 @@ from inspect import Parameter
 from typing import Annotated
 from typing import Any
 from typing import Self
+from typing import TypedDict
 from typing import TypeVar
 from typing import get_args
 from typing import get_origin
@@ -33,6 +34,13 @@ logger = logging.getLogger(__name__)
 _Callback = Callable[..., Any]
 
 
+class _Scoped(TypedDict):
+    bindings: dict[str | type, Any]
+    terminating_callbacks: list[_Callback]
+    after_resolving_callbacks: dict[str | type, list[_Callback]]
+    aliases: dict[str, str | type]
+
+
 class Container(ABC):
     def __init__(self) -> None:
         self._bindings: dict[str | type, Any] = {}
@@ -45,6 +53,12 @@ class Container(ABC):
         self._after_resolving_callbacks: dict[str | type, list[_Callback]] = (
             defaultdict(list)
         )
+        self._scoped: _Scoped = {
+            "bindings": {},
+            "terminating_callbacks": [],
+            "after_resolving_callbacks": defaultdict(list),
+            "aliases": {},
+        }
 
     def register(
         self,
@@ -61,7 +75,10 @@ class Container(ABC):
             concrete = self._concrete_closure(abstract, concrete)
 
         if scoped:
-            self._scoped_bindings[abstract] = {"concrete": concrete, "cached": cached}
+            self._scoped["bindings"][abstract] = {
+                "concrete": concrete,
+                "cached": cached,
+            }
         else:
             self._bindings[abstract] = {"concrete": concrete, "cached": cached}
 
@@ -73,9 +90,7 @@ class Container(ABC):
     def scoped(self, abstract: type | str, concrete: Any = None) -> None:
         self.singleton(abstract, concrete, scoped=True)
 
-    def instance(
-        self, abstract: type | str, instance: Any, scoped: bool = False
-    ) -> None:
+    def instance(self, abstract: type | str, instance: Any) -> None:
         self._instances[abstract] = instance
 
     def alias(self, abstract: str | type, alias: str) -> None:
@@ -91,7 +106,7 @@ class Container(ABC):
     def create_scoped_container(self) -> Self: ...
 
     def has_scoped_bindings(self) -> bool:
-        return bool(self._scoped_bindings)
+        return bool(self._scoped["bindings"])
 
     def resolved(self, abstract: str | type) -> bool:
         abstract = self._get_alias(abstract)
@@ -106,7 +121,11 @@ class Container(ABC):
         if origin is Annotated:
             actual_abstract, *_ = get_args(abstract)
 
-        if abstract in self._bindings:
+        if self._is_scoped(abstract):
+            self._scoped["after_resolving_callbacks"][abstract].append(callback)
+        elif self._is_scoped(actual_abstract):
+            self._scoped["after_resolving_callbacks"][actual_abstract].append(callback)
+        elif abstract in self._bindings:
             self._after_resolving_callbacks[abstract].append(callback)
         elif actual_abstract in self._bindings:
             self._after_resolving_callbacks[actual_abstract].append(callback)
@@ -127,6 +146,9 @@ class Container(ABC):
         return abstract in self._instances or self._bindings.get(abstract, {}).get(
             "cached", False
         )
+
+    def _is_scoped(self, abstract: str | type) -> bool:
+        return self._get_alias(abstract) in self._scoped["bindings"]
 
     def _mark_as_resolved(self, abstract: str | type) -> None:
         self._resolved[abstract] = True

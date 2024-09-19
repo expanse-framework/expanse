@@ -1,3 +1,5 @@
+from typing import Any
+
 from expanse.common.configuration.config import Config
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
@@ -30,7 +32,11 @@ class ViewServiceProvider(ServiceProvider):
         self._container.alias(ViewFinder, "view:finder")
 
     def _register_response_adapters(self, adapter: ResponseAdapter) -> None:
-        def adapt_view(raw_response: View, factory: ViewFactory) -> Response:
+        def adapt_view(
+            raw_response: View,
+            factory: ViewFactory,
+            declared_response_type: type[Any] | None = None,
+        ) -> Response:
             return factory.render(raw_response)
 
         adapter.register_adapter(View, adapt_view)

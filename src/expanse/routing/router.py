@@ -173,8 +173,10 @@ class Router:
             if isinstance(raw_response, Response):
                 return raw_response
 
-            return container.call(
-                container.get(ResponseAdapter).adapter(raw_response), raw_response
+            declared_response_type = route.signature.return_annotation
+
+            return container.get(ResponseAdapter).adapt(
+                raw_response, declared_response_type=declared_response_type
             )
 
         return handler

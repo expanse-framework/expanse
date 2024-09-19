@@ -17,27 +17,23 @@ def custom_response() -> CustomResponseType:
     return CustomResponseType("Custom response")
 
 
-def test_string_adapter_adapts_response_based_on_request_acceptable_type(
-    router: Router, client: TestClient
-) -> None:
+def configure_adapter(adapter: ResponseAdapter) -> None:
+    adapter.register_adapter(
+        CustomResponseType, lambda response: respond().text(response.content)
+    )
+
+
+def test_string_adapter_adapts_response(router: Router, client: TestClient) -> None:
     router.get("/", text_response)
 
     response = client.get("/")
-
-    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert response.text == "foo"
-
-    response = client.get("/", headers={"Accept": "application/json"})
 
     assert response.headers["Content-Type"] == "application/json"
     assert response.json() == "foo"
 
 
 def test_register_new_adapter(router: Router, client: TestClient) -> None:
-    adapter = client.app.container.get(ResponseAdapter)
-    adapter.register_adapter(
-        CustomResponseType, lambda response: respond().text(response.content)
-    )
+    client.app.container.on_resolved(ResponseAdapter, configure_adapter)
 
     router.get("/", custom_response)
 

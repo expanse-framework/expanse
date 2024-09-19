@@ -44,7 +44,7 @@ def test_redirect_to_url(router: Router, client: TestClient) -> None:
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at destination"
+    assert response.text == '"Arrived at destination"'
 
 
 def test_redirect_to_named_route(router: Router, client: TestClient) -> None:
@@ -59,7 +59,7 @@ def test_redirect_to_named_route(router: Router, client: TestClient) -> None:
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at destination"
+    assert response.text == '"Arrived at destination"'
 
 
 def test_redirect_to_named_route_with_parameters(
@@ -76,7 +76,7 @@ def test_redirect_to_named_route_with_parameters(
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at foo destination"
+    assert response.text == '"Arrived at foo destination"'
 
 
 def test_redirect_to_named_route_with_parameters_and_query_params(
@@ -95,4 +95,4 @@ def test_redirect_to_named_route_with_parameters_and_query_params(
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at foo destination"
+    assert response.text == '"Arrived at foo destination"'

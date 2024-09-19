@@ -46,7 +46,7 @@ async def test_redirect_to_url(router: Router, client: TestClient) -> None:
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at destination"
+    assert response.text == '"Arrived at destination"'
 
 
 async def test_redirect_to_named_route(router: Router, client: TestClient) -> None:
@@ -61,7 +61,7 @@ async def test_redirect_to_named_route(router: Router, client: TestClient) -> No
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at destination"
+    assert response.text == '"Arrived at destination"'
 
 
 async def test_redirect_to_named_route_with_parameters(
@@ -78,7 +78,7 @@ async def test_redirect_to_named_route_with_parameters(
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at foo destination"
+    assert response.text == '"Arrived at foo destination"'
 
 
 async def test_redirect_to_named_route_with_parameters_and_query_params(
@@ -97,4 +97,4 @@ async def test_redirect_to_named_route_with_parameters_and_query_params(
     response = client.get("/redirection", follow_redirects=True)
 
     assert response.status_code == 200
-    assert response.text == "Arrived at foo destination"
+    assert response.text == '"Arrived at foo destination"'

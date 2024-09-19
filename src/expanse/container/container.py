@@ -134,17 +134,10 @@ class Container(BaseContainer):
         abstract: str | type,
         callback: _Callback,
     ) -> None:
-        if self.resolved(abstract):
+        if not self._is_scoped(abstract) and self.resolved(abstract):
             callback(self.get(abstract))
 
         self.after_resolving(abstract, callback)
-
-    def after_resolving(
-        self,
-        abstract: str | type,
-        callback: _Callback,
-    ) -> None:
-        super().after_resolving(abstract, callback)
 
     def _concrete_closure(
         self, abstract: str | type, concrete: Any
@@ -204,7 +197,9 @@ class Container(BaseContainer):
 
         self._mark_as_resolved(actual_abstract)
         if terminating_callback is not None:
-            self.terminating(terminating_callback)
+            self.terminating(
+                terminating_callback, scoped=self._is_scoped(actual_abstract)
+            )
 
         self._execute_after_resolving_callbacks(abstract, obj)
 
@@ -425,8 +420,7 @@ class Container(BaseContainer):
 
         if abstract in self._after_resolving_callbacks:
             callbacks += self._after_resolving_callbacks[abstract]
-
-        if actual_abstract in self._after_resolving_callbacks[actual_abstract]:
+        elif actual_abstract in self._after_resolving_callbacks:
             callbacks += self._after_resolving_callbacks[actual_abstract]
 
         for callback in callbacks:
@@ -452,13 +446,18 @@ class ScopedContainer(Container):
 
         # Bind scoped bindings from the base container
         self._bindings.update(
-            {k: {**v} for k, v in self._base_container._scoped_bindings.items()}
+            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
         )
 
         # Setup terminating callbacks
         self._terminating_callbacks = [
-            *self._base_container._scoped_terminating_callbacks
+            *self._base_container._scoped["terminating_callbacks"]
         ]
+
+        # Setup resolving callbacks
+        self._after_resolving_callbacks = {
+            **self._base_container._scoped["after_resolving_callbacks"]
+        }
 
         # Copy instances from the base container
         self._instances.update(self._base_container._instances)

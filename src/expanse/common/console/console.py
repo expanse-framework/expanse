@@ -348,21 +348,27 @@ class Console(Generic[TCommand], ABC):
             # the input to parse it as a single argument
             argv = io.input._tokens[:]
 
+            start: int = 0
             if io.input.script_name is not None:
                 argv.insert(0, io.input.script_name)
+                start = 1
 
             namespace = name.split(" ")[:-1]
             index = None
             for i, arg in enumerate(argv):
+                if i < start:
+                    continue
+
                 if namespace and arg == namespace[0] and len(namespace) == 1:
                     argv[i] = name
+                    index = i if index is None else index
                     break
                 elif namespace and arg == namespace[0]:
                     namespace.pop(0)
                     index = i
 
             if index is not None:
-                del argv[index + 1 : index + 1 + len(namespace) + 1]
+                del argv[index + 1 : index + name.count(" ") + start]
 
             stream = io.input.stream
             interactive = io.input.is_interactive()

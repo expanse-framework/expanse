@@ -177,9 +177,11 @@ class Router:
             if isinstance(raw_response, Response):
                 return raw_response
 
-            return await container.call(
-                (await container.get(ResponseAdapter)).adapter(raw_response),
-                raw_response,
+            declared_response_type = route.signature.return_annotation
+
+            adapter = await container.get(ResponseAdapter)
+            return await adapter.adapt(
+                raw_response, declared_response_type=declared_response_type
             )
 
         return handler
