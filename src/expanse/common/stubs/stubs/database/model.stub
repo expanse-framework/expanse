@@ -1,4 +1,4 @@
-from app.models.model import Model
+from expanse.common.database.orm.model import Model
 
 
 class {model_name}(Model):

@@ -25,29 +25,15 @@ def test_make_model(
     assert command.run("User") == 0
 
     expected = """
-  - Generated file: models/model.py
   - Generated file: models/user.py
 """
 
     assert command.output.fetch() == expected
 
-    assert tmp_path.joinpath("models/model.py").exists()
     assert tmp_path.joinpath("models/user.py").exists()
 
     base_model_content = """\
-from sqlalchemy.orm import MappedAsDataclass
-from typing import Annotated
-
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Model(MappedAsDataclass, DeclarativeBase): ...
-"""
-
-    assert tmp_path.joinpath("models/model.py").read_text() == base_model_content
-
-    base_model_content = """\
-from app.models.model import Model
+from expanse.common.database.orm.model import Model
 
 
 class User(Model):
@@ -76,7 +62,6 @@ def test_make_model_with_table_name(
     assert command.run("User --table my_users") == 0
 
     expected = """
-  - Generated file: models/model.py
   - Generated file: models/user.py
 """
 
@@ -85,7 +70,7 @@ def test_make_model_with_table_name(
     assert tmp_path.joinpath("models/user.py").exists()
 
     base_model_content = """\
-from app.models.model import Model
+from expanse.common.database.orm.model import Model
 
 
 class User(Model):

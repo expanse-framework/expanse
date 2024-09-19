@@ -41,15 +41,6 @@ class MakeModelCommand(MigrationCommand):
             models_path.mkdir()
             models_path.joinpath("__init__.py").touch()
 
-        if not models_path.joinpath("model.py").exists():
-            generator.stub("database/base_model").generate_to(
-                models_path.joinpath("model.py"), {}
-            )
-
-            self.line(
-                f'  - Generated file: <info>{app.path("models/model.py", relative=True)}</info>'
-            )
-
         model_name: str = self.argument("name")
         model_name = camelize(model_name)
         table_name: str = self.option("table") or self._infer_table(model_name)

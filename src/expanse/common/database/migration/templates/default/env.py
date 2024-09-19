@@ -1,5 +1,5 @@
 from alembic import context
-from app.models.model import Model
+from app.models.types import Model
 
 from expanse.database.database_manager import DatabaseManager
 

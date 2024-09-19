@@ -3,7 +3,6 @@ from typing import Any
 from typing import Literal
 from typing import TypeVar
 
-from sqlalchemy.dialects import sqlite
 from sqlalchemy.orm import MappedColumn
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.sql._typing import _AutoIncrementType
@@ -14,10 +13,7 @@ from sqlalchemy.sql.base import _NoArg
 from sqlalchemy.sql.schema import FetchedValue
 from sqlalchemy.sql.schema import SchemaConst
 from sqlalchemy.sql.schema import _ServerDefaultArgument
-from sqlalchemy.sql.sqltypes import BigInteger as BaseBigInteger
 
-
-BigInteger = BaseBigInteger().with_variant(sqlite.INTEGER(), "sqlite")
 
 _T = TypeVar("_T")
 

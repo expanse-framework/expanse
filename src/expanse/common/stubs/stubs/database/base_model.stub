@@ -1,7 +1,0 @@
-from sqlalchemy.orm import MappedAsDataclass
-from typing import Annotated
-
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Model(MappedAsDataclass, DeclarativeBase): ...
