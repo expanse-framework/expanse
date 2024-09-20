@@ -11,12 +11,12 @@ async def create_foo(form: Form) -> Response:
 
 
 async def create_foo_validated(form: Form[FooModel]) -> Response:
-    if not form.is_valid():
-        return await json({"errors": form.errors, "data": form.data})
+    if form.is_submitted() and form.is_valid():
+        assert form.data is not None
 
-    assert form.data is not None
+        return await json({"bar": form.data.bar})
 
-    return await json({"bar": form.data.bar})
+    return await json({"errors": form.errors, "data": form.data})
 
 
 def test_simple_form_data_are_not_converted_if_no_validation_model(

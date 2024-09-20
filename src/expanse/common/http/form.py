@@ -76,6 +76,9 @@ class Form(Generic[T]):
     def is_valid(self) -> bool:
         return not bool(self.errors)
 
+    def is_submitted(self) -> bool:
+        return self._submitted is not None
+
     def __class_getitem__(cls, item: type[T]) -> type["Form"]:
         klass = type(cls.__name__, (cls,), {"_model": item})
 
