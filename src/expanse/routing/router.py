@@ -1,7 +1,12 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
+from typing import Annotated
 from typing import Any
+from typing import get_args
+from typing import get_origin
+
+from pydantic import BaseModel
 
 from expanse.common.http.form import Form
 from expanse.common.http.json import JSON
@@ -154,18 +159,23 @@ class Router:
                 if name in route.param_names:
                     arguments[name] = request.path_params[name]
                 elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, JSON
-                ):
-                    arguments[name] = parameter.annotation(data=request.json)
-                elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Form
                 ):
                     arguments[name] = parameter.annotation(request.form)
-
-                elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, Query
+                elif origin := get_origin(
+                    parameter.annotation
+                ) is Annotated and issubclass(
+                    (origin_args := get_args(parameter.annotation))[0], BaseModel
                 ):
-                    arguments[name] = parameter.annotation(params=request.query_params)
+                    validation_model: type[BaseModel] = origin_args[0]
+                    data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
+
+                    if isinstance(data_type, JSON) or issubclass(data_type, JSON):
+                        arguments[name] = validation_model.model_validate(request.json)
+                    elif isinstance(data_type, Query) or issubclass(data_type, Query):
+                        arguments[name] = validation_model.model_validate(
+                            request.query_params
+                        )
 
             raw_response = container.call(route.endpoint, **arguments)
 

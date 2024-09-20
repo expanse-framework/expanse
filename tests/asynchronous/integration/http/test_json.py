@@ -6,22 +6,8 @@ from expanse.common.http.json import JSON
 from tests.asynchronous.integration.http.fixtures.request.models import FooModel
 
 
-async def create_foo(data: JSON) -> Response:
-    return await json({"bar": data.data["bar"]})
-
-
 async def create_foo_validated(form: JSON[FooModel]) -> Response:
-    return await json({"bar": form.data.bar})
-
-
-def test_simple_json_data_are_not_converted_if_no_validation_model(
-    router: Router, client: TestClient
-) -> None:
-    router.post("/", create_foo)
-
-    response = client.post("/", json={"bar": "42"})
-
-    assert response.json() == {"bar": "42"}
+    return await json({"bar": form.bar})
 
 
 def test_simple_json_data_are_converted_if_validation_model(
@@ -46,7 +32,7 @@ def test_validation_errors_are_correctly_reported(
         "code": "validation_error",
         "detail": [
             {
-                "loc": ["data", "bar"],
+                "loc": ["bar"],
                 "message": (
                     "Input should be a valid integer, "
                     "unable to parse string as an integer"
