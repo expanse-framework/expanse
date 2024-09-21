@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "expanse"
-version = "0.4.0"
+version = "0.4.1"
 description = ""
 authors = ["Sébastien Eustace <sebastien@eustace.io>"]
 license = "MIT"
