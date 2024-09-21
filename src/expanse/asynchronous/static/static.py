@@ -13,8 +13,8 @@ class Static:
         self, directories: list[Path], prefix: str, url: str | None = None
     ) -> None:
         self._directories = directories
-        self._prefix: str = prefix
-        self._url: str | None = url
+        self._prefix: str = prefix.rstrip("/")
+        self._url: str | None = url.rstrip("/") if url is not None else None
 
     async def get(self, path: str) -> Response:
         full_path = self._find(path)
@@ -28,9 +28,10 @@ class Static:
         static_url = []
 
         if self._url is not None:
-            static_url.append(self._url.rstrip("/"))
-            static_url.append(self._prefix.lstrip("/"))
-        else:
+            static_url.append(self._url)
+            if self._prefix.lstrip("/"):
+                static_url.append(self._prefix.lstrip("/"))
+        elif self._prefix:
             static_url.append(self._prefix)
 
         static_url.append(path)
