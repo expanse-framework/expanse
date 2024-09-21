@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from pydantic import HttpUrl
+
 from expanse.routing.route import Route
 from expanse.routing.router import Router
 from expanse.static.static_service_provider import StaticServiceProvider
@@ -60,7 +62,7 @@ def test_static_url_includes_base_url(client: TestClient) -> None:
 
     client.app.config["static.paths"] = [FIXTURES_DIR]
     client.app.config["static.prefix"] = "/assets"
-    client.app.config["static.url"] = "https://assets.example.com"
+    client.app.config["static.url"] = HttpUrl("https://assets.example.com")
     client.app.config["view.paths"] = [FIXTURES_DIR]
     client.app.register(ViewServiceProvider(client.app.container))
     client.app.register(provider)

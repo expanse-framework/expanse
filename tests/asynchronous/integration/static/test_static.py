@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from pydantic import HttpUrl
+
 from expanse.asynchronous.http.helpers import view
 from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.route import Route
@@ -62,7 +64,7 @@ async def test_static_url_includes_base_url(client: TestClient) -> None:
 
     client.app.config["static.paths"] = [FIXTURES_DIR]
     client.app.config["static.prefix"] = "/assets"
-    client.app.config["static.url"] = "https://assets.example.com"
+    client.app.config["static.url"] = HttpUrl("https://assets.example.com")
     client.app.config["view.paths"] = [FIXTURES_DIR]
     await client.app.register(ViewServiceProvider(client.app.container))
     await client.app.register(provider)

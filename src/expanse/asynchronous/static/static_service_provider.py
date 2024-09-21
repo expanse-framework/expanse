@@ -25,10 +25,10 @@ class StaticServiceProvider(ServiceProvider):
         app: Application = await self._container.get("app")
         paths: list[Path] = config.get("static.paths", [])
         paths = [app.base_path / p if not p.is_absolute() else p for p in paths]
+        if (url := config.get("static.url")) is not None:
+            url = str(url)
 
-        return Static(
-            paths, prefix=config.get("static.prefix"), url=config.get("static.url")
-        )
+        return Static(paths, prefix=config.get("static.prefix"), url=url)
 
     async def _add_static_route(self, router: "Router") -> None:
         config = await self._container.get(Config)

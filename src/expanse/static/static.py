@@ -28,7 +28,7 @@ class Static:
         static_url = []
 
         if self._url is not None:
-            static_url.append(self._url)
+            static_url.append(self._url.rstrip("/"))
             static_url.append(self._prefix.lstrip("/"))
         else:
             static_url.append(self._prefix)
