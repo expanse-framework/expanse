@@ -13,14 +13,14 @@ by [SQLAlchemy](https://www.sqlalchemy.org/)),
 To leverage all Expanse has to offer, it is best to setup your project with the official installer. The installer
 creates the project with a convention-based structure that lets you start implementing features right away.
 
-Before creating your first project, make sure that you have Python (minimum version: 3.10) installed on your machine
+Before creating your first project, make sure that you have Python (minimum version: 3.11) installed on your machine
 along with [`pipx`](https://pipx.pypa.io/stable/).
 
-Once both are installed, you can use the official [Expanse installer](https://github.com/expanse-framework/installer)
+Once both are installed, you can use the official [Expanse CLI](https://github.com/expanse-framework/cli)
 to create your project:
 
 ```bash
-pipx install expanse-installer
+pipx install expanse-cli
 
 expanse new my-app
 ```
@@ -72,7 +72,6 @@ provides helpful guidance.
 
 ## Related Projects
 
-* [expanse-installer](https://github.com/expanse-framework/installer): The official installer for Expanse projects. It
-  will
-  setup a ready-to-be-used project for you.
+* [expanse-cli](https://github.com/expanse-framework/cli): The official installer for Expanse projects. It
+  will set up a ready-to-be-used project for you.
 * [website](https://github.com/expanse-framework/expanse-framework.com): The official Poetry website.
