@@ -10,9 +10,9 @@ from expanse.asynchronous.core.helpers import _get_container
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
 
+    from expanse.asynchronous.http.redirect import Redirect
+    from expanse.asynchronous.http.responder import Responder
     from expanse.asynchronous.http.response import Response
-    from expanse.asynchronous.routing.redirect import Redirect
-    from expanse.asynchronous.routing.responder import Responder
 
 
 async def abort(
@@ -39,7 +39,7 @@ async def redirect() -> Redirect:
 async def respond() -> Responder:
     container = _get_container()
 
-    from expanse.asynchronous.routing.responder import Responder
+    from expanse.asynchronous.http.responder import Responder
 
     return await container.get(Responder)
 

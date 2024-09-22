@@ -91,8 +91,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         return await self._render_response(request, e)
 
     async def _render_json_response(self, request: Request, e: Exception) -> Response:
-        from expanse.asynchronous.routing.redirect import Redirect
-        from expanse.asynchronous.routing.responder import Responder
+        from expanse.asynchronous.http.redirect import Redirect
+        from expanse.asynchronous.http.responder import Responder
         from expanse.asynchronous.routing.router import Router
         from expanse.asynchronous.view.view_factory import ViewFactory
 
@@ -195,8 +195,8 @@ class ExceptionHandler(ExceptionHandlerContract):
                     }
                 )
 
-            from expanse.asynchronous.routing.redirect import Redirect
-            from expanse.asynchronous.routing.responder import Responder
+            from expanse.asynchronous.http.redirect import Redirect
+            from expanse.asynchronous.http.responder import Responder
             from expanse.asynchronous.routing.router import Router
             from expanse.asynchronous.view.view_factory import ViewFactory
 

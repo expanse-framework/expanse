@@ -61,7 +61,7 @@ class ResponseAdapter:
             return None
 
         def _adapter(response: Any, **kwargs) -> Response:
-            from expanse.routing.responder import Responder
+            from expanse.http.responder import Responder
 
             responder = self._container.get(Responder)
 
@@ -70,7 +70,7 @@ class ResponseAdapter:
         return _adapter
 
     def _adapt_string(self, response: str, container: Container, **kwargs) -> Response:
-        from expanse.routing.responder import Responder
+        from expanse.http.responder import Responder
 
         responder = container.get(Responder)
 
@@ -83,7 +83,7 @@ class ResponseAdapter:
         *,
         expected_type: type | None = None,
     ) -> Response:
-        from expanse.routing.responder import Responder
+        from expanse.http.responder import Responder
 
         if expected_type is not None:
             origin: type | None = get_origin(expected_type)

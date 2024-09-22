@@ -11,9 +11,9 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from collections.abc import MutableMapping
 
+    from expanse.http.redirect import Redirect
+    from expanse.http.responder import Responder
     from expanse.http.response import Response
-    from expanse.routing.redirect import Redirect
-    from expanse.routing.responder import Responder
 
 
 def abort(
@@ -48,7 +48,7 @@ def redirect() -> Redirect:
 def respond() -> Responder:
     container = _get_container()
 
-    from expanse.routing.responder import Responder
+    from expanse.http.responder import Responder
 
     return container.get(Responder)
 

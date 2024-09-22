@@ -162,9 +162,7 @@ class Router:
                     parameter.annotation, Form
                 ):
                     arguments[name] = parameter.annotation(request.form)
-                elif origin := get_origin(
-                    parameter.annotation
-                ) is Annotated and issubclass(
+                elif get_origin(parameter.annotation) is Annotated and issubclass(
                     (origin_args := get_args(parameter.annotation))[0], BaseModel
                 ):
                     validation_model: type[BaseModel] = origin_args[0]
@@ -193,7 +191,7 @@ class Router:
 
     def _default_handler(self, container: Container) -> RequestHandler:
         def handler(request: Request) -> Response:
-            from expanse.routing.responder import Responder
+            from expanse.http.responder import Responder
 
             container.get(Responder).abort(404)
 

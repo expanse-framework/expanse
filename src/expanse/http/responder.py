@@ -9,8 +9,8 @@ from baize.wsgi import JSONResponse
 from baize.wsgi import PlainTextResponse
 
 from expanse.common.core.http.exceptions import HTTPException
+from expanse.http.redirect import Redirect
 from expanse.http.response import Response
-from expanse.routing.redirect import Redirect
 from expanse.view.view_factory import ViewFactory
 
 

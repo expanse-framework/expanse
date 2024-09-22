@@ -1,7 +1,7 @@
 from expanse.asynchronous.http.helpers import redirect
+from expanse.asynchronous.http.redirect import Redirect
+from expanse.asynchronous.http.responder import Responder
 from expanse.asynchronous.http.response import Response
-from expanse.asynchronous.routing.redirect import Redirect
-from expanse.asynchronous.routing.responder import Responder
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 

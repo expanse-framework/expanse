@@ -5,8 +5,8 @@ import pytest
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.core.http.gateway import Gateway
 from expanse.asynchronous.http.middleware.manage_cors import ManageCors
+from expanse.asynchronous.http.responder import Responder
 from expanse.asynchronous.http.response import Response
-from expanse.asynchronous.routing.responder import Responder
 from expanse.asynchronous.testing.client import TestClient
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from expanse.routing.redirect import Redirect
+from expanse.http.redirect import Redirect
 from expanse.routing.router import Router
 from expanse.support.service_provider import ServiceProvider
 

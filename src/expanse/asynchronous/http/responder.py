@@ -7,8 +7,8 @@ from baize.asgi import FileResponse
 from baize.asgi import JSONResponse
 from baize.asgi import PlainTextResponse
 
+from expanse.asynchronous.http.redirect import Redirect
 from expanse.asynchronous.http.response import Response
-from expanse.asynchronous.routing.redirect import Redirect
 from expanse.asynchronous.view.view_factory import ViewFactory
 from expanse.common.core.http.exceptions import HTTPException
 
