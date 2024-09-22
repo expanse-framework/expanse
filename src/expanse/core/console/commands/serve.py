@@ -28,6 +28,7 @@ class ServeCommand(Command):
         parameters: dict[str, Any] = {
             "port": int(self.option("port")),
             "interface": "wsgi",
+            "lifespan": "off",
             "log_level": log_level,
             "reload": self.option("watch"),
             "use_colors": self._io.is_decorated(),
