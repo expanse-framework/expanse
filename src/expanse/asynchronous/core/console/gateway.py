@@ -141,11 +141,11 @@ class Gateway:
         self, path: Path
     ) -> tuple[str, Callable[[], Command]]:
         try:
-            path = path.resolve().relative_to(self._app.base_path.resolve())
-        except ValueError:
             path = path.resolve().relative_to(
                 Path(expanse.__file__).resolve().parent.parent
             )
+        except ValueError:
+            path = path.resolve().relative_to(self._app.base_path.resolve())
 
         name = path.stem.removesuffix("_command")
         classname = re.sub(r"(_)+", " ", name).title().replace(" ", "")
