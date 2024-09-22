@@ -12,10 +12,10 @@ documentation = "https://expanse-framework.com/docs"
 keywords = ["expanse", "framework", "poetry"]
 
 [tool.poetry.dependencies]
-python = "^3.10"
-uvicorn = { version = "^0.23.2", extras = ["standard"] }
+python = "^3.11"
+uvicorn = { version = ">=0.23.2", extras = ["standard"] }
 cleo = "^2.1.0"
-jinja2 = "^3.1.2"
+jinja2 = ">=3.1.2"
 pydantic = "^2.3.0"
 pendulum = "^3.0.0"
 pydantic-settings = "^2.1.0"
@@ -23,23 +23,22 @@ sqlalchemy = "^2.0.25"
 baize = "^0.20.8"
 crashtest = "^0.4.1"
 anyio = "^4.2.0"
-httpx = "^0.26.0"
-async-chain = "^0.1.2"
+httpx = ">=0.26.0"
 alembic = "^1.13.2"
 pygments = "^2.18.0"
 inflection = "^0.5.1"
 
 
 [tool.poetry.group.test.dependencies]
-pytest = "^7.4.0"
-treat = "^0.2.0"
-pytest-asyncio = "^0.21.1"
-aiosqlite = "^0.19.0"
-greenlet = "^3.0.3"
-psycopg2-binary = "^2.9.9"
-psycopg = "^3.1.18"
-asyncpg = "^0.29.0"
-pg8000 = "^1.30.4"
+pytest = ">=8.3.3"
+treat = ">=0.3.0"
+pytest-asyncio = ">=0.21.1"
+aiosqlite = ">=0.19.0"
+greenlet = ">=3.0.3"
+psycopg2-binary = ">=2.9.9"
+psycopg = ">=3.1.18"
+asyncpg = ">=0.29.0"
+pg8000 = ">=1.30.4"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -57,6 +56,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = ["asynchronous: Mark a test as asynchronous"]
+asyncio_default_fixture_loop_scope = "function"
 
 
 [tool.ruff]

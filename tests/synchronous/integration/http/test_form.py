@@ -57,7 +57,7 @@ def test_validation_errors_are_correctly_handled(
                     "unable to parse string as an integer"
                 ),
                 "input": "foo",
-                "url": "https://errors.pydantic.dev/2.3/v/int_parsing",
+                "url": "https://errors.pydantic.dev/2.9/v/int_parsing",
             }
         ],
     }
