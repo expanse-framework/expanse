@@ -1,10 +1,15 @@
 from pathlib import Path
 
-from treat.mock import Mockery  # type: ignore[import-untyped]
+import pytest
+
+from treat.mock import Mockery
 
 from expanse.core.application import Application
 from expanse.database.console.commands.make_model import MakeModelCommand  # noqa: F401
 from expanse.testing.command_tester import CommandTester
+
+
+pytestmark = pytest.mark.db
 
 
 def test_make_model(

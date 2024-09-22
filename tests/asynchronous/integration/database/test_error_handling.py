@@ -1,5 +1,7 @@
 from dataclasses import asdict
 
+import pytest
+
 from sqlalchemy import select
 
 from expanse.asynchronous.database.session import Session
@@ -8,6 +10,9 @@ from expanse.asynchronous.http.response import Response
 from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 from tests.asynchronous.integration.database.models import User
+
+
+pytestmark = pytest.mark.db
 
 
 async def show(session: Session, user_email: str) -> Response:

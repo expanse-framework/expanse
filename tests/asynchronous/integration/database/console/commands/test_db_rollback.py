@@ -9,6 +9,9 @@ from expanse.asynchronous.database.console.commands.db_rollback import (
 from expanse.asynchronous.testing.command_tester import CommandTester
 
 
+pytestmark = pytest.mark.db
+
+
 @pytest.fixture(autouse=True)
 async def migrate(command_tester: CommandTester, app: Application) -> None:
     app.config["paths"]["database"] = (

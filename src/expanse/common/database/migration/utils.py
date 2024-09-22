@@ -99,18 +99,20 @@ def configure_alembic_loggers(io: "IO", disable: bool = False) -> None:
     """
     logger = logging.getLogger("alembic.runtime.migration")
 
-    if disable:
-        for handler in logger.handlers:
-            logger.removeHandler(handler)
-    else:
-        level = logging.INFO
-        if io.is_debug():
-            level = logging.DEBUG
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
 
-        handler = IOHandler(io)
-        handler.setFormatter(
-            IOFormatter({"alembic.runtime.migration": MigrationFormatter()})
-        )
-        handler.setLevel(level)
-        logger.addHandler(handler)
-        logger.setLevel(level)
+    if disable:
+        return
+
+    level = logging.INFO
+    if io.is_debug():
+        level = logging.DEBUG
+
+    handler = IOHandler(io)
+    handler.setFormatter(
+        IOFormatter({"alembic.runtime.migration": MigrationFormatter()})
+    )
+    handler.setLevel(level)
+    logger.addHandler(handler)
+    logger.setLevel(level)

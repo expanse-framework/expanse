@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import URL
 from sqlalchemy.orm import Session
 from sqlalchemy.util import immutabledict
-from treat.mock import Mockery  # type: ignore[import-untyped]
+from treat.mock import Mockery
 
 from expanse.common.configuration.config import Config
 from expanse.common.database._utils import create_engine

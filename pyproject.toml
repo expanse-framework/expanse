@@ -17,7 +17,7 @@ uvicorn = { version = ">=0.23.2", extras = ["standard"] }
 cleo = "^2.1.0"
 jinja2 = ">=3.1.2"
 pydantic = "^2.3.0"
-pendulum = "^3.0.0"
+pendulum = { version = "^3.0.0", extras = ["test"] }
 pydantic-settings = "^2.1.0"
 sqlalchemy = "^2.0.25"
 baize = "^0.20.8"
@@ -43,6 +43,7 @@ pymysql = "^1.1.1"
 mysqlclient = "^2.2.4"
 asyncmy = "^0.2.9"
 aiomysql = "^0.2.0"
+cryptography = "^43.0.1"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -52,6 +53,13 @@ pytest-mock = "^3.14.0"
 [tool.poetry.group.typing.dependencies]
 types-pygments = "^2.18.0.20240506"
 
+
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+mypy = "^1.11.2"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -59,7 +67,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = ["asynchronous: Mark a test as asynchronous"]
+markers = ["asynchronous: Mark a test as asynchronous", "db: Mark a test as requiring a database connection"]
 asyncio_default_fixture_loop_scope = "function"
 
 

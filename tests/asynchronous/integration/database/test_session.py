@@ -9,6 +9,9 @@ from expanse.asynchronous.routing.router import Router
 from expanse.asynchronous.testing.client import TestClient
 
 
+pytestmark = pytest.mark.db
+
+
 async def default_session(session: Session) -> Response:
     return await json(
         (

@@ -9,6 +9,9 @@ from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
 
+pytestmark = pytest.mark.db
+
+
 def default_connection(connection: Connection) -> Response:
     return json(
         (

@@ -2,7 +2,7 @@ import pytest
 
 from sqlalchemy import URL
 from sqlalchemy.util import immutabledict
-from treat.mock import Mockery  # type: ignore[import-untyped]
+from treat.mock import Mockery
 
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database import database_manager

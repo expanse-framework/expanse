@@ -168,9 +168,9 @@ class Router:
                     validation_model: type[BaseModel] = origin_args[0]
                     data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
 
-                    if isinstance(data_type, JSON) or issubclass(data_type, JSON):
+                    if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type, misc]
                         arguments[name] = validation_model.model_validate(request.json)
-                    elif isinstance(data_type, Query) or issubclass(data_type, Query):
+                    elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type, misc]
                         arguments[name] = validation_model.model_validate(
                             request.query_params
                         )
