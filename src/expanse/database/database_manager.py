@@ -9,6 +9,7 @@ from sqlalchemy.util import immutabledict
 from expanse.common.database._utils import create_engine
 from expanse.core.application import Application
 from expanse.database.config import DatabaseConfig
+from expanse.database.config import MySQLConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig
 from expanse.database.connection import Connection
@@ -71,6 +72,9 @@ class DatabaseManager:
 
             case PostgreSQLConfig():
                 return self._create_postgresql_engine(config)
+
+            case MySQLConfig():
+                return self._create_mysql_engine(config)
 
     def _create_sqlite_engine(self, config: SQLiteConfig) -> Engine:
         if config.url is not None:
@@ -151,6 +155,35 @@ class DatabaseManager:
                 cursor.execute(f"SET SESSION search_path='{config.search_path}'")
                 cursor.close()
                 dbapi_connection.autocommit = existing_autocommit
+
+        return engine
+
+    def _create_mysql_engine(self, config: MySQLConfig) -> Engine:
+        if config.url is not None:
+            url = make_url(str(config.url))
+        else:
+            drivername: str = "mysql"
+            if config.dbapi is not None:
+                drivername += f"+{config.dbapi}"
+
+            query: dict[str, Any] = {}
+
+            if config.charset is not None:
+                query["charset"] = config.charset
+
+            url = URL(
+                drivername=drivername,
+                host=config.host,
+                port=config.port,
+                database=config.database,
+                username=config.username,
+                password=config.password,
+                query=immutabledict(query),
+            )
+
+        engine = self.create_base_engine(
+            url, **config.pool.model_dump(exclude_none=True)
+        )
 
         return engine
 

@@ -32,6 +32,18 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
                 "driver": "postgresql",
                 "url": "postgresql+asyncpg://postgres:password@127.0.0.1:5432/expanse",
             },
+            "mysql": {
+                "driver": "mysql",
+                "url": "mysql://root:password@127.0.0.1:3306/expanse",
+            },
+            "mysql_asyncmy": {
+                "driver": "mysql",
+                "url": "mysql+asyncmy://root:password@127.0.0.1:3306/expanse",
+            },
+            "mysql_aiomysql": {
+                "driver": "mysql",
+                "url": "mysql+aiomysql://root:password@127.0.0.1:3306/expanse",
+            },
             "test": {"driver": "sqlite", "database": tmp_path.joinpath("test.sqlite")},
         },
     }
@@ -73,6 +85,20 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
                 {"id": "postgresql"},
                 {"id": "postgresql_psycopg"},
                 {"id": "postgresql_asyncpg"},
+            ],
+        )
+        await connection.commit()
+
+    async with db.connection("mysql") as connection:
+        await connection.execute(
+            "CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))"
+        )
+        await connection.execute(
+            "INSERT INTO my_table (id) VALUES (:id)",
+            [
+                {"id": "mysql"},
+                {"id": "mysql_asyncmy"},
+                {"id": "mysql_aiomysql"},
             ],
         )
         await connection.commit()

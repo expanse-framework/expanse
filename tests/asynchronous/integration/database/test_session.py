@@ -29,9 +29,18 @@ def test_the_default_session_can_be_injected(
 
 @pytest.mark.parametrize(
     "name",
-    ["sqlite", "sqlite2", "postgresql", "postgresql_psycopg", "postgresql_asyncpg"],
+    [
+        "sqlite",
+        "sqlite2",
+        "postgresql",
+        "postgresql_psycopg",
+        "postgresql_asyncpg",
+        # "mysql",
+        # "mysql_asyncmy",
+        # "mysql_aiomysql",
+    ],
 )
-def test_a_named_session_can_be_injected(
+async def test_a_named_session_can_be_injected(
     router: Router, client: TestClient, name: str
 ) -> None:
     async def named_session(connection: Annotated[Session, name]) -> Response:

@@ -36,6 +36,9 @@ def test_the_default_session_can_be_injected(
         "postgresql_psycopg",
         "postgresql_psycopg2",
         "postgresql_pg8000",
+        "mysql",
+        "mysql_pymysql",
+        "mysql_mysqldb",
     ],
 )
 def test_a_named_session_can_be_injected(

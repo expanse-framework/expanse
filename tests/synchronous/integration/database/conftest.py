@@ -36,7 +36,22 @@ def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
                 "driver": "postgresql",
                 "url": "postgresql+pg8000://postgres:password@localhost:5432/expanse",
             },
-            "test": {"driver": "sqlite", "database": tmp_path.joinpath("test.sqlite")},
+            "mysql": {
+                "driver": "mysql",
+                "url": "mysql://root:password@127.0.0.1:3306/expanse",
+            },
+            "mysql_pymysql": {
+                "driver": "mysql",
+                "url": "mysql+pymysql://root:password@127.0.0.1:3306/expanse",
+            },
+            "mysql_mysqldb": {
+                "driver": "mysql",
+                "url": "mysql+mysqldb://root:password@127.0.0.1:3306/expanse",
+            },
+            "test": {
+                "driver": "sqlite",
+                "database": tmp_path.joinpath("test.sqlite"),
+            },
         },
     }
 
@@ -78,7 +93,22 @@ def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
         )
         connection.commit()
 
+    with db.connection("mysql") as connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))")
+        connection.execute(
+            "INSERT INTO my_table (id) VALUES (:id)",
+            [
+                {"id": "mysql"},
+                {"id": "mysql_pymysql"},
+                {"id": "mysql_mysqldb"},
+            ],
+        )
+        connection.commit()
+
     yield
 
     with db.connection("postgresql") as connection:
+        connection.execute("DROP TABLE IF EXISTS my_table")
+
+    with db.connection("mysql") as connection:
         connection.execute("DROP TABLE IF EXISTS my_table")

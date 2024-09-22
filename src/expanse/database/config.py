@@ -26,6 +26,22 @@ class SQLiteConfig(PoolConfig, BaseModel):
     model_config = SettingsConfigDict(arbitrary_types_allowed=True)
 
 
+class MySQLConfig(PoolConfig, BaseModel):
+    driver: Literal["mysql"] = "mysql"
+    dbapi: (
+        Literal["mysql-connector-python", "mysqldb", "pymysql", "asyncmy", "aiomysql"]
+        | None
+    ) = None
+    url: AnyUrl | None = None
+    host: str | None = None
+    port: int = 3306
+    database: str | None = None
+    username: str = ""
+    password: str = ""
+    charset: str = "utf8mb4"
+    pool: PoolConfig = PoolConfig()
+
+
 class PostgreSQLConfig(PoolConfig, BaseModel):
     driver: Literal["postgresql"] = "postgresql"
     dbapi: (
@@ -43,4 +59,6 @@ class PostgreSQLConfig(PoolConfig, BaseModel):
 
 
 class DatabaseConfig(RootModel):
-    root: Annotated[SQLiteConfig | PostgreSQLConfig, Field(discriminator="driver")]
+    root: Annotated[
+        SQLiteConfig | MySQLConfig | PostgreSQLConfig, Field(discriminator="driver")
+    ]
