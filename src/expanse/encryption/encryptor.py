@@ -1,26 +1,72 @@
 import secrets
 
-from enum import StrEnum
-from typing import Any
+from enum import Enum
 from typing import ClassVar
 
+from expanse.encryption.ciphers.aes256_gcm import AES256GCMCipher
+from expanse.encryption.ciphers.base_cipher import BaseCipher
+from expanse.encryption.compressors.zlib import ZlibCompressor
+from expanse.encryption.key_generator import KeyGenerator
+from expanse.encryption.message import Message
 
-class Cipher(StrEnum):
+
+class Cipher(Enum):
     AES_256_GCM: str = "aes-256-gcm"
 
 
 class Encryptor:
-    CIPHERS: ClassVar[dict[Cipher, dict[str, Any]]] = {
-        Cipher.AES_256_GCM: {"key_length": 32, "iv_length": 16}
+    CIPHERS: ClassVar[dict[Cipher, type[BaseCipher]]] = {
+        Cipher.AES_256_GCM: AES256GCMCipher
     }
 
-    def __init__(self, secret_key: bytes, cipher: Cipher = Cipher.AES_256_GCM) -> None:
+    def __init__(
+        self,
+        secret_key: bytes,
+        salt: bytes,
+        cipher: Cipher = Cipher.AES_256_GCM,
+        compress: bool = True,
+    ) -> None:
         self._secret_key = secret_key
+        self._salt = salt
         self._cipher = cipher
+        self._compress = compress
+        self._compressor = ZlibCompressor()
+
+    def encrypt(self, data: str, deterministic: bool = False) -> Message:
+        cipher_class = self.CIPHERS[self._cipher]
+        key = self.derive_key(length=cipher_class.key_length)
+        cipher = cipher_class(key, deterministic=deterministic)
+
+        encoded: bytes = data.encode()
+        if self._compress:
+            encoded = self._compressor.compress(encoded)
+
+        encrypted = cipher.encrypt(encoded)
+        if self._compress:
+            encrypted.headers["compressed"] = True
+
+        return encrypted
+
+    def decrypt(self, message: Message) -> str:
+        cipher_class = self.CIPHERS[self._cipher]
+        key = self.derive_key(length=cipher_class.key_length)
+        cipher = cipher_class(key)
+
+        decrypted = cipher.decrypt(message)
+
+        if message.headers.get("compressed"):
+            decrypted = self._compressor.decompress(decrypted)
+
+        return decrypted.decode()
 
     @classmethod
     def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> bytes:
-        cipher_config = cls.CIPHERS[cipher]
-        key = secrets.token_bytes(cipher_config["key_length"])
+        cipher_class = cls.CIPHERS[cipher]
+        key = secrets.token_bytes(cipher_class.key_length)
 
         return key
+
+    def derive_key(self, iterations: int | None = None, length: int = 32) -> bytes:
+        return KeyGenerator(self._secret_key, iterations=iterations).generate_key(
+            self._salt, key_size=length
+        )

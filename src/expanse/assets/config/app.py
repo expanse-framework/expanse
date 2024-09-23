@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 from pydantic import Field
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -28,9 +27,7 @@ class Config(BaseSettings):
     # This key is used by the application for encryption and should be set
     # to a random, 32-character string or a base64-encoded 32 bytes prefixed with `base64:`.
     # This must be set prior to deploying the application.
-    secret_key: str = ""
-    # The cipher method used for encryption. Currently, only aes-256-gcm is supported.
-    cipher: str = "aes-256-gcm"
+    secret_key: SecretStr = SecretStr("")
 
     # Service providers
     #

@@ -30,9 +30,11 @@ class EncryptionServiceProvider(ServiceProvider):
 
         secret_key: str = app.config.get("app.secret_key")
         cipher: str = app.config.get("encryption.cipher")
+        salt: str = app.config.get("encryption.salt")
 
         return Encryptor(
             self._normalize_key(secret_key),
+            self._normalize_key(salt),
             Cipher(cipher),
         )
 
