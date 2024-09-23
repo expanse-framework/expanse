@@ -47,9 +47,8 @@ class Static:
         for directory in self._directories:
             directory_path = directory.joinpath(path).resolve()
 
-            if (
-                os.path.commonpath([directory_path.as_posix(), directory.as_posix()])
-                != directory.as_posix()
+            if os.path.commonpath([str(directory_path), str(directory)]) != str(
+                directory
             ):
                 continue
 

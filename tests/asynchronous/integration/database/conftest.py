@@ -8,6 +8,9 @@ from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.database_manager import DatabaseManager
 
 
+pytestmark = pytest.mark.db
+
+
 @pytest.fixture(autouse=True)
 async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[None]:
     config: dict[str, dict[str, Any]] = await app.container.get("config")

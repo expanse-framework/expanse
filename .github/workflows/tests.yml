@@ -1,0 +1,101 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+env:
+  PYTHONUTF8: 1
+
+jobs:
+  linux_tests:
+    name: Ubuntu / ${{ matrix.python-version }}
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: [ "3.11", "3.12" ]
+    defaults:
+      run:
+        shell: bash
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "password"
+          MYSQL_DATABASE: "expanse"
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - "3306:3306"
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: "password"
+          POSTGRES_DB: "expanse"
+        ports:
+          - "5432:5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --with lint
+
+      - name: Run typechecking
+        run: poetry run mypy
+
+      - name: Run tests
+        run: poetry run pytest
+  tests:
+    name: ${{ matrix.os }} / ${{ matrix.python-version }}
+    runs-on: ${{ matrix.image }}
+    strategy:
+      matrix:
+        os: [ macOS, Windows ]
+        python-version: [ "3.11", "3.12" ]
+        include:
+          - os: Windows
+            image: windows-2022
+          - os: macOS
+            image: macos-12
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: poetry
+
+      - name: Setting up MySQL dependencies
+        if: matrix.os == 'macOS'
+        run: |
+          brew install mysql-client pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/mysql-client/lib/pkgconfig" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: poetry install --with lint
+
+      - name: Run typechecking
+        run: poetry run mypy
+
+      - name: Run tests
+        run: poetry run pytest -m "not db"

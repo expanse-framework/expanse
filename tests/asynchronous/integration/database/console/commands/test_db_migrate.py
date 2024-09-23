@@ -1,11 +1,16 @@
 from pathlib import Path
 
+import pytest
+
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.console.commands.db_migrate import (
     DbMigrateCommand,  # noqa: F401
 )
 from expanse.asynchronous.database.database_manager import DatabaseManager
 from expanse.asynchronous.testing.command_tester import CommandTester
+
+
+pytestmark = pytest.mark.db
 
 
 async def test_migrate(

@@ -1,12 +1,17 @@
 from pathlib import Path
 
-from treat.mock import Mockery  # type: ignore[import-untyped]
+import pytest
+
+from treat.mock import Mockery
 
 from expanse.asynchronous.core.application import Application
 from expanse.asynchronous.database.console.commands.make_model import (
     MakeModelCommand,  # noqa: F401
 )
 from expanse.asynchronous.testing.command_tester import CommandTester
+
+
+pytestmark = pytest.mark.db
 
 
 async def test_make_model(

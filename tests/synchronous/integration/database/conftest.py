@@ -8,6 +8,9 @@ from expanse.core.application import Application
 from expanse.database.database_manager import DatabaseManager
 
 
+pytestmark = pytest.mark.db
+
+
 @pytest.fixture(autouse=True)
 def setup_databases(app: Application, tmp_path: Path) -> Generator[None]:
     config: dict[str, dict[str, Any]] = app.container.get("config")
