@@ -5,12 +5,16 @@ from typing import Any
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.router import Router
+from expanse.routing.url_generator import URLGenerator
 
 
 class Redirect:
-    def __init__(self, router: Router, request: Request) -> None:
+    def __init__(
+        self, router: Router, request: Request, generator: URLGenerator
+    ) -> None:
         self._router: Router = router
         self._request: Request = request
+        self._generator: URLGenerator = generator
 
     def to(
         self, url: str, status: int = 302, headers: dict[str, Any] | None = None
@@ -25,7 +29,7 @@ class Redirect:
         headers: dict[str, Any] | None = None,
     ) -> Response:
         return self._create_response(
-            self._router.route(name, parameters=parameters),
+            self._generator.to_route(name, parameters),
             status=status,
             headers=headers,
         )

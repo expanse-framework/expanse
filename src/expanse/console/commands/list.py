@@ -26,7 +26,7 @@ You can also display the commands for a specific namespace:
         Argument("namespace", required=False, description="The namespace name")
     ]
 
-    def handle(self) -> int:
+    async def handle(self) -> int:
         from cleo.descriptors.text_descriptor import TextDescriptor
 
         descriptor = TextDescriptor()

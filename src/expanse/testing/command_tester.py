@@ -28,14 +28,16 @@ class TestingCommand:
 
         return self
 
-    def run(self, parameters: str | None = None) -> int:
+    async def run(self, parameters: str | None = None) -> int:
         self._output.clear()
 
         full_command = self._command
         if parameters:
             full_command += " " + parameters
 
-        handler = self._app.container.get(ExceptionHandler)
+        gateway = await self._app.container.get(Gateway)
+        handler = await self._app.container.get(ExceptionHandler)
+
         input = StringInput(full_command)
         input.set_stream(StringIO())
         if self._user_input:
@@ -46,9 +48,7 @@ class TestingCommand:
             input.interactive()
 
         with handler.raise_unhandled_exceptions():
-            self._return_code = self._app.container.get(Gateway).handle(
-                input, self._output
-            )
+            self._return_code = await gateway.handle(input, self._output)
 
         return self._return_code
 

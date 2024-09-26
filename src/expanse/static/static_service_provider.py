@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
 
-from expanse.common.configuration.config import Config
+from expanse.configuration.config import Config
 from expanse.static.static import Static
 from expanse.support.service_provider import ServiceProvider
-from expanse.view.view_factory import ViewFactory
+from expanse.view.view_manager import ViewManager
 
 
 if TYPE_CHECKING:
@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 
 
 class StaticServiceProvider(ServiceProvider):
-    def register(self) -> None:
+    async def register(self) -> None:
         self._container.singleton(Static, self._register_static)
 
-    def boot(self) -> None:
-        self._container.on_resolved("router", self._add_static_route)
-        self._container.on_resolved("view", self._register_view_globals)
+    async def boot(self) -> None:
+        await self._container.on_resolved("router", self._add_static_route)
+        await self._container.on_resolved("view:manager", self._register_view_globals)
 
-    def _register_static(self, config: Config) -> Static:
-        app: Application = self._container.get("app")
+    async def _register_static(self, config: Config) -> Static:
+        app: Application = await self._container.get("app")
         paths: list[Path] = config.get("static.paths", [])
         paths = [app.base_path / p if not p.is_absolute() else p for p in paths]
         if (url := config.get("static.url")) is not None:
@@ -30,16 +30,16 @@ class StaticServiceProvider(ServiceProvider):
 
         return Static(paths, prefix=config.get("static.prefix"), url=url)
 
-    def _add_static_route(self, router: "Router") -> None:
-        config = self._container.get(Config)
+    async def _add_static_route(self, router: "Router") -> None:
+        config = await self._container.get(Config)
         if config.get("app.debug", False):
             prefix: str = config["static.prefix"].rstrip("/")
 
             router.get(
                 f"{prefix}/{{path:path}}",
-                self._container.get(Static).get,
+                (await self._container.get(Static)).get,
                 name="static",
             )
 
-    def _register_view_globals(self, view: ViewFactory) -> None:
-        view.register_global(static=self._container.get(Static).url)
+    async def _register_view_globals(self, view: ViewManager) -> None:
+        view.register_global(static=(await self._container.get(Static)).url)

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Self
 
 from expanse.http.helpers import abort
-from expanse.http.helpers import respond
+from expanse.http.helpers import file_
 from expanse.http.response import Response
 
 
@@ -16,13 +16,13 @@ class Static:
         self._prefix: str = prefix.rstrip("/")
         self._url: str | None = url.rstrip("/") if url is not None else None
 
-    def get(self, path: str) -> Response:
+    async def get(self, path: str) -> Response:
         full_path = self._find(path)
 
         if not full_path:
             abort(404)
 
-        return respond().file(full_path)
+        return file_(str(full_path))
 
     def url(self, path: str) -> str:
         static_url = []

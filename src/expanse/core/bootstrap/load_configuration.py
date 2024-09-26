@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic_settings import BaseSettings
 
-from expanse.common.configuration.config import Config
-from expanse.common.support._utils import module_from_path
+from expanse.configuration.config import Config
+from expanse.support._utils import module_from_path
 
 
 if TYPE_CHECKING:
@@ -16,23 +16,23 @@ if TYPE_CHECKING:
 
 class LoadConfiguration:
     @classmethod
-    def bootstrap(cls, app: Application) -> None:
+    async def bootstrap(cls, app: Application) -> None:
         config = Config({})
 
-        base_files = cls._get_base_configuration_files(app)
+        base_files = await cls._get_base_configuration_files(app)
         for identifier, filepath in base_files.items():
-            config[identifier] = cls._load_configuration_file(filepath)
+            config[identifier] = await cls._load_configuration_file(filepath)
 
-        files = cls._get_configuration_files(app)
+        files = await cls._get_configuration_files(app)
 
         for identifier, filepath in files.items():
-            for name, value in (cls._load_configuration_file(filepath)).items():
+            for name, value in (await cls._load_configuration_file(filepath)).items():
                 config[f"{identifier}.{name}"] = value
 
         app.set_config(config)
 
     @classmethod
-    def _get_configuration_files(cls, app: Application) -> dict[str, Path]:
+    async def _get_configuration_files(cls, app: Application) -> dict[str, Path]:
         files = {}
 
         for filepath in app.config_path.rglob("*.py"):
@@ -46,7 +46,7 @@ class LoadConfiguration:
         return dict(sorted(files.items()))
 
     @classmethod
-    def _load_configuration_file(cls, path: Path) -> dict[str, Any]:
+    async def _load_configuration_file(cls, path: Path) -> dict[str, Any]:
         module = module_from_path(path)
 
         if module is None:
@@ -62,7 +62,7 @@ class LoadConfiguration:
         return config
 
     @classmethod
-    def _get_base_configuration_files(cls, app: Application) -> dict[str, Path]:
+    async def _get_base_configuration_files(cls, app: Application) -> dict[str, Path]:
         files = {}
 
         config_assets_path = Path(__file__).parent.parent.parent.joinpath(

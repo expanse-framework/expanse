@@ -1,3 +1,4 @@
+from collections.abc import Awaitable
 from collections.abc import Callable
 from functools import wraps
 from typing import Self
@@ -16,10 +17,12 @@ class Pipeline:
 
     def __init__(self, container: Container) -> None:
         self._container = container
-        self._pipes: list[Callable[[Request, RequestHandler], Response]] = []
+        self._pipes: list[Callable[[Request, RequestHandler], Awaitable[Response]]] = []
         self._request: Request | None = None
 
-    def use(self, pipes: list[Callable[[Request, RequestHandler], Response]]) -> Self:
+    def use(
+        self, pipes: list[Callable[[Request, RequestHandler], Awaitable[Response]]]
+    ) -> Self:
         self._pipes = pipes
 
         return self
@@ -29,48 +32,49 @@ class Pipeline:
 
         return self
 
-    def to(self, handler: RequestHandler) -> Response:
+    async def to(self, handler: RequestHandler) -> Response:
+        if self._request is None:
+            raise RuntimeError("No request has been set on the pipeline.")
+
         from expanse.core.helpers import _set_container
-
-        if not self._request:
-            raise ValueError("No request has been set")
-
-        assert self._request is not None
 
         _set_container(self._container)
 
         try:
-            return self._build_pipeline(handler)(self._request)
+            pipeline = await self._build_pipeline(handler)
+            return await pipeline(self._request)
         except Exception as e:
             from expanse.contracts.debug.exception_handler import ExceptionHandler
 
             if not self._container.has(ExceptionHandler):
                 raise e
 
-            exception_handler = self._container.get(ExceptionHandler)
+            exception_handler = await self._container.get(ExceptionHandler)
 
-            exception_handler.report(e)
+            await exception_handler.report(e)
 
-            return exception_handler.render(self._request, e)
+            return await exception_handler.render(self._request, e)
         finally:
             _set_container(None)
 
-    def _build_pipeline(self, handler: RequestHandler) -> RequestHandler:
+    async def _build_pipeline(self, handler: RequestHandler) -> RequestHandler:
         stack = handler
 
         for pipe in self._pipes[::-1]:
-            stack = self._wrap(pipe)(stack)
+            stack = await self._wrap(pipe)(stack)
 
         return stack
 
     def _wrap(
-        self, pipe: Callable[[Request, RequestHandler], Response]
-    ) -> Callable[[RequestHandler], RequestHandler]:
+        self, pipe: Callable[[Request, RequestHandler], Awaitable[Response]]
+    ) -> Callable[[RequestHandler], Awaitable[RequestHandler]]:
         @wraps(pipe)
-        def decorator(next_call: RequestHandler) -> Callable[[Request], Response]:
+        async def decorator(
+            next_call: RequestHandler,
+        ) -> Callable[[Request], Awaitable[Response]]:
             @wraps(next_call)
-            def handler(request: Request) -> Response:
-                return pipe(request, next_call)
+            async def handler(request: Request) -> Response:
+                return await pipe(request, next_call)
 
             return handler
 

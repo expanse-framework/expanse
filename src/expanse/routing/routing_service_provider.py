@@ -1,34 +1,34 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from expanse.http.redirect import Redirect
 from expanse.routing.router import Router
+from expanse.routing.url_generator import URLGenerator
 from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.common.http.url_path import URLPath
+    from expanse.view.view_factory import AsyncViewFactory
     from expanse.view.view_factory import ViewFactory
 
 
 class RoutingServiceProvider(ServiceProvider):
-    def register(self) -> None:
-        self._container.singleton(Router, lambda container: Router(container))
+    async def register(self) -> None:
+        self._container.singleton(Router)
         self._container.alias(Router, "router")
         self._container.scoped(Redirect)
 
-    def boot(self) -> None:
-        self._container.on_resolved("view", self._register_view_globals)
+    async def boot(self) -> None:
+        await self._container.on_resolved("view", self._register_view_locals)
+        await self._container.on_resolved(
+            "view:async", self._register_async_view_locals
+        )
 
-    def _register_view_globals(self, view: ViewFactory) -> None:
-        router = self._container.get(Router)
+    async def _register_view_locals(
+        self, view: "ViewFactory", generator: URLGenerator
+    ) -> None:
+        view.register_local(url=generator.to, route=generator.to_route)
 
-        def route(name: str, **parameters) -> URLPath:
-            return router.route(name, parameters)
-
-        def url(name: str, **parameters) -> URLPath:
-            return router.url(name, parameters)
-
-        view.register_global(url=url)
-        view.register_global(route=route)
+    async def _register_async_view_locals(
+        self, view: "AsyncViewFactory", generator: URLGenerator
+    ) -> None:
+        view.register_local(url=generator.to, route=generator.to_route)

@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from functools import partial
 from typing import Self
 
@@ -8,13 +7,14 @@ from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.pipeline import Pipeline
 from expanse.routing.router import Router
-from expanse.types import Environ
-from expanse.types import StartResponse
+from expanse.types import Receive
+from expanse.types import Scope
+from expanse.types import Send
 
 
 class Gateway:
     """
-    The gateway is the layer between the WSGI spec/world and Expanse internal
+    The gateway is the layer between the ASGI spec/world and Expanse internal
     architecture.
     """
 
@@ -24,15 +24,15 @@ class Gateway:
         self._middleware: list[type[Middleware]] = []
         self._group_middleware: dict[str, list[type[Middleware]]] = {}
 
-    def handle(self, request: Request) -> Response:
-        with self._app.container.create_scoped_container() as container:
+    async def handle(self, request: Request) -> Response:
+        async with self._app.container.create_scoped_container() as container:
             container.instance(Request, request)
 
-            return (
+            return await (
                 Pipeline(container)
                 .use(
                     [
-                        container.get(middleware).handle
+                        (await container.get(middleware)).handle
                         for middleware in self._middleware
                     ]
                 )
@@ -57,16 +57,14 @@ class Gateway:
 
         return self
 
-    def __call__(
-        self, environ: Environ, start_response: StartResponse
-    ) -> Iterable[bytes]:
-        request = Request(environ, start_response)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        request = Request(scope, receive, send)
 
-        response = self.handle(request)
+        response = await self.handle(request)
 
-        return self._prepare_response(response, environ, start_response)
+        return await self._prepare_response(response, scope, receive, send)
 
-    def _prepare_response(
-        self, response: Response, environ: Environ, start_response: StartResponse
-    ) -> Iterable[bytes]:
-        return response(environ, start_response)
+    async def _prepare_response(
+        self, response: Response, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        return await response(scope, receive, send)

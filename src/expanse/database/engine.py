@@ -1,12 +1,5 @@
-from typing import cast
-
-from sqlalchemy.engine import Engine as BaseEngine
-
-from expanse.database.connection import Connection
+from expanse.database.asynchronous.engine import AsyncEngine
+from expanse.database.synchronous.engine import Engine
 
 
-class Engine(BaseEngine):
-    _connection_cls = Connection
-
-    def connect(self) -> Connection:
-        return cast(Connection, super().connect())
+__all__ = ["AsyncEngine", "Engine"]

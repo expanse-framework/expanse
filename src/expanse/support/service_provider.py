@@ -11,7 +11,7 @@ class ServiceProvider:
     def __init__(self, container: Container) -> None:
         self._container: Container = container
 
-    def register(self) -> None:
+    async def register(self) -> None:
         """
         Register any application services.
         """

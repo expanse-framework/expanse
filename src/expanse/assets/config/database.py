@@ -22,6 +22,7 @@ class Config(BaseSettings):
     # For instance:
     # >>> DB_CONNECTIONS__SQLITE__DRIVER=sqlite
     # >>> DB_CONNECTIONS__SQLITE__DATABASE=database/database.sqlite
+
     connections: dict[str, DatabaseConfig] = Field(
         default={"sqlite": SQLiteConfig(database=Path("database/database.sqlite"))}
     )

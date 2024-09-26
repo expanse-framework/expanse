@@ -8,14 +8,11 @@ from expanse.support.service_providers_list import ServiceProvidersList
 
 
 class Config(BaseSettings):
-    # The name of the application.
-    # Configured with the `APP_NAME` environment variable.
     name: str = "Expanse"
 
     # Application environment
     #
     # The environment the application is running in.
-    # Configured with the `APP_ENV` environment variable.
     env: str = "production"
 
     # Debug mode
@@ -24,7 +21,6 @@ class Config(BaseSettings):
     # occurs. When debug mode is enabled, the application will display detailed
     # messages about the error, including a stack trace. When debug mode is disabled,
     # the application will display a generic error message instead.
-    # Configured with the `APP_DEBUG` environment variable.
     debug: bool = False
 
     # Encryption key
@@ -32,8 +28,9 @@ class Config(BaseSettings):
     # This key is used by the application for encryption and should be set
     # to a random, 32-character string or a base64-encoded 32 bytes prefixed with `base64:`.
     # This must be set prior to deploying the application.
-    # Configured with the `APP_SECRET_KEY` environment variable.
     secret_key: str = ""
+    # The cipher method used for encryption. Currently, only aes-256-gcm is supported.
+    cipher: str = "aes-256-gcm"
 
     # Service providers
     #

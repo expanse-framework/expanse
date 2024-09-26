@@ -44,7 +44,7 @@ class MiddlewareStack:
         """
         Retrieve the middleware group with the given name.
 
-        If it does not exist it will be created automatically.
+        If does not exist it will be created automatically.
         """
         if name not in self._groups:
             self._groups[name] = MiddlewareGroup()

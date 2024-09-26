@@ -4,9 +4,9 @@ from cleo.helpers import option
 from cleo.io.inputs.argument import Argument
 from cleo.io.inputs.option import Option
 
-from expanse.common.database.migration.migrator import Migrator
-from expanse.common.database.migration.utils import configure_alembic_loggers
 from expanse.database.console.command import MigrationCommand
+from expanse.database.migration.migrator import Migrator
+from expanse.support._concurrency import run_in_threadpool
 
 
 class DbMigrateCommand(MigrationCommand):
@@ -34,7 +34,7 @@ A number of migrations to apply can be specified with the --step option.
 This will apply the next two migrations.
 """
 
-    def handle(self, migrator: Migrator) -> int:
+    async def handle(self, migrator: Migrator) -> int:
         self.line("")
 
         dry_run: bool = self.option("dry-run")
@@ -43,9 +43,11 @@ This will apply the next two migrations.
         if self.option("step"):
             revision = f'+{self.option("step").removeprefix("+")}'
 
-        if dry_run:
-            configure_alembic_loggers(self._io, disable=True)
-
-        migrator.migrate(revision=revision, dry_run=self.option("dry-run"), io=self._io)
+        await run_in_threadpool(
+            migrator.migrate,
+            revision=revision,
+            dry_run=dry_run,
+            io=self._io,
+        )
 
         return 0

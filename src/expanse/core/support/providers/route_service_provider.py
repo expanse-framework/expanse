@@ -1,22 +1,24 @@
+from __future__ import annotations
+
 import sys
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from expanse.common.support._utils import module_from_path
-from expanse.routing.router import Router
+from expanse.support._utils import module_from_path
 from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from expanse.core.application import Application
+    from expanse.routing.router import Router
 
 
 class RouteServiceProvider(ServiceProvider):
-    def load_routes_from_file(self, router: Router, path: Path) -> Router:
-        app: Application = self._container.get("app")
+    async def load_routes_from_file(self, router: Router, path: Path) -> Router:
+        app: Application = await self._container.get("app")
         module_name = (
             path.resolve()
             .relative_to(app.base_path)

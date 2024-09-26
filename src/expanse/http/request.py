@@ -5,29 +5,32 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
 
-from baize.wsgi.requests import Request as BaseRequest
+from baize.asgi import empty_receive
+from baize.asgi import empty_send
+from baize.asgi.requests import Request as BaseRequest
 
-from expanse.common.http.accept_header import AcceptHeader
-from expanse.common.http.url import URL
+from expanse.http.accept_header import AcceptHeader
+from expanse.http.url import URL
 
 
 if TYPE_CHECKING:
     from expanse.routing.route import Route
-    from expanse.types import Environ
-    from expanse.types import StartResponse
+    from expanse.types import Receive
+    from expanse.types import Scope
+    from expanse.types import Send
 
 
 class Request(BaseRequest):
-    def __init__(self, environ: Environ, start_response: StartResponse | None = None):
-        super().__init__(environ, start_response)  # type: ignore[arg-type]
+    def __init__(
+        self, scope: Scope, receive: Receive = empty_receive, send: Send = empty_send
+    ):
+        super().__init__(scope=scope, receive=receive, send=send)
 
         self._route: Route | None = None
 
-        self._acceptable_content_types: list[str] | None = None
-
     @cached_property
     def url(self) -> URL:  # type: ignore[override]
-        return URL(environ=self._environ)
+        return URL(scope=self._scope)
 
     @cached_property
     def host(self) -> str:
@@ -44,6 +47,10 @@ class Request(BaseRequest):
             item.value
             for item in AcceptHeader.from_string(self.headers.get("Accept", "")).all()
         ]
+
+    @property
+    def route(self) -> Route | None:
+        return self._route
 
     def accepts_any_content_type(self) -> bool:
         """
@@ -89,10 +96,6 @@ class Request(BaseRequest):
     def is_pjax(self) -> bool:
         return self.headers.get("X-PJAX") == "true"
 
-    @property
-    def route(self) -> Route | None:
-        return self._route
-
     def set_route(self, route: Route) -> Self:
         self._route = route
 
@@ -100,61 +103,64 @@ class Request(BaseRequest):
 
     @classmethod
     def create(
-        cls, raw_url: str, method: str = "GET", environ: dict[str, Any] | None = None
+        cls, raw_url: str, method: str = "GET", scope: dict[str, Any] | None = None
     ) -> Request:
-        base_environ = {
-            "wsgi.url_scheme": "http",
-            "SERVER_NAME": "localhost",
-            "SERVER_PORT": 80,
-            "HTTP_HOST": "localhost",
-            "HTTP_USER_AGENT": "Expanse",
-            "HTTP_ACCEPT": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "HTTP_ACCEPT_LANGUAGE": "en-us,en;q=0.5",
-            "REMOTE_ADDR": "127.0.0.1",
-            "SCRIPT_NAME": "",
-            "SCRIPT_FILENAME": "",
-            "SERVER_PROTOCOL": "HTTP/1.1",
-            "PATH_INFO": "",
-            "REQUEST_METHOD": method.upper(),
-            **(environ or {}),
+        default_headers = {
+            b"User-Agent": b"Expanse",
+            b"Accept": b"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            b"Accept-Language": b"en-us,en;q=0.5",
         }
+        base_scope = {
+            "type": "http",
+            "scheme": "http",
+            "server": ["localhost", 80],
+            "headers": [],
+            "REMOTE_ADDR": "127.0.0.1",
+            "root_path": "",
+            "http_version": "1.1",
+            "path": "",
+            "raw_path": "",
+            "method": method.upper(),
+            **(scope or {}),
+        }
+
+        headers = base_scope["headers"]
+        header_names = {header[0] for header in headers}
+
+        for default_header in default_headers:
+            if default_header not in header_names:
+                headers.append([default_header, default_headers[default_header]])
 
         url = URL(raw_url)
 
         if url.hostname is not None:
-            base_environ["SERVER_NAME"] = url.hostname
-            base_environ["HTTP_HOST"] = url.hostname
+            base_scope["server"][0] = url.hostname
 
         if url.scheme:
-            base_environ["wsgi.url_scheme"] = url.scheme
+            base_scope["scheme"] = url.scheme
 
             if url.scheme == "https":
-                base_environ["HTTPS"] = "on"
-                base_environ["SERVER_PORT"] = 443
+                base_scope["server"][1] = 443
             else:
-                base_environ.pop("HTTPS", None)
-                base_environ["SERVER_PORT"] = 80
+                base_scope["server"][1] = 80
 
         if url.port is not None:
-            base_environ["SERVER_PORT"] = url.port
-            base_environ["HTTP_HOST"] += f":{url.port}"
+            base_scope["server"][1] = url.port
 
         path = url.path
         if not path:
             path = "/"
 
-        base_environ["PATH_INFO"] = path
+        base_scope["path"] = path
+        base_scope["raw_path"] = path
 
         query_string = ""
         if url.query:
             query_string = url.query
 
-        base_environ["REQUEST_URI"] = path + (
-            "?" + query_string if query_string else ""
-        )
-        base_environ["QUERY_STRING"] = query_string
+        base_scope["query_string"] = query_string
 
-        return cls(environ=base_environ)
+        return cls(scope=base_scope)
 
 
 __all__ = ["Request"]
