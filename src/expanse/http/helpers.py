@@ -4,16 +4,19 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import NoReturn
 
+from baize.asgi import JSONResponse
+
 from expanse.core.helpers import _get_container
+from expanse.core.http.exceptions import HTTPException
+from expanse.http.response import Response
 
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from collections.abc import MutableMapping
+    from os import PathLike
 
     from expanse.http.redirect import Redirect
-    from expanse.http.responder import Responder
-    from expanse.http.response import Response
+    from expanse.http.responder import AsyncResponder
 
 
 def abort(
@@ -21,7 +24,7 @@ def abort(
     message: str | None = None,
     headers: MutableMapping[str, str] | None = None,
 ) -> NoReturn:
-    respond().abort(status_code, message, headers)
+    raise HTTPException(status_code, message, headers)
 
 
 def json(
@@ -30,41 +33,57 @@ def json(
     headers: MutableMapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> Response:
-    return respond().json(content, status_code, headers, **kwargs)
+    return Response(
+        response=JSONResponse(
+            content, status_code=status_code, headers=headers, **kwargs
+        )
+    )
 
 
-def text(
-    content: Any = "",
-    status_code: int = 200,
-    headers: MutableMapping[str, Any] | None = None,
+def file_(
+    path: str | PathLike[str],
+    headers: MutableMapping[str, str] | None = None,
+    media_type: str | None = None,
+    filename: str | None = None,
+    chunk_size: int = 4096 * 64,
 ) -> Response:
-    return respond().text(content, status_code, headers)
+    from baize.asgi import FileResponse
+
+    return Response(
+        response=FileResponse(
+            str(path),
+            headers=headers,
+            content_type=media_type,
+            download_name=filename,
+            chunk_size=chunk_size,
+        )
+    )
 
 
-def redirect() -> Redirect:
-    return respond().redirect()
+async def redirect() -> Redirect:
+    return (await respond()).redirect()
 
 
-def respond() -> Responder:
+async def respond() -> AsyncResponder:
     container = _get_container()
 
-    from expanse.http.responder import Responder
+    from expanse.http.responder import AsyncResponder
 
-    return container.get(Responder)
+    return await container.get(AsyncResponder)
 
 
-def response(
+async def response(
     content: str = "",
     status_code: int = 200,
     headers: MutableMapping[str, Any] | None = None,
 ) -> Response:
-    return respond().html(content, status_code, headers)
+    return (await respond()).html(content, status_code, headers)
 
 
-def view(
+async def view(
     view: str,
-    data: Mapping[str, Any] | None = None,
+    data: MutableMapping[str, Any] | None = None,
     status_code: int = 200,
     headers: MutableMapping[str, Any] | None = None,
 ) -> Response:
-    return respond().view(view, data, status_code, headers)
+    return await (await respond()).view(view, data, status_code, headers)

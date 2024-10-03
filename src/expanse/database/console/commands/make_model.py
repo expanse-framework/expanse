@@ -9,9 +9,9 @@ from inflection import camelize
 from inflection import pluralize
 from inflection import underscore
 
-from expanse.common.stubs.generator import Generator
 from expanse.core.application import Application
 from expanse.database.console.command import MigrationCommand
+from expanse.stubs.generator import Generator
 
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class MakeModelCommand(MigrationCommand):
         )
     ]
 
-    def handle(self, app: Application, generator: Generator) -> int:
+    async def handle(self, app: Application, generator: Generator) -> int:
         self.line("")
 
         models_path: Path = app.path("models")

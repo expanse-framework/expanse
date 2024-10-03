@@ -6,10 +6,10 @@ from typing import ClassVar
 from cleo.helpers import option
 from cleo.io.inputs.option import Option
 
-from expanse.common.encryption.encryptor import Cipher
-from expanse.common.encryption.encryptor import Encryptor
 from expanse.console.commands.command import Command
 from expanse.core.application import Application
+from expanse.encryption.encryptor import Cipher
+from expanse.encryption.encryptor import Encryptor
 
 
 class EncryptionKeyGenerateCommand(Command):
@@ -22,7 +22,7 @@ class EncryptionKeyGenerateCommand(Command):
         ),
     ]
 
-    def handle(self, app: Application) -> int:
+    async def handle(self, app: Application) -> int:
         raw_key = Encryptor.generate_random_key(
             Cipher(app.config.get("encryption.cipher"))
         )
@@ -34,7 +34,7 @@ class EncryptionKeyGenerateCommand(Command):
 
             return 0
 
-        if not self._replace_key(app, key):
+        if not await self._replace_key(app, key):
             return 1
 
         app.config["app.secret_key"] = key
@@ -43,7 +43,7 @@ class EncryptionKeyGenerateCommand(Command):
 
         return 0
 
-    def _replace_key(self, app: Application, key: str) -> bool:
+    async def _replace_key(self, app: Application, key: str) -> bool:
         existing_key: str | None = app.config.get("app.secret_key")
 
         if existing_key and not self.confirm(
@@ -51,9 +51,9 @@ class EncryptionKeyGenerateCommand(Command):
         ):
             return False
 
-        return self._write_key(app, key)
+        return await self._write_key(app, key)
 
-    def _write_key(self, app: Application, key: str) -> bool:
+    async def _write_key(self, app: Application, key: str) -> bool:
         env_file = app.environment_path / app.environment_file
         if not env_file.exists():
             self.line_error("The .env file does not exist.", style="error")

@@ -16,7 +16,7 @@ class ServeCommand(Command):
         option("watch"),
     ]
 
-    def handle(self, app: Application) -> int:
+    async def handle(self, app: Application) -> int:
         import uvicorn
 
         log_level: str = "info"
@@ -27,8 +27,6 @@ class ServeCommand(Command):
 
         parameters: dict[str, Any] = {
             "port": int(self.option("port")),
-            "interface": "wsgi",
-            "lifespan": "off",
             "log_level": log_level,
             "reload": self.option("watch"),
             "use_colors": self._io.is_decorated(),
@@ -50,6 +48,6 @@ class ServeCommand(Command):
             sock = config.bind_socket()
             ChangeReload(config, target=server.run, sockets=[sock]).run()
         else:
-            server.run()
+            await server.serve()
 
         return 0

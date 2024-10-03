@@ -21,7 +21,7 @@ METHODS_COLORS: dict[str, str] = {
 class RoutesListCommand(Command):
     name: str = "routes list"
 
-    def handle(self, router: Router) -> int:
+    async def handle(self, router: Router) -> int:
         routes: list[Route] = []
 
         max_methods_length = 0

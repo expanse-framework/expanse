@@ -2,19 +2,17 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from typing import Annotated
-from typing import Any
+from typing import NoReturn
 from typing import get_args
 from typing import get_origin
 
 from pydantic import BaseModel
 
-from expanse.common.http.form import Form
-from expanse.common.http.json import JSON
-from expanse.common.http.query import Query
-from expanse.common.http.url_path import URLPath
-from expanse.common.routing.exceptions import RouteNotFound
-from expanse.common.routing.route_matcher import RouteMatcher
 from expanse.container.container import Container
+from expanse.http.form import Form
+from expanse.http.helpers import abort
+from expanse.http.json import JSON
+from expanse.http.query import Query
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
@@ -27,6 +25,7 @@ from expanse.types.routing import Endpoint
 
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
     from collections.abc import Callable
 
 
@@ -105,36 +104,21 @@ class Router:
         self,
         name: str | None = None,
         prefix: str | None = None,
-    ) -> Generator[RouteGroup, None, None]:
+    ) -> Generator[RouteGroup]:
         group = RouteGroup(name=name, prefix=prefix)
 
         yield group
 
         self.add_group(group)
 
-    def route(self, name: str, parameters: dict[str, Any] | None = None) -> URLPath:
-        parameters = parameters or {}
+    def find(self, name: str) -> Route | None:
+        return self._routes.find(name)
 
-        for route in self._routes:
-            if route.name == name:
-                matcher = self._container.get(RouteMatcher)
-
-                return matcher.url(route.path, **parameters)
-
-        raise RouteNotFound(f"Route [{name}] is not defined")
-
-    def url(self, path: str, parameters: dict[str, Any] | None = None) -> URLPath:
-        matcher = self._container.get(RouteMatcher)
-
-        parameters = parameters or {}
-
-        return matcher.url(path, **parameters)
-
-    def handle(self, container: Container, request: Request) -> Response:
+    async def handle(self, container: Container, request: Request) -> Response:
         route = self._routes.match(request)
 
         handler: RequestHandler
-        pipes: list[Callable[[Request, RequestHandler], Response]] = []
+        pipes: list[Callable[[Request, RequestHandler], Awaitable[Response]]] = []
         if route is None:
             # No matching route was found, so we use the default handler
             # to handle the request.
@@ -145,14 +129,14 @@ class Router:
 
             handler = self._route_handler(route, container)
             pipes = [
-                container.get(middleware).handle
+                (await container.get(middleware)).handle
                 for middleware in route.get_middleware()
             ]
 
-        return Pipeline(container).use(pipes).send(request).to(handler)
+        return await Pipeline(container).use(pipes).send(request).to(handler)
 
     def _route_handler(self, route: Route, container: Container) -> RequestHandler:
-        def handler(request: Request) -> Response:
+        async def handler(request: Request) -> Response:
             arguments = {}
 
             for name, parameter in route.signature.parameters.items():
@@ -161,21 +145,24 @@ class Router:
                 elif isinstance(parameter.annotation, type) and issubclass(
                     parameter.annotation, Form
                 ):
-                    arguments[name] = parameter.annotation(request.form)
+                    arguments[name] = parameter.annotation(await request.form)
                 elif get_origin(parameter.annotation) is Annotated and issubclass(
                     (origin_args := get_args(parameter.annotation))[0], BaseModel
                 ):
                     validation_model: type[BaseModel] = origin_args[0]
+
                     data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
 
                     if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type, misc]
-                        arguments[name] = validation_model.model_validate(request.json)
+                        arguments[name] = validation_model.model_validate(
+                            await request.json
+                        )
                     elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type, misc]
                         arguments[name] = validation_model.model_validate(
                             request.query_params
                         )
 
-            raw_response = container.call(route.endpoint, **arguments)
+            raw_response = await container.call(route.endpoint, **arguments)
 
             # Do not go through the response adapter if the response is already a Response instance
             if isinstance(raw_response, Response):
@@ -183,16 +170,15 @@ class Router:
 
             declared_response_type = route.signature.return_annotation
 
-            return container.get(ResponseAdapter).adapt(
+            adapter = await container.get(ResponseAdapter)
+            return await adapter.adapt(
                 raw_response, declared_response_type=declared_response_type
             )
 
         return handler
 
     def _default_handler(self, container: Container) -> RequestHandler:
-        def handler(request: Request) -> Response:
-            from expanse.http.responder import Responder
-
-            container.get(Responder).abort(404)
+        async def handler(request: Request) -> NoReturn:
+            abort(404)
 
         return handler

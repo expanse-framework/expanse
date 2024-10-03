@@ -4,19 +4,20 @@ from typing import TYPE_CHECKING
 from typing import Literal
 from typing import Self
 
-from baize.wsgi.responses import PlainTextResponse
-from baize.wsgi.responses import Response as BaizeResponse
-from baize.wsgi.responses import SmallResponse as BaizeSmallResponse
+from baize.asgi.responses import PlainTextResponse
+from baize.asgi.responses import Response as BaizeResponse
+from baize.asgi.responses import SmallResponse as BaizeSmallResponse
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Mapping
     from collections.abc import MutableMapping
 
     from baize.datastructures import Cookie
 
-    from expanse.types import Environ
-    from expanse.types import StartResponse
+    from expanse.types import Receive
+    from expanse.types import Scope
+    from expanse.types import Send
 
 
 class Response:
@@ -84,7 +85,7 @@ class Response:
 
         return self
 
-    def with_headers(self, headers: MutableMapping[str, str]) -> Self:
+    def with_headers(self, headers: Mapping[str, str]) -> Self:
         self._response.headers.update(headers)
 
         return self
@@ -133,7 +134,5 @@ class Response:
             samesite=samesite,
         )
 
-    def __call__(
-        self, environ: Environ, start_response: StartResponse
-    ) -> Iterable[bytes]:
-        return self._response(environ, start_response)  # type: ignore[arg-type]
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        return await self._response(scope=scope, receive=receive, send=send)

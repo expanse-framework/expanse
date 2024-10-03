@@ -3,12 +3,12 @@ from collections.abc import Iterator
 from typing import ClassVar
 from typing import NoReturn
 
-from expanse.common.core.http.exceptions import HTTPException
-from expanse.common.routing.route import Match
-from expanse.common.routing.route_matcher import RouteMatcher
+from expanse.core.http.exceptions import HTTPException
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.route import Route
+from expanse.routing.route_matcher import Match
+from expanse.routing.route_matcher import RouteMatcher
 
 
 class RouteCollection:
@@ -25,6 +25,7 @@ class RouteCollection:
     def __init__(self) -> None:
         self._routes: list[Route] = []
         self._routes_by_method: dict[str, list[Route]] = defaultdict(list)
+        self._routes_by_name: dict[str, Route] = {}
         self._route_matcher: RouteMatcher = RouteMatcher()
 
     def add(self, route: Route) -> None:
@@ -33,7 +34,10 @@ class RouteCollection:
         for method in route.methods:
             self._routes_by_method[method.upper()].append(route)
 
-    def match(self, request: Request):
+        if route.name:
+            self._routes_by_name[route.name] = route
+
+    def match(self, request: Request) -> Route | None:
         routes = self.get(request.method)
 
         route = self.get_matching_route(request, routes)
@@ -58,6 +62,9 @@ class RouteCollection:
                 return route
 
         return None
+
+    def find(self, name: str) -> Route | None:
+        return self._routes_by_name.get(name)
 
     def _handle_route(self, request: Request, route: Route | None) -> Route | None:
         if route is not None:
@@ -91,7 +98,7 @@ class RouteCollection:
     ) -> Route | None:
         if request.method == "OPTIONS":
 
-            def endpoint() -> Response:
+            async def endpoint() -> Response:
                 return Response(
                     "", status_code=200, headers={"Allow": ", ".join(methods)}
                 )

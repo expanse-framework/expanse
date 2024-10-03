@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 class LoadEnvironmentVariables:
     @classmethod
-    def bootstrap(cls, app: Application) -> None:
+    async def bootstrap(cls, app: Application) -> None:
         env_file = app.environment_path.joinpath(app.environment_file)
 
         if env_file.exists():

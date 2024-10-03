@@ -6,5 +6,5 @@ from expanse.support.service_provider import ServiceProvider
 
 
 class CoreServiceProvider(ServiceProvider):
-    def register(self) -> None:
+    async def register(self) -> None:
         self._container.singleton(ExceptionRendererContract, ExceptionRenderer)

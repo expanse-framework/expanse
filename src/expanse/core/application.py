@@ -3,14 +3,11 @@ from __future__ import annotations
 import traceback
 
 from pathlib import Path
-from threading import Lock
 from typing import TYPE_CHECKING
 from typing import ClassVar
 from typing import Self
 
-from expanse.common.configuration.config import Config
-from expanse.common.core.application import Application as BaseApplication
-from expanse.common.support._utils import string_to_class
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
@@ -21,21 +18,23 @@ from expanse.core.bootstrap.load_configuration import LoadConfiguration
 from expanse.core.bootstrap.load_environment_variables import LoadEnvironmentVariables
 from expanse.core.bootstrap.register_providers import RegisterProviders
 from expanse.exceptions.handler import ExceptionHandler
+from expanse.support._utils import string_to_class
 
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
     from collections.abc import Callable
-    from collections.abc import Iterable
 
     from cleo.io.inputs.input import Input
 
     from expanse.core.bootstrap.bootstrapper import Bootstrapper
     from expanse.support.service_provider import ServiceProvider
-    from expanse.types import Environ
-    from expanse.types import StartResponse
+    from expanse.types import Receive
+    from expanse.types import Scope
+    from expanse.types import Send
 
 
-class Application(BaseApplication):
+class Application:
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,
@@ -46,26 +45,82 @@ class Application(BaseApplication):
     def __init__(
         self, base_path: Path | None = None, container: Container | None = None
     ) -> None:
-        BaseApplication.__init__(
-            self,
-            base_path
-            or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent,
-        )
-        self._lock = Lock()
-
         if container is None:
             container = Container()
 
         self._container = container
 
+        self._base_path: Path = (
+            base_path
+            or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
+        )
+        self._config_path: Path | None = None
+        self._resources_path: Path | None = None
+        self._static_path: Path | None = None
+        self._environment_path: Path | None = None
+        self._database_path: Path | None = None
+
+        self._booted: bool = False
+        self._has_been_bootstrapped: bool = False
+        self._config: Config
         self._service_providers: list[ServiceProvider] = []
         self._default_bootstrappers: list[type[Bootstrapper]] = (
             self.__class__._bootstrappers.copy()
         )
-        self._bootstrapping_callbacks: list[Callable[[Container], None]] = []
+        self._bootstrapping_callbacks: list[Callable[[Container], Awaitable[None]]] = []
 
         self._bind_paths()
         self._register_base_bindings()
+
+    @property
+    def base_path(self) -> Path:
+        return self._base_path
+
+    @property
+    def config_path(self) -> Path:
+        return self._config_path or self._base_path.joinpath("config")
+
+    @property
+    def environment_path(self) -> Path:
+        return self._environment_path or self._base_path
+
+    def path(self, path: str | Path, relative: bool = False) -> Path:
+        path = self._base_path.joinpath("app").joinpath(path)
+
+        if relative:
+            path = path.relative_to(self._base_path)
+
+        return path
+
+    def named_path(self, name: str) -> Path:
+        path_key = f"paths.{name}"
+        if path_key not in self._config:
+            raise ValueError(f"Named path {name} is not configured.")
+
+        path: Path = self._config[path_key]
+
+        return self._base_path.joinpath(path)
+
+    @property
+    def environment_file(self) -> str:
+        return ".env"
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def is_booted(self) -> bool:
+        return self._booted
+
+    def has_been_bootstrapped(self) -> bool:
+        return self._has_been_bootstrapped
+
+    def set_base_path(self, base_path: Path) -> Self:
+        self._base_path = base_path
+
+        self._bind_paths()
+
+        return self
 
     @property
     def container(self) -> Container:
@@ -77,15 +132,14 @@ class Application(BaseApplication):
             base_path
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
         )
-        builder = ApplicationBuilder(base_path).with_kernels().with_commands()
 
-        return builder
+        return ApplicationBuilder(base_path).with_kernels().with_commands()
 
     def set_config(self, config: Config) -> None:
-        super().set_config(config)
+        self._config = config
         self._container.instance(Config, config)
 
-    def boot(self) -> None:
+    async def boot(self) -> None:
         """
         Boot the application service providers.
         """
@@ -93,46 +147,39 @@ class Application(BaseApplication):
             return
 
         for service_provider in self._service_providers:
-            self._boot_provider(service_provider)
+            await self._boot_provider(service_provider)
 
         self._booted = True
 
-    def set_base_path(self, base_path: Path) -> Self:
-        self._base_path = base_path
+    async def bootstrap(self) -> Self:
+        return await self.bootstrap_with(self._default_bootstrappers)
 
-        self._bind_paths()
-
-        return self
-
-    def bootstrap(self) -> Self:
-        return self.bootstrap_with(self._default_bootstrappers)
-
-    def bootstrap_with(self, bootstrappers: list[type[Bootstrapper]]) -> Self:
+    async def bootstrap_with(self, bootstrappers: list[type[Bootstrapper]]) -> Self:
         if self._has_been_bootstrapped:
             return self
 
-        self._register_base_service_providers()
+        await self._register_base_service_providers()
 
         for bootstrapper_class in bootstrappers:
-            bootstrapper: Bootstrapper = self._container.get(bootstrapper_class)
-            bootstrapper.bootstrap(self)
+            bootstrapper: Bootstrapper = await self._container.get(bootstrapper_class)
+            await bootstrapper.bootstrap(self)
 
         for callback in self._bootstrapping_callbacks:
-            callback(self._container)
+            await callback(self._container)
 
-        self.boot()
+        await self.boot()
 
         self._has_been_bootstrapped = True
 
         return self
 
-    def bootstrapping(self, *callback: Callable[[Container], None]) -> Self:
+    def bootstrapping(self, *callback: Callable[[Container], Awaitable[None]]) -> Self:
         self._bootstrapping_callbacks.extend(callback)
 
         return self
 
-    def register_configured_providers(self) -> None:
-        providers = self._container.get(Config).get("app.providers", [])
+    async def register_configured_providers(self) -> None:
+        providers = (await self._container.get(Config)).get("app.providers", [])
 
         for provider_class in providers:
             if isinstance(provider_class, str):
@@ -140,26 +187,23 @@ class Application(BaseApplication):
 
             provider = provider_class(self._container)
 
-            self.register(provider)
+            await self.register(provider)
 
-    def register(
+    async def register(
         self, provider: ServiceProvider, force: bool = False
     ) -> ServiceProvider:
         self._service_providers.append(provider)
 
-        provider.register()
-
-        if self._has_been_bootstrapped:
-            self._boot_provider(provider)
+        await provider.register()
 
         return provider
 
-    def handle_command(self, input: Input) -> int:
+    async def handle_command(self, input: Input) -> int:
         from expanse.core.console.gateway import Gateway
 
-        kernel = self._container.get(Gateway)
+        kernel = await self._container.get(Gateway)
 
-        return kernel.handle(input)
+        return await kernel.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None
@@ -167,15 +211,14 @@ class Application(BaseApplication):
         self._container.instance("path", self._base_path)
         self._container.instance("path:config", self.config_path)
 
-    def _boot_provider(self, provider: ServiceProvider) -> None:
+    async def _boot_provider(self, provider: ServiceProvider) -> None:
         if hasattr(provider, "boot"):
-            self._container.call(provider.boot)
+            await self._container.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
         from expanse.core.http.gateway import Gateway
 
         self._container.instance(self.__class__, self)
-        self._container.instance(BaseApplication, self)
         self._container.alias(self.__class__, "app")
         self._container.instance(Container, self._container)
         self._config = Config({})
@@ -186,19 +229,27 @@ class Application(BaseApplication):
 
         self._container.singleton(ExceptionHandlerContract, ExceptionHandler)
 
-    def _register_base_service_providers(self) -> None:
+    async def _register_base_service_providers(self) -> None:
         from expanse.http.http_service_provider import HTTPServiceProvider
         from expanse.routing.routing_service_provider import RoutingServiceProvider
 
-        self.register(HTTPServiceProvider(self._container))
-        self.register(RoutingServiceProvider(self._container))
+        await self.register(HTTPServiceProvider(self._container))
+        await self.register(RoutingServiceProvider(self._container))
 
-    def __call__(
-        self, environ: Environ, start_response: StartResponse
-    ) -> Iterable[bytes]:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await self.bootstrap()
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await self._container.terminate()
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+
         from expanse.core.http.gateway import Gateway
 
-        with self._lock:
-            self.bootstrap()
+        gateway = await self._container.get(Gateway)
 
-        return self._container.get(Gateway)(environ, start_response)
+        await gateway(scope, receive, send)

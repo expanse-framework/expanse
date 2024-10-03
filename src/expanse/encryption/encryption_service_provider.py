@@ -3,30 +3,30 @@ import base64
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from expanse.common.encryption.errors import MissingSecretKeyError
 from expanse.core.application import Application
+from expanse.encryption.errors import MissingSecretKeyError
 from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.common.encryption.encryptor import Encryptor
     from expanse.core.console.gateway import Gateway
+    from expanse.encryption.encryptor import Encryptor
 
 
 class EncryptionServiceProvider(ServiceProvider):
-    def register(self) -> None:
-        from expanse.common.encryption.encryptor import Encryptor
+    async def register(self) -> None:
+        from expanse.encryption.encryptor import Encryptor
 
         self._container.singleton(Encryptor, self._create_encryptor)
 
-    def boot(self) -> None:
+    async def boot(self) -> None:
         from expanse.core.console.gateway import Gateway
 
-        self._container.on_resolved(Gateway, self._register_command_path)
+        await self._container.on_resolved(Gateway, self._register_command_path)
 
-    def _create_encryptor(self, app: Application) -> "Encryptor":
-        from expanse.common.encryption.encryptor import Cipher
-        from expanse.common.encryption.encryptor import Encryptor
+    async def _create_encryptor(self, app: Application) -> "Encryptor":
+        from expanse.encryption.encryptor import Cipher
+        from expanse.encryption.encryptor import Encryptor
 
         secret_key: str = app.config.get("app.secret_key")
         cipher: str = app.config.get("encryption.cipher")
@@ -36,8 +36,8 @@ class EncryptionServiceProvider(ServiceProvider):
             Cipher(cipher),
         )
 
-    def _register_command_path(self, gateway: "Gateway") -> None:
-        gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
+    async def _register_command_path(self, gateway: "Gateway") -> None:
+        await gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
 
     def _normalize_key(self, key: str) -> bytes:
         if not key:

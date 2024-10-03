@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from expanse.common.database.migration.utils import configure_alembic_loggers
 from expanse.console.commands.command import Command
+from expanse.database.migration.utils import configure_alembic_loggers
 
 
 if TYPE_CHECKING:
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class MigrationCommand(Command):
-    def run(self, io: "IO") -> int:
+    async def run(self, io: "IO") -> int:
         configure_alembic_loggers(io)
 
-        return super().run(io)
+        return await super().run(io)

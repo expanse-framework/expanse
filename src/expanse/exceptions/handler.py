@@ -13,15 +13,17 @@ from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
 from pydantic import ValidationError
 
-from expanse.common.configuration.config import Config
-from expanse.common.core.http.exceptions import HTTPException
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
 )
 from expanse.contracts.debug.exception_renderer import ExceptionRenderer
+from expanse.core.http.exceptions import HTTPException
+from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.routing.url_generator import URLGenerator
 
 
 if TYPE_CHECKING:
@@ -40,19 +42,20 @@ class ExceptionHandler(ExceptionHandlerContract):
         self._raise_unhandled_exceptions: bool = False
         self._exception_preparers: dict[type, Callable[[Any], Exception]] = {}
 
-    def report(self, e: Exception) -> None:
-        if not self.should_report(e):
+    async def report(self, e: Exception) -> None:
+        if not await self.should_report(e):
             return
 
-        self._report_exception(e)
+        await self._report_exception(e)
 
-    def _report_exception(self, e: Exception) -> None:
+    async def _report_exception(self, e: Exception) -> None:
+        # TODO: Better logging handling
         if self._raise_unhandled_exceptions:
             raise e
 
         logger.exception(e)
 
-    def should_report(self, e: Exception) -> bool:
+    async def should_report(self, e: Exception) -> bool:
         return not any(isinstance(e, klass) for klass in self._dont_report)
 
     def ignore(self, exception_class: type[Exception]) -> Self:
@@ -66,24 +69,46 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         return self
 
-    def render(self, request: Request, e: Exception) -> Response:
+    async def render(self, request: Request, e: Exception) -> Response:
         e = self._prepare_exception(e)
 
         if isinstance(e, ValidationError):
-            return self._render_validation_exception(e, request)
+            return await self._render_validation_exception(e, request)
 
-        return self._render_exception_response(request, e)
+        return await self._render_exception_response(request, e)
 
-    def render_for_console(self, output: Output, e: Exception) -> None:
+    async def render_for_console(self, output: Output, e: Exception) -> None:
         from cleo.ui.exception_trace import ExceptionTrace
 
         trace = ExceptionTrace(e)
 
         trace.render(output)
 
+    async def _render_exception_response(
+        self, request: Request, e: Exception
+    ) -> Response:
+        if request.expects_json():
+            return await self._render_json_response(request, e)
+
+        return await self._render_response(request, e)
+
+    async def _render_json_response(self, request: Request, e: Exception) -> Response:
+        return json(
+            await self._convert_exception_to_dict(e),
+            status_code=e.status_code if isinstance(e, HTTPException) else 500,
+            indent=2,
+            headers=e.headers if isinstance(e, HTTPException) else {},
+        )
+
     def prepare_using(
         self, exception_class: type[_TError], preparer: Callable[[_TError], Exception]
     ) -> None:
+        """
+        Register a preparer for a specific exception class.
+
+        :param exception_class: The exception class to prepare, i.e. convert to another exception.
+        :param preparer: The preparer function to use to convert the given exception type.
+        """
         self._exception_preparers[exception_class] = preparer
 
     def _prepare_exception(self, e: Exception) -> Exception:
@@ -103,47 +128,18 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         return preparer(e)
 
-    def _render_exception_response(self, request: Request, e: Exception) -> Response:
-        if request.expects_json():
-            return self._render_json_response(request, e)
-
-        return self._render_response(request, e)
-
-    def _render_json_response(self, request: Request, e: Exception) -> Response:
-        from expanse.http.responder import Responder
-
-        if self._container.has(Responder):
-            responder = self._container.get(Responder)
-        else:
-            from expanse.http.redirect import Redirect
-            from expanse.routing.router import Router
-            from expanse.view.view_factory import ViewFactory
-
-            responder = Responder(
-                self._container.get(ViewFactory),
-                Redirect(self._container.get(Router), request),
-            )
-
-        return responder.json(
-            self._convert_exception_to_dict(e),
-            status_code=e.status_code if isinstance(e, HTTPException) else 500,
-            indent=2,
-            headers=e.headers if isinstance(e, HTTPException) else None,
-        )
-
-    def _render_response(self, request: Request, e: Exception) -> Response:
-        if not isinstance(e, HTTPException) and self._container.get(Config).get(
-            "app.debug"
-        ):
+    async def _render_response(self, request: Request, e: Exception) -> Response:
+        config = await self._container.get(Config)
+        if not isinstance(e, HTTPException) and config.get("app.debug"):
             if self._container.has(ExceptionRenderer):
                 return Response(
-                    self._container.get(ExceptionRenderer).render(e),
+                    await (await self._container.get(ExceptionRenderer)).render(e),
                     status_code=500,
                     content_type="text/html",
                 )
 
             return Response(
-                self._render_exception_content(e),
+                await self._render_exception_content(e),
                 status_code=500,
                 content_type="text/plain",
             )
@@ -151,38 +147,39 @@ class ExceptionHandler(ExceptionHandlerContract):
         if not isinstance(e, HTTPException):
             e = HTTPException(500, str(e))
 
-        return self._render_http_exception(e)
+        return await self._render_http_exception(e)
 
-    def _render_http_exception(self, e: HTTPException) -> Response:
-        self._register_error_paths()
+    async def _render_http_exception(self, e: HTTPException) -> Response:
+        await self._register_error_paths()
 
-        if view := self._get_http_exception_view(e):
-            from expanse.view.view_factory import ViewFactory
+        if view := (await self._get_http_exception_view(e)):
+            from expanse.view.view_factory import AsyncViewFactory
 
-            factory = self._container.get(ViewFactory)
+            factory = await self._container.get(AsyncViewFactory)
 
-            response = factory.render(
+            response = await factory.render(
                 factory.make(view, {"exception": e}, status_code=e.status_code)
             )
 
             return response
 
         return Response(
-            self._render_exception_content(e),
+            await self._render_exception_content(e),
             status_code=e.status_code,
             content_type="text/plain",
             headers=e.headers,
         )
 
-    def _render_validation_exception(
+    async def _render_validation_exception(
         self, e: ValidationError, request: Request
     ) -> Response:
         if request.expects_json() or request.is_json():
-            content: dict[str, Any] = {"code": "validation_error"}
-            details: list[dict[str, Any]] = []
+            content = {"code": "validation_error", "detail": []}
+
+            assert isinstance(content["detail"], list)
 
             for error in e.errors():
-                details.append(
+                content["detail"].append(
                     {
                         "loc": error["loc"],
                         "message": error["msg"],
@@ -190,38 +187,45 @@ class ExceptionHandler(ExceptionHandlerContract):
                     }
                 )
 
-            content["detail"] = details
-
             from expanse.http.redirect import Redirect
-            from expanse.http.responder import Responder
+            from expanse.http.responder import AsyncResponder
             from expanse.routing.router import Router
-            from expanse.view.view_factory import ViewFactory
+            from expanse.view.view_factory import AsyncViewFactory
 
-            responder = Responder(
-                self._container.get(ViewFactory),
-                Redirect(self._container.get(Router), request),
+            router = await self._container.get(Router)
+
+            responder = AsyncResponder(
+                await self._container.get(AsyncViewFactory),
+                Redirect(router, request, URLGenerator(router, request)),
             )
 
             return responder.json(content, status_code=422)
 
         http_exception = HTTPException(422, str(e))
 
-        return self._render_http_exception(http_exception)
+        return await self._render_http_exception(http_exception)
 
-    def _get_http_exception_view(self, e: HTTPException) -> str | None:
+    async def _get_http_exception_view(self, e: HTTPException) -> str | None:
         view = f"errors/{e.status_code}"
 
-        from expanse.view.view_factory import ViewFactory
+        from expanse.view.view_factory import AsyncViewFactory
 
-        factory = self._container.get(ViewFactory)
+        factory = await self._container.get(AsyncViewFactory)
 
         if not factory.exists(view):
             return None
 
         return view
 
-    def _render_exception_content(self, e: Exception) -> str:
-        config = self._container.get(Config)
+    async def _register_error_paths(self) -> None:
+        from expanse.view.view_finder import ViewFinder
+
+        (await self._container.get(ViewFinder)).add_paths(
+            [Path(__file__).parent.joinpath("views")]
+        )
+
+    async def _render_exception_content(self, e: Exception) -> str:
+        config = await self._container.get(Config)
         if config.get("app.debug", False):
             inspector = Inspector(e)
 
@@ -239,10 +243,11 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         return e.detail if isinstance(e, HTTPException) else "Server Error"
 
-    def _convert_exception_to_dict(self, e: Exception) -> dict[str, Any]:
-        debug = self._container.get(Config).get("app.debug", False)
+    async def _convert_exception_to_dict(self, e: Exception) -> dict[str, Any]:
+        debug = (await self._container.get(Config)).get("app.debug", False)
         if debug:
             inspector = Inspector(e)
+
             frame: Frame | None = None
             trace: list[dict[str, Any]] = []
             if inspector.frames:
@@ -272,15 +277,6 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         return {"message": e.detail if isinstance(e, HTTPException) else "Server error"}
 
-    def _register_error_paths(self) -> None:
-        import expanse
-
-        from expanse.view.view_finder import ViewFinder
-
-        self._container.get(ViewFinder).add_paths(
-            [Path(expanse.__file__).parent.joinpath("common/exceptions/views")]
-        )
-
     def dont_report(self, *e: type[Exception]) -> Self:
         self._dont_report |= set(e)
 
@@ -289,7 +285,7 @@ class ExceptionHandler(ExceptionHandlerContract):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> Generator[None]:
+    ) -> Generator[None, None, None]:
         original_value = self._raise_unhandled_exceptions
         self._raise_unhandled_exceptions = raise_exceptions
 

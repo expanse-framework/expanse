@@ -39,7 +39,7 @@ To display the list of available commands, please use the <info>list</info> comm
 
         super().configure()
 
-    def handle(self) -> int:
+    async def handle(self) -> int:
         from cleo.descriptors.text_descriptor import TextDescriptor
 
         if self._command is None:

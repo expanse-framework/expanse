@@ -1,3 +1,4 @@
+from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -13,8 +14,8 @@ from expanse.container.container import Container
 from expanse.http.response import Response
 
 
-_Adapter = Callable[..., Response]
-_Serializer = Callable[..., dict[str, Any]]
+_Adapter = Callable[..., Awaitable[Response]] | Callable[..., Response]
+_Serializer = Callable[..., Awaitable[dict[str, Any]]]
 T = TypeVar("T")
 
 
@@ -26,7 +27,7 @@ class ResponseAdapter:
             Sequence: self._adapt_sequence,
         }
 
-    def adapt(
+    async def adapt(
         self, response: Any, declared_response_type: type | None = None
     ) -> Response:
         adapter = self.adapter(response, declared_response_type=declared_response_type)
@@ -34,7 +35,7 @@ class ResponseAdapter:
         if adapter is None:
             raise ValueError(f"Cannot adapt type {type(response)} to a valid response")
 
-        return self._container.call(
+        return await self._container.call(
             adapter, response, expected_type=declared_response_type
         )
 
@@ -60,30 +61,32 @@ class ResponseAdapter:
         if not serializer:
             return None
 
-        def _adapter(response: Any, **kwargs) -> Response:
-            from expanse.http.responder import Responder
+        async def _adapter(response: Any, **kwargs) -> Response:
+            from expanse.http.responder import AsyncResponder
 
-            responder = self._container.get(Responder)
+            responder = await self._container.get(AsyncResponder)
 
-            return responder.json(serializer(response))
+            return responder.json(await serializer(response))
 
         return _adapter
 
-    def _adapt_string(self, response: str, container: Container, **kwargs) -> Response:
-        from expanse.http.responder import Responder
+    async def _adapt_string(
+        self, response: str, container: Container, **kwargs
+    ) -> Response:
+        from expanse.http.responder import AsyncResponder
 
-        responder = container.get(Responder)
+        responder = await container.get(AsyncResponder)
 
         return responder.json(response)
 
-    def _adapt_sequence(
+    async def _adapt_sequence(
         self,
         response: Sequence,
         container: Container,
         *,
         expected_type: type | None = None,
     ) -> Response:
-        from expanse.http.responder import Responder
+        from expanse.http.responder import AsyncResponder
 
         if expected_type is not None:
             origin: type | None = get_origin(expected_type)
@@ -100,10 +103,11 @@ class ResponseAdapter:
 
         # Adapt each item in the sequence
         new_response: list[Any] = [
-            serializer(item) if serializer is not None else item for item in response
+            await serializer(item) if serializer is not None else item
+            for item in response
         ]
 
-        responder = container.get(Responder)
+        responder = await container.get(AsyncResponder)
 
         return responder.json(new_response)
 
@@ -121,12 +125,16 @@ class ResponseAdapter:
 
                 if issubclass(serialization_model, BaseModel):
 
-                    def _serializer(model: Any) -> dict[str, Any]:
+                    async def _serializer(model: Any) -> dict[str, Any]:
                         return serialization_model.model_validate(model).model_dump()
 
                     serializer = _serializer
 
         if serializer is None and is_dataclass(obj):
-            serializer = asdict
+
+            async def _serializer(model: Any) -> dict[str, Any]:
+                return asdict(model)
+
+            serializer = _serializer
 
         return serializer

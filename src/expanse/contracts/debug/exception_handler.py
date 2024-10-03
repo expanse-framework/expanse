@@ -17,7 +17,7 @@ _TError = TypeVar("_TError", bound=Exception)
 
 class ExceptionHandler(ABC):
     @abstractmethod
-    def report(self, e: Exception) -> None:
+    async def report(self, e: Exception) -> None:
         """
         Report or log an exception.
 
@@ -27,7 +27,7 @@ class ExceptionHandler(ABC):
         """
 
     @abstractmethod
-    def should_report(self, e: Exception) -> bool:
+    async def should_report(self, e: Exception) -> bool:
         """
         Determine whether the exception should be reported or not.
 
@@ -45,7 +45,7 @@ class ExceptionHandler(ABC):
         ...
 
     @abstractmethod
-    def render(self, request: Request, e: Exception) -> Response:
+    async def render(self, request: Request, e: Exception) -> Response:
         """
         Render the exception into an HTTP response.
 
@@ -55,7 +55,7 @@ class ExceptionHandler(ABC):
         ...
 
     @abstractmethod
-    def render_for_console(self, output: Output, e: Exception) -> None:
+    async def render_for_console(self, output: Output, e: Exception) -> None:
         """
         Render the exception to the console output.
 
@@ -68,7 +68,7 @@ class ExceptionHandler(ABC):
     @contextmanager
     def raise_unhandled_exceptions(
         self, raise_exceptions: bool = True
-    ) -> Generator[None]:
+    ) -> Generator[None, None, None]:
         """
         Temporarily enable/disable raising unhandled exceptions.
         This is mainly useful for debugging purposes.

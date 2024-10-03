@@ -1,8 +1,8 @@
-# ruff: noqa: I002
 import re
 
-from expanse.common.configuration.config import Config
+from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.core.http.middleware.middleware import Middleware
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.types.http.middleware import RequestHandler
@@ -200,20 +200,20 @@ class Cors:
             )
 
 
-class ManageCors:
+class ManageCors(Middleware):
     def __init__(self, container: Container, config: Config) -> None:
         self._container: Container = container
         self._cors: Cors = Cors()
         self._config: Config = config
 
-    def handle(self, request: Request, next_call: RequestHandler) -> Response:
+    async def handle(self, request: Request, next_call: RequestHandler) -> Response:
         """
         Handle the incoming request.
         """
         if not self._has_matching_path(request):
-            return next_call(request)
+            return await next_call(request)
 
-        self._cors.set_options(**self._container.get(Config).get("cors", {}))
+        self._cors.set_options(**(await self._container.get(Config)).get("cors", {}))
 
         if self._cors.is_preflight_request(request):
             response = self._cors.handle_preflight_request(request)
@@ -222,7 +222,7 @@ class ManageCors:
 
             return response
 
-        response = next_call(request)
+        response = await next_call(request)
 
         if request.method == "OPTIONS":
             self._cors.vary_header(response, "Access-Control-Request-Method")
@@ -232,7 +232,7 @@ class ManageCors:
         return response
 
     def _has_matching_path(self, request: Request) -> bool:
-        paths: list[str] = self._config.get("cors.paths", [])
+        paths: list[str] = self._config.get("cors", {}).get("paths", [])
 
         for path in paths:
             if path != "/":
