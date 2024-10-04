@@ -11,7 +11,7 @@ async def test_generate_key_without_env_file(
 
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.run()
+    return_code = command.run()
     assert return_code == 1
 
     expected = """The .env file does not exist.
@@ -28,7 +28,7 @@ async def test_generate_key_with_env_file_but_without_app_secret_key(
 
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.run()
+    return_code = command.run()
     assert return_code == 1
 
     expected = """The application key could not be set. \
@@ -47,7 +47,7 @@ async def test_generate_key_with_env_file_and_with_empty_app_secret_key(
 
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.run()
+    return_code = command.run()
     assert return_code == 0
 
     expected = """Application secret key generated successfully.
@@ -71,7 +71,7 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key(
 
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.with_user_input("y\n").run()
+    return_code = command.with_user_input("y\n").run()
     assert return_code == 0
 
     expected = """Do you want to replace the existing application secret key? (yes/no) [no]\
@@ -96,7 +96,7 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key_and_
 
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.with_user_input("n\n").run()
+    return_code = command.with_user_input("n\n").run()
     assert return_code == 1
 
     expected = (
@@ -114,7 +114,7 @@ async def test_generate_key_show_only(
 ) -> None:
     command = command_tester.command("encryption key generate")
 
-    return_code = await command.run("--show")
+    return_code = command.run("--show")
     assert return_code == 0
 
     assert command.output.fetch().strip().startswith("base64:")
