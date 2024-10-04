@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 
-from abc import abstractmethod
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ClassVar
@@ -15,8 +15,11 @@ from cleo.io.inputs.definition import Definition
 from cleo.io.null_io import NullIO
 from cleo.io.outputs.output import Verbosity
 
+from expanse.support._concurrency import run_in_threadpool
+
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from contextlib import AbstractContextManager
 
     from cleo.io.inputs.argument import Argument
@@ -66,17 +69,25 @@ class Command:
 
         self._container: Container | None = None
 
-    @abstractmethod
-    async def handle(self, *args, **kwargs) -> int | None: ...
-
     async def execute(self, io: IO) -> int | None:
         self._io = io
 
+        handle: Callable[..., int | None] | None = getattr(self, "handle", None)
+
+        if handle is None:
+            io.write_error_line(
+                f"The handle() method is not defined on Command '{self.name}'."
+            )
+            return 1
+
         try:
             if not self._container:
-                return await self.handle()
+                if asyncio.iscoroutinefunction(handle):
+                    return await handle()
 
-            return await self._container.call(self.handle)
+                return await run_in_threadpool(handle)
+
+            return await self._container.call(handle)
         except KeyboardInterrupt:
             return 1
 

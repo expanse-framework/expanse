@@ -20,13 +20,13 @@ async def migrate(command_tester: CommandTester, app: Application) -> None:
 
     command = command_tester.command("db migrate")
 
-    await command.run()
+    command.run()
 
 
 async def test_rollback(command_tester: CommandTester, app: Application) -> None:
     command = command_tester.command("db rollback")
 
-    return_code = await command.run()
+    return_code = command.run()
     assert return_code == 0
 
     expected = """
@@ -41,7 +41,7 @@ async def test_rollback_with_step(
 ) -> None:
     command = command_tester.command("db rollback")
 
-    return_code = await command.run("--step 2")
+    return_code = command.run("--step 2")
     assert return_code == 0
 
     expected = """

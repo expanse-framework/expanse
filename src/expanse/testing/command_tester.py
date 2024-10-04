@@ -1,6 +1,8 @@
 from io import StringIO
 from typing import Self
 
+import anyio.from_thread
+
 from cleo.io.inputs.string_input import StringInput
 from cleo.io.outputs.buffered_output import BufferedOutput
 
@@ -28,15 +30,12 @@ class TestingCommand:
 
         return self
 
-    async def run(self, parameters: str | None = None) -> int:
+    def run(self, parameters: str | None = None) -> int:
         self._output.clear()
 
         full_command = self._command
         if parameters:
             full_command += " " + parameters
-
-        gateway = await self._app.container.get(Gateway)
-        handler = await self._app.container.get(ExceptionHandler)
 
         input = StringInput(full_command)
         input.set_stream(StringIO())
@@ -47,8 +46,15 @@ class TestingCommand:
             input.stream.seek(0)
             input.interactive()
 
-        with handler.raise_unhandled_exceptions():
-            self._return_code = await gateway.handle(input, self._output)
+        async def handle(input: StringInput) -> int:
+            gateway = await self._app.container.get(Gateway)
+            handler = await self._app.container.get(ExceptionHandler)
+
+            with handler.raise_unhandled_exceptions():
+                return await gateway.handle(input, self._output)
+
+        with anyio.from_thread.start_blocking_portal() as portal:
+            self._return_code = portal.call(handle, input)
 
         return self._return_code
 

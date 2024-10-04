@@ -23,7 +23,7 @@ async def test_migrate(
 
     command = command_tester.command("db migrate")
 
-    return_code = await command.run()
+    return_code = command.run()
     assert return_code == 0
 
     expected = """
@@ -51,7 +51,7 @@ async def test_migrate_with_step(
 
     command = command_tester.command("db migrate")
 
-    return_code = await command.run("--step 1")
+    return_code = command.run("--step 1")
     assert return_code == 0
 
     expected = """
@@ -73,7 +73,7 @@ async def test_migrate_with_dry_run_mode(
 
     command = command_tester.command("db migrate")
 
-    return_code = await command.run("--dry-run")
+    return_code = command.run("--dry-run")
     assert return_code == 0
 
     expected = """

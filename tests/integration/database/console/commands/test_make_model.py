@@ -26,7 +26,7 @@ async def test_make_model(
 
     command = command_tester.command("make model")
 
-    assert await command.run("User") == 0
+    assert command.run("User") == 0
 
     expected = """
   - Generated file: models/user.py
@@ -63,7 +63,7 @@ async def test_make_model_with_table_name(
 
     command = command_tester.command("make model")
 
-    assert await command.run("User --table my_users") == 0
+    assert command.run("User --table my_users") == 0
 
     expected = """
   - Generated file: models/user.py

@@ -17,7 +17,7 @@ async def test_route_listing(command_tester: CommandTester, router: Router) -> N
 
     command = command_tester.command("routes list")
 
-    assert await command.run() == 0
+    assert command.run() == 0
 
     expected_output = """
   DELETE    /group/delete (group.delete_name)
@@ -36,7 +36,7 @@ async def test_route_listing_verbose(
 
     command = command_tester.command("routes list")
 
-    assert await command.run("-v") == 0
+    assert command.run("-v") == 0
 
     expected_output = f"""
   DELETE    /group/delete (group.delete_name)
