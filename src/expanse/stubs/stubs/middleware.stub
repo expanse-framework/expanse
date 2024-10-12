@@ -1,0 +1,11 @@
+from expanse.http.request import Request
+from expanse.http.response import Response
+from expanse.types.http.middleware import RequestHandler
+
+
+class {name}:
+
+    async def handle(
+        self, request: Request, next_call: RequestHandler
+    ) -> Response:
+        return await next_call(request)
