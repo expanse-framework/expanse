@@ -1,5 +1,3 @@
-import logging
-
 from collections.abc import Callable
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -23,14 +21,13 @@ from expanse.core.http.exceptions import HTTPException
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.logging.logger import Logger
 
 
 if TYPE_CHECKING:
     from crashtest.frame import Frame
 
 _TError = TypeVar("_TError", bound=Exception)
-
-logger = logging.getLogger(__name__)
 
 
 class ExceptionHandler(ExceptionHandlerContract):
@@ -52,6 +49,7 @@ class ExceptionHandler(ExceptionHandlerContract):
         if self._raise_unhandled_exceptions:
             raise e
 
+        logger = await self._container.get(Logger)
         logger.exception(e)
 
     async def should_report(self, e: Exception) -> bool:

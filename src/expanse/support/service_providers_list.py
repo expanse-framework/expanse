@@ -32,6 +32,7 @@ class ServiceProvidersList:
             [
                 "expanse.core.support.providers.core_service_provider.CoreServiceProvider",
                 "expanse.core.console.providers.command_service_provider.CommandServiceProvider",
+                "expanse.logging.logging_service_provider.LoggingServiceProvider",
                 "expanse.database.database_service_provider.DatabaseServiceProvider",
                 "expanse.view.view_service_provider.ViewServiceProvider",
                 "expanse.static.static_service_provider.StaticServiceProvider",
