@@ -618,10 +618,7 @@ class Container:
             if isinstance(type_, typing.ForwardRef):
                 type_ = type_.__forward_arg__
 
-                if type_ in _typing_builtins_strings:
-                    return True
-
-                return False
+                return type_ in _typing_builtins_strings
 
         module = inspect.getmodule(type_)
         if module == builtins:
@@ -630,12 +627,11 @@ class Container:
         if type_ in _typing_builtins:
             return True
 
-        if (
-            module == typing or module == collections.abc
-        ) and type_.__name__ == "Callable":
-            return True
-
-        return False
+        return (
+            module == typing
+            or module == collections.abc
+            and type_.__name__ == "Callable"
+        )
 
     def _get_alias(self, abstract: str | type) -> str | type:
         if not isinstance(abstract, str):
