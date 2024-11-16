@@ -69,10 +69,7 @@ class Buffer:
         return highlight(data, self._lexer, self._formatter)
 
     def _should_filter_message(self, message: str) -> bool:
-        if message == "Generating static SQL":
-            return True
-
-        return False
+        return message == "Generating static SQL"
 
 
 class Migrator:

@@ -25,7 +25,7 @@ class MakeControllerCommand(Command):
     ]
 
     async def handle(self, app: Application, generator: Generator) -> int:
-        controllers_path: "Path" = app.path("http/controllers")
+        controllers_path: Path = app.path("http/controllers")
         if not controllers_path.exists():
             controllers_path.mkdir(parents=True)
             controllers_path.joinpath("__init__.py").touch()
