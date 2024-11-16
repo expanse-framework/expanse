@@ -604,6 +604,13 @@ class Container:
             # Get the first type of the type union
             type_ = get_args(type_)[0]
 
+        origin = get_origin(type_)
+        if origin is Annotated:
+            actual_type, *_ = get_args(type_)
+
+            if not self._is_builtin(actual_type, _globals=_globals):
+                return type_
+
         if self._is_builtin(type_, _globals=_globals):
             return None
 
