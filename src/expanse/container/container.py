@@ -26,6 +26,7 @@ from typing import overload
 from expanse.container.exceptions import ContainerException
 from expanse.container.exceptions import ResolutionException
 from expanse.container.exceptions import UnboundAbstractException
+from expanse.support._concurrency import AsyncRLock
 from expanse.support._concurrency import run_in_threadpool
 from expanse.support._utils import eval_type_lenient
 from expanse.support._utils import string_to_class
@@ -70,6 +71,7 @@ class Container:
         }
 
         self._terminating_callbacks: list[_Callback] = []
+        self._lock = AsyncRLock()
 
     def register(
         self,
@@ -125,7 +127,7 @@ class Container:
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args), None
 
-            if concrete.__name__ == "_container_concrete":
+            if "_concrete_closure" in concrete.__qualname__:
                 return await concrete(self), None
 
             function = concrete
@@ -141,6 +143,12 @@ class Container:
                 # What we are trying to build is a class,
                 # so we need to resolve the parameters of the __init__ method.
                 function = concrete.__init__  # type: ignore[misc]
+
+                if isinstance(function, types.WrapperDescriptorType):
+                    # If the class doe not define an __init__ method
+                    # call it directly.
+                    return concrete(*args), None
+
                 is_class = True
 
         (
@@ -285,6 +293,16 @@ class Container:
     async def _resolve(self, abstract: str) -> Any: ...
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
+        async with self._lock:
+            return await self._do_resolve(abstract)
+
+    @overload
+    async def _do_resolve(self, abstract: type[T]) -> T: ...
+
+    @overload
+    async def _do_resolve(self, abstract: str) -> Any: ...
+
+    async def _do_resolve(self, abstract: str | type[T]) -> Any | T:
         abstract = self._get_alias(abstract)
 
         if abstract in self._instances:
@@ -338,11 +356,8 @@ class Container:
         arguments = list(args)
         _globals = getattr(callable, "__globals__", None)
 
-        for name, parameter in inspect.signature(callable).parameters.items():
+        for parameter in inspect.signature(callable).parameters.values():
             klass = self._get_class(parameter)
-
-            if name == "self":
-                continue
 
             if klass is None:
                 await self._resolve_primitive(
@@ -589,6 +604,13 @@ class Container:
             # Get the first type of the type union
             type_ = get_args(type_)[0]
 
+        origin = get_origin(type_)
+        if origin is Annotated:
+            actual_type, *_ = get_args(type_)
+
+            if not self._is_builtin(actual_type, _globals=_globals):
+                return type_
+
         if self._is_builtin(type_, _globals=_globals):
             return None
 
@@ -603,10 +625,7 @@ class Container:
             if isinstance(type_, typing.ForwardRef):
                 type_ = type_.__forward_arg__
 
-                if type_ in _typing_builtins_strings:
-                    return True
-
-                return False
+                return type_ in _typing_builtins_strings
 
         module = inspect.getmodule(type_)
         if module == builtins:
@@ -615,12 +634,11 @@ class Container:
         if type_ in _typing_builtins:
             return True
 
-        if (
-            module == typing or module == collections.abc
-        ) and type_.__name__ == "Callable":
-            return True
-
-        return False
+        return (
+            module == typing
+            or module == collections.abc
+            and type_.__name__ == "Callable"
+        )
 
     def _get_alias(self, abstract: str | type) -> str | type:
         if not isinstance(abstract, str):
@@ -675,9 +693,9 @@ class ScopedContainer(Container):
         # If the abstract is neither bound in the container nor in its base container,
         # we will resolve it from the scoped container.
         if not self.bound(abstract):
-            return await super()._resolve(abstract)
+            return await self._do_resolve(abstract)
 
         if not self._directly_bound(actual_abstract):
             return await self._base_container._resolve(abstract)
 
-        return await super()._resolve(abstract)
+        return await self._do_resolve(abstract)
