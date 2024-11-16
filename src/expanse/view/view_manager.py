@@ -22,7 +22,7 @@ class ViewManager:
             auto_reload=app.config.get("app.debug", False),
         )
 
-        self._scoped: "MutableMapping[str, Any]" = {}
+        self._scoped: MutableMapping[str, Any] = {}
 
     def template(self, name: str) -> Any:
         return self._env.get_template(name)

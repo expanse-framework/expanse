@@ -25,7 +25,7 @@ class MakeMiddlewareCommand(Command):
     ]
 
     async def handle(self, app: Application, generator: Generator) -> int:
-        middleware_path: "Path" = app.path("http/middleware")
+        middleware_path: Path = app.path("http/middleware")
         if not middleware_path.exists():
             middleware_path.mkdir(parents=True)
             middleware_path.joinpath("__init__.py").touch()
