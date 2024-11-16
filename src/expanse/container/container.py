@@ -127,7 +127,7 @@ class Container:
             if concrete.__name__ == "<lambda>":
                 return concrete(self, *args), None
 
-            if concrete.__name__ == "_container_concrete":
+            if "_concrete_closure" in concrete.__qualname__:
                 return await concrete(self), None
 
             function = concrete
@@ -143,6 +143,12 @@ class Container:
                 # What we are trying to build is a class,
                 # so we need to resolve the parameters of the __init__ method.
                 function = concrete.__init__  # type: ignore[misc]
+
+                if isinstance(function, types.WrapperDescriptorType):
+                    # If the class doe not define an __init__ method
+                    # call it directly.
+                    return concrete(*args), None
+
                 is_class = True
 
         (
@@ -350,11 +356,8 @@ class Container:
         arguments = list(args)
         _globals = getattr(callable, "__globals__", None)
 
-        for name, parameter in inspect.signature(callable).parameters.items():
+        for parameter in inspect.signature(callable).parameters.values():
             klass = self._get_class(parameter)
-
-            if name == "self":
-                continue
 
             if klass is None:
                 await self._resolve_primitive(

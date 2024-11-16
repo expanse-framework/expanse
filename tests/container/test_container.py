@@ -79,6 +79,15 @@ class Foo:
         return self._id
 
 
+class Bar:
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+    @classmethod
+    def get_class_id(cls) -> str:
+        return str(uuid.uuid4())
+
+
 async def test_singleton_returns_same_instance() -> None:
     """
     Singletons should return the same instance.
@@ -250,6 +259,19 @@ async def test_call_can_call_instance_methods() -> None:
     assert (await container.call(Foo.get_id)) == (await container.call(Foo.get_id))
 
 
+async def test_call_can_call_class_methods() -> None:
+    container = Container()
+
+    id1 = await container.call(Bar.get_class_id)
+
+    assert isinstance(id1, str)
+
+    id2 = await container.call(Bar.get_class_id)
+
+    assert isinstance(id2, str)
+    assert id1 != id2
+
+
 async def test_concurrency() -> None:
     container = Container()
 
@@ -281,3 +303,12 @@ async def test_concurrency_sync_functions() -> None:
     results = await asyncio.gather(t1, t2)
 
     assert results[0] is results[1]
+
+
+async def test_resolve_class_without_init() -> None:
+    class NoInit:
+        pass
+
+    container = Container()
+
+    assert isinstance(await container.get(NoInit), NoInit)
