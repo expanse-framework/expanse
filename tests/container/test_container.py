@@ -1,4 +1,5 @@
 # ruff: noqa: I002
+import asyncio
 import uuid
 
 from abc import ABC
@@ -247,3 +248,36 @@ async def test_call_can_call_instance_methods() -> None:
     await container.get(Foo)
 
     assert (await container.call(Foo.get_id)) == (await container.call(Foo.get_id))
+
+
+async def test_concurrency() -> None:
+    container = Container()
+
+    def create_concrete() -> Concrete:
+        return Concrete()
+
+    container.singleton(Abstract, create_concrete)
+
+    t1 = asyncio.create_task(container.get(Abstract))
+    t2 = asyncio.create_task(container.get(Abstract))
+    results = await asyncio.gather(t1, t2)
+
+    assert results[0] is results[1]
+
+
+async def test_concurrency_sync_functions() -> None:
+    container = Container()
+
+    def create_concrete() -> Concrete:
+        return Concrete()
+
+    def resolve_concrete(concrete: Abstract):
+        return concrete
+
+    container.singleton(Abstract, create_concrete)
+
+    t1 = asyncio.create_task(container.call(resolve_concrete))
+    t2 = asyncio.create_task(container.call(resolve_concrete))
+    results = await asyncio.gather(t1, t2)
+
+    assert results[0] is results[1]

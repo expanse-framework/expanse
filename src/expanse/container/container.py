@@ -26,6 +26,7 @@ from typing import overload
 from expanse.container.exceptions import ContainerException
 from expanse.container.exceptions import ResolutionException
 from expanse.container.exceptions import UnboundAbstractException
+from expanse.support._concurrency import AsyncRLock
 from expanse.support._concurrency import run_in_threadpool
 from expanse.support._utils import eval_type_lenient
 from expanse.support._utils import string_to_class
@@ -70,6 +71,7 @@ class Container:
         }
 
         self._terminating_callbacks: list[_Callback] = []
+        self._lock = AsyncRLock()
 
     def register(
         self,
@@ -285,6 +287,16 @@ class Container:
     async def _resolve(self, abstract: str) -> Any: ...
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
+        async with self._lock:
+            return await self._do_resolve(abstract)
+
+    @overload
+    async def _do_resolve(self, abstract: type[T]) -> T: ...
+
+    @overload
+    async def _do_resolve(self, abstract: str) -> Any: ...
+
+    async def _do_resolve(self, abstract: str | type[T]) -> Any | T:
         abstract = self._get_alias(abstract)
 
         if abstract in self._instances:
@@ -675,9 +687,9 @@ class ScopedContainer(Container):
         # If the abstract is neither bound in the container nor in its base container,
         # we will resolve it from the scoped container.
         if not self.bound(abstract):
-            return await super()._resolve(abstract)
+            return await self._do_resolve(abstract)
 
         if not self._directly_bound(actual_abstract):
             return await self._base_container._resolve(abstract)
 
-        return await super()._resolve(abstract)
+        return await self._do_resolve(abstract)
