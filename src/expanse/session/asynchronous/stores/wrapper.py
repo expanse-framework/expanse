@@ -23,3 +23,6 @@ class AsyncWrapperStore(AsyncStore):
 
     async def delete(self, id: str) -> None:
         await run_in_threadpool(self._store.delete, id)
+
+    async def clear(self) -> int:
+        return await run_in_threadpool(self._store.clear)

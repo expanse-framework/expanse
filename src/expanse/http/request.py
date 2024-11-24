@@ -72,6 +72,10 @@ class Request(BaseRequest):
     def route(self) -> Route | None:
         return self._route
 
+    @property
+    def session(self) -> HTTPSession | None:
+        return self._session
+
     def is_from_trusted_proxy(self) -> bool:
         return False
 

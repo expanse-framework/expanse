@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 from typing import TYPE_CHECKING
 from typing import Any
@@ -16,6 +17,7 @@ from sqlalchemy import column
 from sqlalchemy import exists
 from sqlalchemy import select
 from sqlalchemy import table
+from sqlalchemy import text
 
 from expanse.session.synchronous.stores.store import Store
 
@@ -90,7 +92,9 @@ class DatabaseStore(Store):
             case _:
                 with self._db.connection(self._database_name) as connection:
                     session_exists = connection.execute(
-                        select(self._table, exists()).where(column("id") == session_id)
+                        select(exists(text("1")))
+                        .select_from(self._table)
+                        .where(column("id") == session_id)
                     ).scalar()
                     if session_exists:
                         connection.execute(
@@ -109,6 +113,18 @@ class DatabaseStore(Store):
         with self._db.connection(self._database_name) as connection:
             connection.execute(self._table.delete().where(column("id") == session_id))
             connection.commit()
+
+    def clear(self) -> int:
+        with self._db.connection(self._database_name) as connection:
+            result = connection.execute(
+                self._table.delete().where(
+                    column("last_activity")
+                    < datetime.now(timezone.utc) - timedelta(minutes=self._lifetime)
+                )
+            )
+            connection.commit()
+
+            return result.rowcount
 
     def _is_session_expired(self, session: SessionRow) -> bool:
         return (
@@ -139,14 +155,14 @@ class DatabaseStore(Store):
 
         with self._db.connection(self._database_name) as connection:
             connection.execute(upsert_stmt)
+            connection.commit()
 
     def _mysql_upsert(self, session_id: str, payload: dict[str, Any]) -> None:
         from sqlalchemy.dialects.mysql import insert
 
         insert_stmt = insert(self._table).values(**{"id": session_id, **payload})
-        upsert_stmt = insert_stmt.on_duplicate_key_update(
-            data=insert_stmt.inserted.data, status="U"
-        )
+        data = {key: insert_stmt.inserted[key] for key in payload}
+        upsert_stmt = insert_stmt.on_duplicate_key_update(**data, status="U")
 
         with self._db.connection(self._database_name) as connection:
             connection.execute(upsert_stmt)

@@ -20,3 +20,6 @@ class AsyncStore(ABC):
 
     @abstractmethod
     async def delete(self, session_id: str) -> None: ...
+
+    @abstractmethod
+    async def clear(self) -> int: ...

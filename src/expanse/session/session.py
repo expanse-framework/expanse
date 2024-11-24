@@ -5,6 +5,7 @@ import secrets
 
 from collections.abc import Iterator
 from collections.abc import MutableMapping
+from collections.abc import Sequence
 from string import ascii_letters
 from string import digits
 from typing import TYPE_CHECKING
@@ -40,10 +41,10 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         Load the session using the synchronous store.
         """
-        if self._loaded:
-            return self
-
         self._load_session()
+
+        if not self.has("_csrf_token"):
+            self.regenerate_csrf_token()
 
         self._loaded = True
 
@@ -53,10 +54,10 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         Load the session using the asynchronous store.
         """
-        if self._loaded:
-            return self
-
         await self._async_load_session()
+
+        if not self.has("_csrf_token"):
+            self.regenerate_csrf_token()
 
         self._loaded = True
 
@@ -66,6 +67,8 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         Save the session data using the synchronous store.
         """
+        self.ripen_flash_data()
+
         self._store.write(
             self._id, self._serialize(self._attributes), request=self._request
         )
@@ -74,31 +77,11 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         Save the session data using the asynchronous store.
         """
+        self.ripen_flash_data()
+
         await self._async_store.write(
             self._id, self._serialize(self._attributes), request=self._request
         )
-
-    def regenerate(self, delete: bool = False) -> Self:
-        """
-        Generate a new ID for the session and optionally delete it using the synchronous store.
-        """
-        if delete:
-            self._store.delete(self._id)
-
-        self._id = self._generate_id()
-
-        return self
-
-    async def async_regenerate(self, delete: bool = False) -> Self:
-        """
-        Generate a new ID for the session and optionally delete it using the asynchronous store.
-        """
-        if delete:
-            await self._async_store.delete(self._id)
-
-        self._id = self._generate_id()
-
-        return self
 
     def get_id(self) -> str:
         """
@@ -123,23 +106,166 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         return self._name
 
+    def get_csrf_token(self) -> str:
+        """
+        Get the CSRF token.
+        """
+        return self.get("_csrf_token")
+
+    def is_loaded(self) -> bool:
+        """
+        Check if the session has been loaded.
+        """
+        return self._loaded
+
     def get(self, key: str, /, default: Any | None = None) -> Any | None:
-        return self._attributes.get(key, default)
+        attributes: dict[str, Any] = self._attributes
+
+        parts = key.split(".")
+        for part in parts:
+            if part not in attributes:
+                return default
+
+            attributes = attributes[part]
+
+        return attributes
 
     def set(self, key: str, value: str) -> None:
-        self._attributes[key] = value
+        attributes: dict[str, Any] = self._attributes
+
+        parts = key.split(".")
+        count = len(parts)
+        for i, part in enumerate(parts):
+            if i == count - 1:
+                attributes[part] = value
+                return
+
+            if part not in attributes:
+                attributes[part] = {}
+
+            attributes = attributes[part]
 
     def has(self, key: str) -> bool:
-        return key in self._attributes
+        attributes: dict[str, Any] = self._attributes
 
-    def delete(self, key: str) -> None:
-        del self._attributes[key]
+        parts = key.split(".")
+        for part in parts:
+            if part not in attributes:
+                return False
+
+            attributes = attributes[part]
+
+        return True
+
+    def delete(self, *keys: str) -> None:
+        for key in keys:
+            self._delete_key(key)
 
     def pop(self, key: str, default: Any = None) -> None:
         self._attributes.pop(key, default)
 
     def all(self) -> dict:
         return self._attributes
+
+    def clear(self) -> None:
+        self._attributes = {}
+
+    def append(self, key: str, value: Any) -> None:
+        if key not in self._attributes:
+            self._attributes[key] = []
+
+        self._attributes[key].append(value)
+
+    def flash(self, key: str, value: Any) -> None:
+        self.set(key, value)
+
+        flash_data: list[str] = self.get("_flash.new", [])
+        if key not in flash_data:
+            flash_data.append(key)
+
+        self.set("_flash.new", flash_data)
+
+        self._delete_from_old_flash_data(key)
+
+    def reflash(self, only: Sequence[str] | None) -> None:
+        """
+        Reflash the existing flash data.
+        """
+        if only is None:
+            self._add_to_new_flash_data(*self.get("_flash.old", []))
+            self.set("_flash.old", [])
+        else:
+            self._add_to_new_flash_data(*only)
+            self._delete_from_old_flash_data(*only)
+
+    def ripen_flash_data(self) -> None:
+        self.delete(*self.get("_flash.old", []))
+        self.set("_flash.old", self.get("_flash.new", []))
+        self.set("_flash.new", [])
+
+    def invalidate(self) -> None:
+        """
+        Invalidate the session and delete it from the synchronous store.
+        """
+        self.clear()
+
+        return self.generate_new_id(delete=True)
+
+    async def async_invalidate(self) -> None:
+        """
+        Invalidate the session and delete it from the asynchronous store.
+        """
+        self.clear()
+
+        return await self.async_generate_new_id(delete=True)
+
+    def regenerate(self, delete: bool = False) -> None:
+        """
+        Generate a new ID for the session and optionally delete it using the synchronous store.
+
+        This method also regenerates the CSRF token.
+        """
+        self.generate_new_id(delete=delete)
+
+        self.regenerate_csrf_token()
+
+    async def async_regenerate(self, delete: bool = False) -> None:
+        """
+        Generate a new ID for the session and optionally delete it using the asynchronous store.
+
+        This method also regenerates the CSRF token.
+        """
+        await self.async_generate_new_id(delete=delete)
+
+        self.regenerate_csrf_token()
+
+    def generate_new_id(self, delete: bool = False) -> None:
+        """
+        Generate a new ID for the session and optionally delete the old one.
+
+        :param delete: Whether to delete the old session or not.
+        """
+        if delete:
+            self._store.delete(self._id)
+
+        self.set_id(self._generate_id())
+
+    async def async_generate_new_id(self, delete: bool = False) -> None:
+        """
+        Generate a new ID for the session and optionally delete the old one using the asynchronous store.
+
+        :param delete: Whether to delete the old session or not.
+        """
+        if delete:
+            self._store.delete(self._id)
+
+        self.set_id(self._generate_id())
+
+    def regenerate_csrf_token(self) -> None:
+        """
+        Regenerate the CSRF token.
+        """
+        self.set("_csrf_token", secrets.token_urlsafe(40))
 
     def set_request(self, request: Request) -> None:
         self._request = request
@@ -180,6 +306,31 @@ class HTTPSession(MutableMapping[str, Any]):
         except (json.JSONDecodeError, TypeError):
             return {}
 
+    def _add_to_new_flash_data(self, *keys: str) -> None:
+        flash_data: list[str] = self.get("_flash.new", [])
+
+        flash_data.extend([key for key in keys if key not in flash_data])
+
+        self.set("_flash.new", flash_data)
+
+    def _delete_from_old_flash_data(self, *keys: str) -> None:
+        flash_data: list[str] = self.get("_flash.old", [])
+
+        flash_data = [key for key in flash_data if key not in keys]
+
+        self.set("_flash.old", flash_data)
+
+    def _delete_key(self, key: str) -> None:
+        parts = key.split(".")
+        count = len(parts)
+        attributes: dict[str, Any] = self._attributes
+        for i, part in enumerate(parts):
+            if i == count - 1:
+                del attributes[part]
+                return
+
+            attributes = attributes[part]
+
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
@@ -187,10 +338,19 @@ class HTTPSession(MutableMapping[str, Any]):
         self.delete(key)
 
     def __getitem__(self, key: str, /):
-        return self._attributes[key]
+        _missing = object()
+        value = self.get(key, _missing)
+
+        if value is _missing:
+            raise KeyError(key)
+
+        return value
 
     def __len__(self) -> int:
         return len(self._attributes)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._attributes)
+
+    def __contains__(self, key: str) -> bool:
+        return self.has(key)

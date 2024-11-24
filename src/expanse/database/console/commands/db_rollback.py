@@ -16,7 +16,8 @@ class DbRollbackCommand(MigrationCommand):
 
     arguments: ClassVar[list[Argument]] = []
     options: ClassVar[list[Option]] = [
-        option("step", None, "The number of migrations to apply.", flag=False)
+        option("step", None, "The number of migrations to apply.", flag=False),
+        option("reset", None, "Rollback all migrations."),
     ]
 
     help: str = """Rollback the last database migration.
@@ -26,6 +27,8 @@ A number of migrations to rollback can be specified with the --step option.
 <info>db rollback --step 2</info>
 
 Would rollback the last two migrations.
+
+The --reset option can be used to rollback all migrations.
 """
 
     async def handle(self, migrator: Migrator) -> int:
@@ -34,6 +37,9 @@ Would rollback the last two migrations.
         revision = "-1"
         if self.option("step"):
             revision = f'-{self.option("step").removeprefix("-")}'
+
+        if self.option("reset"):
+            revision = "base"
 
         await run_in_threadpool(migrator.rollback, revision=revision, io=self._io)
 

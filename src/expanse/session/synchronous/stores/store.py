@@ -20,3 +20,6 @@ class Store(ABC):
 
     @abstractmethod
     def delete(self, session_id: str) -> None: ...
+
+    @abstractmethod
+    def clear(self) -> int: ...

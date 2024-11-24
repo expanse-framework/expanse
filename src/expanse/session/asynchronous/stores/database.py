@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 from typing import TYPE_CHECKING
 from typing import Any
@@ -16,6 +17,7 @@ from sqlalchemy import column
 from sqlalchemy import exists
 from sqlalchemy import select
 from sqlalchemy import table
+from sqlalchemy import text
 
 from expanse.session.asynchronous.stores.store import AsyncStore
 
@@ -95,9 +97,9 @@ class AsyncDatabaseStore(AsyncStore):
                 async with self._db.connection(self._database_name) as connection:
                     session_exists = (
                         await connection.execute(
-                            select(self._table, exists()).where(
-                                column("id") == session_id
-                            )
+                            select(exists(text("1")))
+                            .select_from(self._table)
+                            .where(column("id") == session_id)
                         )
                     ).scalar()
                     if session_exists:
@@ -119,6 +121,19 @@ class AsyncDatabaseStore(AsyncStore):
                 self._table.delete().where(column("id") == session_id)
             )
             await connection.commit()
+
+    async def clear(self) -> int:
+        async with self._db.connection(self._database_name) as connection:
+            result = await connection.execute(
+                self._table.delete().where(
+                    column("last_activity")
+                    < datetime.now(timezone.utc) - timedelta(minutes=self._lifetime)
+                )
+            )
+
+            await connection.commit()
+
+            return result.rowcount
 
     def _is_session_expired(self, session: SessionRow) -> bool:
         last_activity = session.last_activity
@@ -153,14 +168,14 @@ class AsyncDatabaseStore(AsyncStore):
 
         async with self._db.connection(self._database_name) as connection:
             await connection.execute(upsert_stmt)
+            await connection.commit()
 
     async def _mysql_upsert(self, session_id: str, payload: dict[str, Any]) -> None:
         from sqlalchemy.dialects.mysql import insert
 
         insert_stmt = insert(self._table).values(**{"id": session_id, **payload})
-        upsert_stmt = insert_stmt.on_duplicate_key_update(
-            data=insert_stmt.inserted.data, status="U"
-        )
+        data = {key: insert_stmt.inserted[key] for key in payload}
+        upsert_stmt = insert_stmt.on_duplicate_key_update(**data, status="U")
 
         async with self._db.connection(self._database_name) as connection:
             await connection.execute(upsert_stmt)

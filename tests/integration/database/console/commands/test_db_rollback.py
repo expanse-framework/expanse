@@ -50,3 +50,17 @@ async def test_rollback_with_step(
 """
 
     assert command.output.fetch() == expected
+
+
+async def test_rollback_reset(command_tester: CommandTester, app: Application) -> None:
+    command = command_tester.command("db rollback")
+
+    return_code = command.run("--reset")
+    assert return_code == 0
+
+    expected = """
+  - Rolling back migration 1234567891 (Foo Migration)
+  - Rolling back migration 1234567890 (Auto Migration)
+"""
+
+    assert command.output.fetch() == expected

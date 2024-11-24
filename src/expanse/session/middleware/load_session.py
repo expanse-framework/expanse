@@ -1,5 +1,3 @@
-import pendulum
-
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.session.session import HTTPSession
@@ -16,9 +14,7 @@ class LoadSession:
             return await next(request)
 
         session = await self._get_session(request)
-        session.set("ip_address", request.client.host)
-
-        request.set_session(session)
+        request.set_session(await session.async_load())
         session.set_request(request)
 
         response = await next(request)
@@ -41,7 +37,7 @@ class LoadSession:
         response.set_cookie(
             session.get_name(),
             session.get_id(),
-            expires=await self._compute_expiration(),
+            max_age=self._get_max_age(),
             path=config["path"],
             domain=config["domain"],
             secure=config["secure"],
@@ -49,12 +45,13 @@ class LoadSession:
             samesite=config["same_site"],
         )
 
-    async def _compute_expiration(self) -> int:
-        now = pendulum.now("UTC")
-
-        return now.add(minutes=self._manager.get_config()["lifetime"])
-
     def _is_session_configured(self) -> bool:
         config = self._manager.get_config()
 
         return "store" in config and config["store"] is not None
+
+    def _get_max_age(self) -> int:
+        if self._manager.get_config()["clear_with_browser"]:
+            return -1
+
+        return self._manager.get_config()["lifetime"] * 60

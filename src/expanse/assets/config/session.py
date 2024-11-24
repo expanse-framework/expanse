@@ -3,6 +3,8 @@ from typing import Literal
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
+from expanse.session.config import StoresConfig
+
 
 class Config(BaseSettings):
     # Default session store
@@ -12,6 +14,14 @@ class Config(BaseSettings):
     #
     # Supported stores are: database and file
     store: Literal["database", "file", "dict"] = "database"
+
+    # Available session stores
+    #
+    # They can all be configured with environment variables in you `.env` file.
+    # For instance:
+    # >>> SESSION_STORES__DATABASE__TABLE=sessions
+    # >>> SESSION_STORES__DATABASE__CONNECTION=named_connection
+    stores: StoresConfig = StoresConfig()
 
     # Session cookie name
     #
@@ -25,16 +35,10 @@ class Config(BaseSettings):
     # before it expires.
     lifetime: int = 120
 
-    # Session database connection
+    # Whether the session should be cleared when the browser is closed.
     #
-    # The database connection that should be used to store the session data.
-    # The value must match one of the configured database connections.
-    database_connection: str | None = None
-
-    # Session database table
-    #
-    # The table that should be used to store the session data.
-    database_table: str = "sessions"
+    # When set to true, the session ID cookie will be removed after the user closes the browser window.
+    clear_with_browser: bool = False
 
     # Session cookie path
     #
@@ -65,4 +69,4 @@ class Config(BaseSettings):
     # Supported values are: strict, lax, and none
     same_site: Literal["strict", "lax", "none"] = "lax"
 
-    model_config = SettingsConfigDict(env_prefix="session_")
+    model_config = SettingsConfigDict(env_prefix="session_", env_nested_delimiter="__")

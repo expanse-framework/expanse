@@ -3,6 +3,7 @@ from typing import Any
 from expanse.core.application import Application
 from expanse.session.asynchronous.stores.store import AsyncStore
 from expanse.session.asynchronous.stores.wrapper import AsyncWrapperStore
+from expanse.session.config import StoresConfig
 from expanse.session.session import HTTPSession
 from expanse.session.synchronous.stores.store import Store
 from expanse.support._utils import slugify
@@ -15,26 +16,36 @@ class SessionManager:
         self._config = self._app.config.get("session", {})
 
     async def session(self) -> HTTPSession:
-        stores = await self.stores(self.get_config()["store"])
+        stores = await self.stores()
 
         return HTTPSession(self.get_cookie_name(), *stores)
 
-    async def stores(self, name: str) -> tuple[Store, AsyncStore]:
+    async def stores(self, name: str | None = None) -> tuple[Store, AsyncStore]:
+        name = name or self._config["store"]
+
         if name in self._stores:
             return self._stores[name]
 
-        store = await self._create_stores(name)
+        if name not in self._config["stores"]:
+            raise RuntimeError(f"Session store {name} is not defined")
+
+        raw_config = self._config.get("stores", {})
+        config = StoresConfig.model_validate(raw_config)
+
+        store = await self._create_stores(name, config)
 
         self._stores[name] = store
 
         return self._stores[name]
 
-    async def _create_stores(self, name: str) -> tuple[Store, AsyncStore]:
+    async def _create_stores(
+        self, name: str, config: StoresConfig
+    ) -> tuple[Store, AsyncStore]:
         match name:
-            case "dict":
+            case "dictionary":
                 from expanse.session.synchronous.stores.dict import DictStore
 
-                store = DictStore()
+                store = DictStore(lifetime=self._config["lifetime"])
 
                 return store, AsyncWrapperStore(store)
             case "database":
@@ -45,21 +56,19 @@ class SessionManager:
                 )
                 from expanse.session.synchronous.stores.database import DatabaseStore
 
-                config = self.get_config()
-
                 return DatabaseStore(
                     await self._app.container.get(DatabaseManager),
-                    config["database_table"],
-                    config["lifetime"],
-                    config["database_connection"],
+                    config.database.table,
+                    self._config["lifetime"],
+                    config.database.connection,
                 ), AsyncDatabaseStore(
                     await self._app.container.get(AsyncDatabaseManager),
-                    config["database_table"],
-                    config["lifetime"],
-                    config["database_connection"],
+                    config.database.table,
+                    self._config["lifetime"],
+                    config.database.connection,
                 )
             case _:
-                raise RuntimeError(f"Unsupported session store driver: {name}")
+                raise RuntimeError(f"Unsupported session store: {name}")
 
     def get_config(self) -> dict[str, Any]:
         return self._config
