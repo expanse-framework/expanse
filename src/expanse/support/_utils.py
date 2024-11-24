@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata  # type: ignore[attr-defined]
 
 from importlib import import_module
 from importlib.util import module_from_spec
@@ -9,7 +10,7 @@ from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ForwardRef
-from typing import _eval_type  # type: ignore[attr-defined]
+from typing import _eval_type
 
 
 if TYPE_CHECKING:
@@ -93,3 +94,23 @@ def eval_type_lenient(
     except NameError:
         # the point of this function is to be tolerant to this case
         return value
+
+
+def slugify(value, allow_unicode=False):
+    """
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
