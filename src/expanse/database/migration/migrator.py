@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextlib import suppress
 from pathlib import Path
+from typing import Literal
 
 from alembic import util
 from alembic.command import downgrade
@@ -134,6 +135,27 @@ class Migrator:
             io = NullIO()
 
         downgrade(self._config, revision)
+
+    def include_name(
+        self,
+        name: str | None,
+        type_: Literal[
+            "schema",
+            "table",
+            "column",
+            "index",
+            "unique_constraint",
+            "foreign_key_constraint",
+        ],
+        reflected: bool,
+    ) -> bool:
+        match type_:
+            case "table":
+                from expanse.database.orm.model import Model
+
+                return name in Model.metadata.tables
+            case _:
+                return True
 
     def _load_models(self) -> None:
         model_directory = self._app.path("models")

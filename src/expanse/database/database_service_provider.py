@@ -90,6 +90,7 @@ class DatabaseServiceProvider(ServiceProvider):
     async def _create_migrator(self, app: Application, config: Config) -> Migrator:
         migrator = Migrator(app)
         migrator.config.attributes["db"] = await self._container.get(DatabaseManager)
+        migrator.config.attributes["include_name"] = migrator.include_name
 
         return migrator
 
