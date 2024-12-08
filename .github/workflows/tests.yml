@@ -68,7 +68,7 @@ jobs:
           - os: Windows
             image: windows-2022
           - os: macOS
-            image: macos-12
+            image: macos-latest
         exclude:
           - os: Windows
             python-version: "3.13"
@@ -91,8 +91,10 @@ jobs:
       - name: Setting up MySQL dependencies
         if: matrix.os == 'macOS'
         run: |
-          brew install mysql-client pkg-config
+          brew install mysql-client pkg-config postgresql@16
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/mysql-client/lib/pkgconfig" >> $GITHUB_ENV
+          # --overwrite: Overwrite pre-installed GitHub Actions PostgreSQL binaries
+          brew link --overwrite postgresql@16
 
       - name: Install dependencies
         run: poetry install --with lint

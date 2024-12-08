@@ -9,7 +9,7 @@ from expanse.support._utils import string_matches
 
 
 class URL:
-    __slots__ = ("_url", "_components")
+    __slots__ = ("_components", "_url")
 
     def __init__(
         self,

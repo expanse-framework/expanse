@@ -81,11 +81,8 @@ class Request(BaseRequest):
         Determine if the current request probably expects a JSON response.
         """
         return (
-            self.is_ajax()
-            and not self.is_pjax()
-            and self.accepts_any_content_type()
-            or self.wants_json()
-        )
+            self.is_ajax() and not self.is_pjax() and self.accepts_any_content_type()
+        ) or self.wants_json()
 
     def is_xml_http_request(self) -> bool:
         return self.headers.get("X-Requested-With") == "XMLHttpRequest"
