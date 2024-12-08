@@ -634,10 +634,8 @@ class Container:
         if type_ in _typing_builtins:
             return True
 
-        return (
-            module == typing
-            or module == collections.abc
-            and type_.__name__ == "Callable"
+        return module == typing or (
+            module == collections.abc and type_.__name__ == "Callable"
         )
 
     def _get_alias(self, abstract: str | type) -> str | type:
