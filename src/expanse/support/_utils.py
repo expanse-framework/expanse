@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-import unicodedata  # type: ignore[attr-defined]
+import unicodedata
 
 from importlib import import_module
 from importlib.util import module_from_spec
@@ -10,7 +10,7 @@ from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ForwardRef
-from typing import _eval_type
+from typing import _eval_type  # type: ignore[attr-defined]
 
 
 if TYPE_CHECKING:

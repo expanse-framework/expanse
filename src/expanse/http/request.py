@@ -61,12 +61,12 @@ class Request(BaseRequest):
         ips = [self.client.host]
 
         if not self.is_from_trusted_proxy():
-            return ips
+            return [ip for ip in ips if ip is not None]
 
         if forwarded_ip := self.headers.get("X-Forwarded-For"):
             ips.insert(0, forwarded_ip)
 
-        return ips
+        return [ip for ip in ips if ip is not None]
 
     @property
     def route(self) -> Route | None:
