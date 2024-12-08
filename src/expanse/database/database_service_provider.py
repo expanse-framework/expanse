@@ -88,9 +88,12 @@ class DatabaseServiceProvider(ServiceProvider):
         await gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
 
     async def _create_migrator(self, app: Application, config: Config) -> Migrator:
+        from expanse.database.orm.model import Model
+
         migrator = Migrator(app)
         migrator.config.attributes["db"] = await self._container.get(DatabaseManager)
         migrator.config.attributes["include_name"] = migrator.include_name
+        migrator.config.attributes["target_metadata"] = Model.metadata
 
         return migrator
 

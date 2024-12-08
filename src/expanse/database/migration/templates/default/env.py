@@ -5,7 +5,6 @@ from typing import Literal
 from alembic import context
 
 from expanse.database.database_manager import DatabaseManager
-from expanse.database.orm.model import Model
 
 
 config = context.config
@@ -33,7 +32,7 @@ include_name: Callable[
     bool,
 ] = context.config.attributes["include_name"]
 
-target_metadata = Model.metadata
+target_metadata = config.attributes["target_metadata"]
 
 
 def run_migrations_offline() -> None:
