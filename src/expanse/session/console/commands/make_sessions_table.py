@@ -1,3 +1,4 @@
+from importlib import import_module
 from typing import Literal
 
 from expanse.console.commands.command import Command
@@ -21,9 +22,7 @@ class MakeSessionsTableCommand(Command):
         return 0
 
     def _load_models(self) -> None:
-        from expanse.session.models.session import Session
-
-        return Session
+        import_module("expanse.session.models.session")
 
     def include_name(
         self,

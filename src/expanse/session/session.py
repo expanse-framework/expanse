@@ -106,7 +106,7 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         return self._name
 
-    def get_csrf_token(self) -> str:
+    def get_csrf_token(self) -> str | None:
         """
         Get the CSRF token.
         """
@@ -118,7 +118,7 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         return self._loaded
 
-    def get(self, key: str, /, default: Any | None = None) -> Any | None:
+    def get(self, key: str, /, default: Any | None = None) -> Any:
         attributes: dict[str, Any] = self._attributes
 
         parts = key.split(".")
@@ -130,7 +130,7 @@ class HTTPSession(MutableMapping[str, Any]):
 
         return attributes
 
-    def set(self, key: str, value: str) -> None:
+    def set(self, key: str, value: Any) -> None:
         attributes: dict[str, Any] = self._attributes
 
         parts = key.split(".")
@@ -352,5 +352,5 @@ class HTTPSession(MutableMapping[str, Any]):
     def __iter__(self) -> Iterator[str]:
         return iter(self._attributes)
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: str) -> bool:  # type: ignore[override]
         return self.has(key)

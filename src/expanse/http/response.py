@@ -136,7 +136,7 @@ class Response:
             samesite=samesite,
         )
 
-    def _compute_expires(self, expires: int | datetime) -> datetime | None:
+    def _compute_expires(self, expires: int | datetime | None) -> datetime | None:
         if expires is None:
             return None
 
