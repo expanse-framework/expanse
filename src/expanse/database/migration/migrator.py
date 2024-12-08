@@ -1,6 +1,7 @@
 import re
 
 from argparse import Namespace
+from collections.abc import Callable
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextlib import suppress
@@ -77,6 +78,7 @@ class Migrator:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
         self._config = AlembicConfig(app, cmd_opts=Namespace(quiet=True))
+        self.models_loader: Callable[[], None] = self._load_models
 
     @property
     def config(self) -> AlembicConfig:
@@ -113,7 +115,7 @@ class Migrator:
             # to ensure that alembic sees all the model changes.
             # This is not done in the Alembic's env.py file to avoid loading
             # models unnecessarily.
-            self._load_models()
+            self.models_loader()
 
         with self._patched_status(io):
             revision(self._config, message=message, autogenerate=auto)
