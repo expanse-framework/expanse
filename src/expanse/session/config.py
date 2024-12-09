@@ -13,3 +13,4 @@ class DatabaseStoreConfig(BaseModel):
 class StoresConfig(BaseModel):
     database: DatabaseStoreConfig = DatabaseStoreConfig()
     dictionary: None = None
+    null: None = None
