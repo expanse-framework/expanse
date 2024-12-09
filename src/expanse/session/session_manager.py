@@ -67,6 +67,11 @@ class SessionManager:
                     self._config["lifetime"],
                     config.database.connection,
                 )
+            case "null":
+                from expanse.session.asynchronous.stores.null import AsyncNullStore
+                from expanse.session.synchronous.stores.null import NullStore
+
+                return NullStore(), AsyncNullStore()
             case _:
                 raise RuntimeError(f"Unsupported session store: {name}")
 

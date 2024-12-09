@@ -13,7 +13,7 @@ class Config(BaseSettings):
     # when no store is explicitly specified.
     #
     # Supported stores are: database and file
-    store: Literal["database", "file", "dict"] = "database"
+    store: Literal["database", "file", "dict", "null"] = "database"
 
     # Available session stores
     #
