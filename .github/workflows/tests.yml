@@ -72,6 +72,11 @@ jobs:
         exclude:
           - os: Windows
             python-version: "3.13"
+    env:
+      DATABASE_HOST: localhost
+      DATABASE_NAME: expanse
+      DATABASE_USER: expanse
+      DATABASE_PASSWORD: password
     defaults:
       run:
         shell: bash
@@ -91,10 +96,14 @@ jobs:
       - name: Setting up MySQL dependencies
         if: matrix.os == 'macOS'
         run: |
-          brew install mysql-client pkg-config postgresql@16
+          brew install mysql-client pkg-config
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/mysql-client/lib/pkgconfig" >> $GITHUB_ENV
-          # --overwrite: Overwrite pre-installed GitHub Actions PostgreSQL binaries
-          brew link --overwrite postgresql@16
+
+      - name: Setting up PostgreSQL dependencies
+        if: matrix.os == 'macOS'
+        run: |
+          brew install postgresql@16
+          echo "PATH=$(brew --prefix)/opt/postgresql@16/bin:$PATH" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: poetry install --with lint
