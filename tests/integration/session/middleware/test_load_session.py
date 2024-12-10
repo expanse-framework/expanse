@@ -9,7 +9,6 @@ from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.router import Router
 from expanse.session.middleware.load_session import LoadSession
-from expanse.session.session_service_provider import SessionServiceProvider
 from expanse.testing.client import TestClient
 from expanse.testing.command_tester import CommandTester
 
@@ -25,7 +24,6 @@ def test_session_is_managed_for_each_request(
     command_tester: CommandTester,
     tmp_path: Path,
 ) -> None:
-    app.register(SessionServiceProvider)
     app.config["session"]["store"] = store
     app.config["database"]["default"] = "sqlite"
     app.config["session"]["stores"]["file"]["path"] = tmp_path.joinpath("sessions")
@@ -35,6 +33,8 @@ def test_session_is_managed_for_each_request(
     command.run()
 
     def session_test(request: Request) -> Response:
+        assert request.session is not None
+
         request.session.set("foo", "bar")
         if request.query_params.get("flash"):
             request.session.flash("baz", 42)
@@ -81,7 +81,6 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
     command_tester: CommandTester,
     tmp_path: Path,
 ) -> None:
-    app.register(SessionServiceProvider)
     app.config["session"]["store"] = store
     app.config["database"]["default"] = "sqlite"
     app.config["session"]["stores"]["file"]["path"] = tmp_path.joinpath("sessions")
@@ -92,6 +91,8 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
     command.run()
 
     def session_test(request: Request) -> Response:
+        assert request.session is not None
+
         request.session.set("foo", "bar")
         if request.query_params.get("flash"):
             request.session.flash("baz", 42)

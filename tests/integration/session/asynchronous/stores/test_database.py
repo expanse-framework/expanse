@@ -92,6 +92,7 @@ async def test_store_can_write_to_the_database(
             )
         ).first()
 
+    assert row is not None
     assert row.id == session_id
     assert row.ip_address == "127.0.0.1"
     assert row.user_agent == "Mozilla/5.0"
@@ -185,6 +186,7 @@ async def test_writing_to_store_works_for_non_natively_supported_dialect(
             )
         ).first()
 
+    assert row is not None
     assert row.id == session_id
     assert row.ip_address == "127.0.0.1"
     assert row.user_agent == "Mozilla/5.0"

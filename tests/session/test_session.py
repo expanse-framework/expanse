@@ -299,7 +299,7 @@ def test_session_can_generate_new_ids_and_delete_existing_id_synchronously(
 
 
 async def test_session_can_generate_new_ids_and_delete_existing_id_asynchronously(
-    session: HTTPSession, async_store: Store
+    session: HTTPSession, async_store: AsyncStore
 ) -> None:
     await async_store.write(
         session.get_id(), json.dumps({"key": "value", "foo": {"bar": "baz"}})
@@ -344,7 +344,7 @@ def test_session_can_be_regenerated_synchronously(
 
 
 async def test_session_can_be_regenerated_asynchronously(
-    session: HTTPSession, async_store: Store
+    session: HTTPSession, async_store: AsyncStore
 ) -> None:
     await async_store.write(
         session.get_id(), json.dumps({"key": "value", "foo": {"bar": "baz"}})
