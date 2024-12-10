@@ -2,7 +2,6 @@ from typing import Any
 
 from expanse.core.application import Application
 from expanse.session.asynchronous.stores.store import AsyncStore
-from expanse.session.asynchronous.stores.wrapper import AsyncWrapperStore
 from expanse.session.config import StoresConfig
 from expanse.session.session import HTTPSession
 from expanse.session.synchronous.stores.store import Store
@@ -43,6 +42,9 @@ class SessionManager:
     ) -> tuple[Store, AsyncStore]:
         match name:
             case "dictionary":
+                from expanse.session.asynchronous.stores.wrapper import (
+                    AsyncWrapperStore,
+                )
                 from expanse.session.synchronous.stores.dict import DictStore
 
                 store = DictStore(lifetime=self._config["lifetime"])
@@ -67,6 +69,19 @@ class SessionManager:
                     self._config["lifetime"],
                     config.database.connection,
                 )
+            case "file":
+                from expanse.session.asynchronous.stores.wrapper import (
+                    AsyncWrapperStore,
+                )
+                from expanse.session.synchronous.stores.file import FileStore
+
+                path = config.file.path
+                if not path.is_absolute():
+                    path = self._app.base_path.joinpath(path)
+
+                file_store = FileStore(path, self._config["lifetime"])
+
+                return file_store, AsyncWrapperStore(file_store)
             case "null":
                 from expanse.session.asynchronous.stores.null import AsyncNullStore
                 from expanse.session.synchronous.stores.null import NullStore

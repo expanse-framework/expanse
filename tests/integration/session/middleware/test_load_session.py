@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pendulum
 import pytest
 
@@ -13,7 +15,7 @@ from expanse.testing.command_tester import CommandTester
 
 
 @pytest.mark.parametrize(
-    "store", ["dictionary", pytest.param("database", marks=pytest.mark.db)]
+    "store", ["dictionary", pytest.param("database", marks=pytest.mark.db), "file"]
 )
 def test_session_is_managed_for_each_request(
     app: Application,
@@ -21,10 +23,13 @@ def test_session_is_managed_for_each_request(
     client: TestClient,
     store: str,
     command_tester: CommandTester,
+    tmp_path: Path,
 ) -> None:
     app.register(SessionServiceProvider)
     app.config["session"]["store"] = store
     app.config["database"]["default"] = "sqlite"
+    app.config["session"]["stores"]["file"]["path"] = tmp_path.joinpath("sessions")
+    tmp_path.joinpath("sessions").mkdir(parents=True, exist_ok=True)
 
     command = command_tester.command("db migrate")
     command.run()
@@ -66,7 +71,7 @@ def test_session_is_managed_for_each_request(
 
 
 @pytest.mark.parametrize(
-    "store", ["dictionary", pytest.param("database", marks=pytest.mark.db)]
+    "store", ["dictionary", pytest.param("database", marks=pytest.mark.db), "file"]
 )
 def test_session_can_be_set_to_be_cleared_with_the_browser(
     app: Application,
@@ -74,10 +79,13 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
     client: TestClient,
     store: str,
     command_tester: CommandTester,
+    tmp_path: Path,
 ) -> None:
     app.register(SessionServiceProvider)
     app.config["session"]["store"] = store
     app.config["database"]["default"] = "sqlite"
+    app.config["session"]["stores"]["file"]["path"] = tmp_path.joinpath("sessions")
+    tmp_path.joinpath("sessions").mkdir(parents=True, exist_ok=True)
     app.config["session"]["clear_with_browser"] = True
 
     command = command_tester.command("db migrate")
