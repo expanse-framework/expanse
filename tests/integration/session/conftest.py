@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from expanse.core.application import Application
-from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+from expanse.database.database_manager import DatabaseManager
 from expanse.testing.command_tester import CommandTester
 
 
@@ -40,18 +40,18 @@ async def setup_databases(
         },
     }
 
-    db = await app.container.get(AsyncDatabaseManager)
+    db = await app.container.get(DatabaseManager)
 
     for connection in config["database"]["connections"]:
-        async with db.connection(connection) as connection:
-            await connection.execute("DROP TABLE IF EXISTS sessions")
-            await connection.execute("DROP TABLE IF EXISTS alembic_version")
-            await connection.commit()
+        with db.connection(connection) as connection:
+            connection.execute("DROP TABLE IF EXISTS sessions")
+            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.commit()
 
     yield
 
     for connection in config["database"]["connections"]:
-        async with db.connection(connection) as connection:
-            await connection.execute("DROP TABLE IF EXISTS sessions")
-            await connection.execute("DROP TABLE IF EXISTS alembic_version")
-            await connection.commit()
+        with db.connection(connection) as connection:
+            connection.execute("DROP TABLE IF EXISTS sessions")
+            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.commit()
