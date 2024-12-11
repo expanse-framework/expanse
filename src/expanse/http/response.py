@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Literal
 from typing import Self
@@ -7,13 +8,12 @@ from typing import Self
 from baize.asgi.responses import PlainTextResponse
 from baize.asgi.responses import Response as BaizeResponse
 from baize.asgi.responses import SmallResponse as BaizeSmallResponse
+from baize.datastructures import Cookie
 
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from collections.abc import MutableMapping
-
-    from baize.datastructures import Cookie
 
     from expanse.types import Receive
     from expanse.types import Scope
@@ -95,23 +95,25 @@ class Response:
         key: str,
         value: str = "",
         max_age: int = -1,
-        expires: int | None = None,
+        expires: int | datetime | None = None,
         path: str = "/",
         domain: str | None = None,
         secure: bool = False,
         httponly: bool = False,
         samesite: Literal["strict", "lax", "none"] = "lax",
     ) -> None:
-        self._response.set_cookie(
-            key,
-            value=value,
-            max_age=max_age,
-            expires=expires,
-            path=path,
-            domain=domain,
-            secure=secure,
-            httponly=httponly,
-            samesite=samesite,
+        self._response.cookies.append(
+            Cookie(
+                key,
+                value,
+                expires=self._compute_expires(expires),
+                max_age=max_age,
+                path=path,
+                domain=domain,
+                secure=secure,
+                httponly=httponly,
+                samesite=samesite,
+            )
         )
 
     def delete_cookie(
@@ -133,6 +135,15 @@ class Response:
             httponly=httponly,
             samesite=samesite,
         )
+
+    def _compute_expires(self, expires: int | datetime | None) -> datetime | None:
+        if expires is None:
+            return None
+
+        if isinstance(expires, datetime):
+            return expires
+
+        return datetime.fromtimestamp(expires)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         return await self._response(scope=scope, receive=receive, send=send)

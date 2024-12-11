@@ -73,6 +73,10 @@ class Application:
         self._register_base_bindings()
 
     @property
+    def name(self) -> str:
+        return self._config.get("app.name", "Expanse")
+
+    @property
     def base_path(self) -> Path:
         return self._base_path
 
@@ -241,7 +245,16 @@ class Application:
             while True:
                 message = await receive()
                 if message["type"] == "lifespan.startup":
-                    await self.bootstrap()
+                    try:
+                        await self.bootstrap()
+                    except Exception as e:
+                        await send(
+                            {
+                                "type": "lifespan.startup.failed",
+                                "message": str(e),
+                            }
+                        )
+                        return
                     await send({"type": "lifespan.startup.complete"})
                 elif message["type"] == "lifespan.shutdown":
                     await self._container.terminate()

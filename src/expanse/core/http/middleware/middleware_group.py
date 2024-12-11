@@ -30,3 +30,23 @@ class MiddlewareGroup:
         self._middlewares = middleware
 
         return self
+
+    def replace(
+        self, middleware: type[Middleware], replacement: type[Middleware]
+    ) -> Self:
+        """
+        Replace a middleware with another middleware.
+        """
+        index = self._middlewares.index(middleware)
+
+        self._middlewares[index] = replacement
+
+        return self
+
+    def remove(self, middleware: type[Middleware]) -> Self:
+        """
+        Remove a middleware from the middleware group.
+        """
+        self._middlewares.remove(middleware)
+
+        return self

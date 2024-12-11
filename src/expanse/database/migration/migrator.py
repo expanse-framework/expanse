@@ -1,10 +1,12 @@
 import re
 
 from argparse import Namespace
+from collections.abc import Callable
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextlib import suppress
 from pathlib import Path
+from typing import Literal
 
 from alembic import util
 from alembic.command import downgrade
@@ -76,6 +78,7 @@ class Migrator:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
         self._config = AlembicConfig(app, cmd_opts=Namespace(quiet=True))
+        self.models_loader: Callable[[], None] = self._load_models
 
     @property
     def config(self) -> AlembicConfig:
@@ -112,7 +115,7 @@ class Migrator:
             # to ensure that alembic sees all the model changes.
             # This is not done in the Alembic's env.py file to avoid loading
             # models unnecessarily.
-            self._load_models()
+            self.models_loader()
 
         with self._patched_status(io):
             revision(self._config, message=message, autogenerate=auto)
@@ -134,6 +137,27 @@ class Migrator:
             io = NullIO()
 
         downgrade(self._config, revision)
+
+    def include_name(
+        self,
+        name: str | None,
+        type_: Literal[
+            "schema",
+            "table",
+            "column",
+            "index",
+            "unique_constraint",
+            "foreign_key_constraint",
+        ],
+        reflected: bool,
+    ) -> bool:
+        match type_:
+            case "table":
+                from expanse.database.orm.model import Model
+
+                return name in Model.metadata.tables
+            case _:
+                return True
 
     def _load_models(self) -> None:
         model_directory = self._app.path("models")

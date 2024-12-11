@@ -36,5 +36,6 @@ class ServiceProvidersList:
                 "expanse.view.view_service_provider.ViewServiceProvider",
                 "expanse.static.static_service_provider.StaticServiceProvider",
                 "expanse.encryption.encryption_service_provider.EncryptionServiceProvider",
+                "expanse.session.session_service_provider.SessionServiceProvider",
             ]
         )

@@ -15,6 +15,7 @@ from expanse.http.url import URL
 
 if TYPE_CHECKING:
     from expanse.routing.route import Route
+    from expanse.session.session import HTTPSession
     from expanse.types import Receive
     from expanse.types import Scope
     from expanse.types import Send
@@ -27,6 +28,7 @@ class Request(BaseRequest):
         super().__init__(scope=scope, receive=receive, send=send)
 
         self._route: Route | None = None
+        self._session: HTTPSession | None = None
 
     @cached_property
     def url(self) -> URL:  # type: ignore[override]
@@ -48,9 +50,34 @@ class Request(BaseRequest):
             for item in AcceptHeader.from_string(self.headers.get("Accept", "")).all()
         ]
 
+    @cached_property
+    def ip(self) -> str | None:
+        ips = self.ips
+
+        return ips[0] if ips else None
+
+    @cached_property
+    def ips(self) -> list[str]:
+        ips = [self.client.host]
+
+        if not self.is_from_trusted_proxy():
+            return [ip for ip in ips if ip is not None]
+
+        if forwarded_ip := self.headers.get("X-Forwarded-For"):
+            ips.insert(0, forwarded_ip)
+
+        return [ip for ip in ips if ip is not None]
+
     @property
     def route(self) -> Route | None:
         return self._route
+
+    @property
+    def session(self) -> HTTPSession | None:
+        return self._session
+
+    def is_from_trusted_proxy(self) -> bool:
+        return False
 
     def accepts_any_content_type(self) -> bool:
         """
@@ -95,6 +122,11 @@ class Request(BaseRequest):
 
     def set_route(self, route: Route) -> Self:
         self._route = route
+
+        return self
+
+    def set_session(self, session: HTTPSession) -> Self:
+        self._session = session
 
         return self
 

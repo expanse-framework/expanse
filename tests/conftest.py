@@ -22,7 +22,7 @@ def root() -> Path:
 
 
 @pytest.fixture()
-async def app(root: Path) -> Application:
+def unbootstrapped_app(root: Path) -> Application:
     async def configure_middleware(stack: MiddlewareStack) -> None:
         stack.use([])
 
@@ -30,11 +30,16 @@ async def app(root: Path) -> Application:
         Application.configure(root).with_middleware(configure_middleware).create()
     )
 
-    await application.bootstrap()
-
-    application.config["app.debug"] = True
-
     return application
+
+
+@pytest.fixture()
+async def app(unbootstrapped_app: Application) -> Application:
+    await unbootstrapped_app.bootstrap()
+
+    unbootstrapped_app.config["app.debug"] = True
+
+    return unbootstrapped_app
 
 
 @pytest.fixture()

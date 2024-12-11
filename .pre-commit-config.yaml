@@ -9,6 +9,7 @@ repos:
         exclude: |
           (?x)(
                ^tests/integration/database/console/commands/.*
+            |  ^tests/integration/session/console/commands/.*
           )
       - id: end-of-file-fixer
       - id: check-merge-conflict

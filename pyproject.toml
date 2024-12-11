@@ -27,6 +27,7 @@ httpx = ">=0.26.0"
 alembic = "^1.13.2"
 pygments = "^2.18.0"
 inflection = "^0.5.1"
+filelock = "^3.16.1"
 
 
 [tool.poetry.group.test.dependencies]
