@@ -18,6 +18,7 @@ from expanse.testing.command_tester import CommandTester
 pytestmark = pytest.mark.db
 
 
+@pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_store_can_read_from_the_database(
     app: Application, name: str, command_tester: CommandTester
@@ -52,6 +53,7 @@ async def test_store_can_read_from_the_database(
     assert store.read(session_id) == json.dumps({"foo": "bar"})
 
 
+@pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_store_can_write_to_the_database(
     app: Application, name: str, command_tester: CommandTester
@@ -97,6 +99,7 @@ async def test_store_can_write_to_the_database(
     assert row.payload == base64.b64encode(json.dumps({"bar": "baz"}).encode()).decode()
 
 
+@pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_store_can_delete_from_the_database(
     app: Application, name: str, command_tester: CommandTester
@@ -138,6 +141,7 @@ async def test_store_can_delete_from_the_database(
     assert row is None
 
 
+@pytest.mark.usefixtures("setup_databases")
 async def test_writing_to_store_works_for_non_natively_supported_dialect(
     app: Application, command_tester: CommandTester, mockery: Mockery
 ) -> None:
@@ -187,6 +191,7 @@ async def test_writing_to_store_works_for_non_natively_supported_dialect(
     assert row.payload == base64.b64encode(json.dumps({"bar": "baz"}).encode()).decode()
 
 
+@pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_expired_sessions_can_be_cleared(
     app: Application, name: str, command_tester: CommandTester, mockery: Mockery

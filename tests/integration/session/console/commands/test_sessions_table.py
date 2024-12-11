@@ -13,7 +13,8 @@ from expanse.testing.command_tester import CommandTester
 pytestmark = pytest.mark.db
 
 
-def test_comand_creates_a_new_migration_file_with_necessary_operations(
+@pytest.mark.usefixtures("setup_databases")
+def test_command_creates_a_new_migration_file_with_necessary_operations(
     command_tester: CommandTester, app: Application, tmp_path: Path, mockery: Mockery
 ) -> None:
     mockery.mock(util).should_receive("rev_id").and_return("1234567890")

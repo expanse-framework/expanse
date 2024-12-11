@@ -1,11 +1,6 @@
 import json
 
-import pytest
-
 from expanse.session.synchronous.stores.null import NullStore
-
-
-pytestmark = pytest.mark.db
 
 
 def test_store_is_noop() -> None:

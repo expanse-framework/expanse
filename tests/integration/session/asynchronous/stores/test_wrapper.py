@@ -4,13 +4,8 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 
-import pytest
-
 from expanse.session.asynchronous.stores.wrapper import AsyncWrapperStore
 from expanse.session.synchronous.stores.dict import DictStore
-
-
-pytestmark = pytest.mark.db
 
 
 async def test_store_can_read_from_the_dict() -> None:

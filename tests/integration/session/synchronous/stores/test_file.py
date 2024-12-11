@@ -2,12 +2,7 @@ import json
 
 from pathlib import Path
 
-import pytest
-
 from expanse.session.synchronous.stores.file import FileStore
-
-
-pytestmark = pytest.mark.db
 
 
 def test_store_can_read_from_the_storage(tmp_path: Path) -> None:
