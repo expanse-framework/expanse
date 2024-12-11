@@ -1,3 +1,5 @@
+from pydantic.version import version_short as pydantic_version
+
 from expanse.http.form import Form
 from expanse.http.helpers import json
 from expanse.http.response import Response
@@ -57,7 +59,7 @@ def test_validation_errors_are_correctly_handled(
                     "unable to parse string as an integer"
                 ),
                 "input": "foo",
-                "url": "https://errors.pydantic.dev/2.9/v/int_parsing",
+                "url": f"https://errors.pydantic.dev/{pydantic_version()}/v/int_parsing",
             }
         ],
     }

@@ -24,7 +24,11 @@ class Config(BaseSettings):
     # >>> DB_CONNECTIONS__SQLITE__DATABASE=database/database.sqlite
 
     connections: dict[str, DatabaseConfig] = Field(
-        default={"sqlite": SQLiteConfig(database=Path("database/database.sqlite"))}
+        default_factory=lambda: {
+            "sqlite": DatabaseConfig(
+                root=SQLiteConfig(database=Path("database/database.sqlite"))
+            )
+        }
     )
 
     model_config = SettingsConfigDict(env_prefix="DB_", env_nested_delimiter="__")
