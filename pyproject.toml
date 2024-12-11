@@ -20,7 +20,7 @@ pydantic = "^2.3.0"
 pendulum = { version = "^3.0.0", extras = ["test"] }
 pydantic-settings = "^2.1.0"
 sqlalchemy = "^2.0.25"
-baize = "^0.20.8"
+baize = "^0.22.0"
 crashtest = "^0.4.1"
 anyio = "^4.2.0"
 httpx = ">=0.26.0"
