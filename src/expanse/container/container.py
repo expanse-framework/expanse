@@ -245,6 +245,7 @@ class Container:
             self._after_resolving_callbacks[actual_abstract].append(callback)
         else:
             self._after_resolving_callbacks[abstract].append(callback)
+            self._scoped["after_resolving_callbacks"][abstract].append(callback)
 
     def terminating(self, callback: _Callback, scoped: bool = False) -> None:
         if scoped:
