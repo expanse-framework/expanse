@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from expanse.http.request import Request
 from expanse.http.url import URL
 from expanse.routing.route_matcher import RouteMatcher
-from expanse.routing.router import Router
+from expanse.routing.trie.router import Router
 
 
 class URLGenerator:
