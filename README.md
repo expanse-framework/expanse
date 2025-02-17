@@ -74,4 +74,4 @@ provides helpful guidance.
 
 * [expanse-cli](https://github.com/expanse-framework/cli): The official installer for Expanse projects. It
   will set up a ready-to-be-used project for you.
-* [website](https://github.com/expanse-framework/expanse-framework.com): The official Poetry website.
+* [website](https://expanse-framework.com/): The official Expanse website.
