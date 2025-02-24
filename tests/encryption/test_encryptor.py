@@ -1,17 +1,38 @@
+import pytest
+
 from pytest_mock import MockerFixture
 
 from expanse.encryption.compressors.zlib import ZlibCompressor
 from expanse.encryption.encryptor import Encryptor
+from expanse.encryption.errors import DecryptionError
+from expanse.encryption.key import Key
+from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.message import Message
 
 
 SECRET = b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb"
+SECRET2 = b"MG6cMKYU4q3UTine3OT-UiPX-Zp-Ga10"
 SALT = b"73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"
 
 
-def test_encryptor_can_encrypt_data(mocker: MockerFixture) -> None:
-    encryptor = Encryptor(SECRET, SALT)
+@pytest.fixture
+def key_chain() -> KeyChain:
+    return KeyChain([Key(SECRET)])
 
+
+@pytest.fixture
+def encryptor(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, SALT)
+
+
+@pytest.fixture
+def encryptor_without_compression(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, SALT, compress=False)
+
+
+def test_encryptor_can_encrypt_data(
+    encryptor: Encryptor, mocker: MockerFixture
+) -> None:
     compress = mocker.spy(ZlibCompressor, "compress")
 
     message = encryptor.encrypt("Hello, World!")
@@ -25,12 +46,12 @@ def test_encryptor_can_encrypt_data(mocker: MockerFixture) -> None:
     assert compress.call_count == 1
 
 
-def test_encryptor_can_encrypt_data_without_compression(mocker: MockerFixture) -> None:
-    encryptor = Encryptor(SECRET, SALT, compress=False)
-
+def test_encryptor_can_encrypt_data_without_compression(
+    encryptor_without_compression: Encryptor, mocker: MockerFixture
+) -> None:
     compress = mocker.spy(ZlibCompressor, "compress")
 
-    message = encryptor.encrypt("Hello, World!")
+    message = encryptor_without_compression.encrypt("Hello, World!")
 
     assert isinstance(message, Message)
     assert isinstance(message.payload, bytes)
@@ -41,9 +62,9 @@ def test_encryptor_can_encrypt_data_without_compression(mocker: MockerFixture) -
     assert compress.call_count == 0
 
 
-def test_encryptor_can_decrypt_messages(mocker: MockerFixture) -> None:
-    encryptor = Encryptor(SECRET, SALT)
-
+def test_encryptor_can_decrypt_messages(
+    encryptor: Encryptor, mocker: MockerFixture
+) -> None:
     decompress = mocker.spy(ZlibCompressor, "decompress")
 
     message = encryptor.encrypt("Hello, World!")
@@ -55,23 +76,23 @@ def test_encryptor_can_decrypt_messages(mocker: MockerFixture) -> None:
     assert decompress.call_count == 1
 
 
-def test_encryptor_can_decrypt_data_without_compression(mocker: MockerFixture) -> None:
-    encryptor = Encryptor(SECRET, SALT, compress=False)
-
+def test_encryptor_can_decrypt_data_without_compression(
+    encryptor_without_compression: Encryptor, mocker: MockerFixture
+) -> None:
     decompress = mocker.spy(ZlibCompressor, "decompress")
 
-    message = encryptor.encrypt("Hello, World!")
+    message = encryptor_without_compression.encrypt("Hello, World!")
 
-    decrypted = encryptor.decrypt(message)
+    decrypted = encryptor_without_compression.decrypt(message)
 
     assert decrypted == "Hello, World!"
 
     assert decompress.call_count == 0
 
 
-def test_encryptor_can_encrypt_and_decrypt_data_deterministically() -> None:
-    encryptor = Encryptor(SECRET, SALT)
-
+def test_encryptor_can_encrypt_and_decrypt_data_deterministically(
+    encryptor: Encryptor,
+) -> None:
     message = encryptor.encrypt("Hello, World!", deterministic=True)
     message2 = encryptor.encrypt("Hello, World!", deterministic=True)
 
@@ -89,3 +110,30 @@ def test_encryptor_can_generate_keys() -> None:
 
     assert isinstance(key, bytes)
     assert len(key) == 32
+
+
+def test_encryptor_iterates_over_keys_to_decrypt() -> None:
+    key_chain = KeyChain([Key(SECRET2)])
+    encryptor = Encryptor(key_chain, SALT)
+
+    message = encryptor.encrypt("Hello, World!")
+
+    key_chain = KeyChain([Key(SECRET), Key(SECRET2)])
+    encryptor = Encryptor(key_chain, SALT)
+
+    decrypted = encryptor.decrypt(message)
+
+    assert decrypted == "Hello, World!"
+
+
+def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
+    key_chain = KeyChain([Key(SECRET2)])
+    encryptor = Encryptor(key_chain, SALT)
+
+    message = encryptor.encrypt("Hello, World!")
+
+    key_chain = KeyChain([Key(SECRET)])
+    encryptor = Encryptor(key_chain, SALT)
+
+    with pytest.raises(DecryptionError):
+        encryptor.decrypt(message)

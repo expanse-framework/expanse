@@ -40,15 +40,18 @@ class AES256GCMCipher(BaseCipher):
         auth_tag = message.headers["at"]
 
         if not auth_tag or len(auth_tag) != 16:
-            raise DecryptionError()
+            raise DecryptionError("Invalid tag")
 
         cipher = Cipher(AES(self._secret), GCM(iv), backend=default_backend())
-        cipher.auth_tag = auth_tag
 
         decryptor = cipher.decryptor()
-        decrypted = decryptor.update(encrypted_data) + decryptor.finalize_with_tag(
-            auth_tag
-        )
+
+        try:
+            decrypted = decryptor.update(encrypted_data) + decryptor.finalize_with_tag(
+                auth_tag
+            )
+        except Exception as e:
+            raise DecryptionError("Unable to decrypt message") from e
 
         return decrypted
 

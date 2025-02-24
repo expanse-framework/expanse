@@ -3,15 +3,13 @@ from typing import Any
 
 
 class Message:
-    def __init__(self, payload: bytes | None, headers: dict | None = None) -> None:
-        self.payload: bytes | None = payload
+    def __init__(self, payload: bytes, headers: dict | None = None) -> None:
+        self.payload: bytes = payload
         self.headers: dict[str, Any] = headers or {}
 
     def dump(self) -> dict[str, Any]:
         return {
-            "p": (
-                b64encode(self.payload).decode() if self.payload is not None else None
-            ),
+            "p": (b64encode(self.payload).decode()),
             "h": self._dump_headers(self.headers),
         }
 
@@ -27,4 +25,4 @@ class Message:
         return to_dump
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.payload}, {self.headers!r})"
+        return f"{self.__class__.__name__}({self.payload!r}, {self.headers!r})"

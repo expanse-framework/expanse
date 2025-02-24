@@ -27,13 +27,27 @@ class EncryptionServiceProvider(ServiceProvider):
     async def _create_encryptor(self, app: Application) -> "Encryptor":
         from expanse.encryption.encryptor import Cipher
         from expanse.encryption.encryptor import Encryptor
+        from expanse.encryption.key import Key
+        from expanse.encryption.key_chain import KeyChain
 
         secret_key: str = app.config.get("app.secret_key")
+        previous_keys: str = app.config.get("app.previous_keys")
         cipher: str = app.config.get("encryption.cipher")
         salt: str = app.config.get("encryption.salt")
 
+        key_chain = KeyChain([Key(self._normalize_key(secret_key))])
+
+        if previous_keys:
+            for key in previous_keys.split(","):
+                key = key.strip()
+
+                if not key:
+                    continue
+
+                key_chain.add(Key(self._normalize_key(key)))
+
         return Encryptor(
-            self._normalize_key(secret_key),
+            key_chain,
             self._normalize_key(salt),
             Cipher(cipher),
         )

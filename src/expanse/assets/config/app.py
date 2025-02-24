@@ -29,6 +29,12 @@ class Config(BaseSettings):
     # This must be set prior to deploying the application.
     secret_key: SecretStr = SecretStr("")
 
+    # Previous encryption keys
+    #
+    # This is a comma-separated list of previous encryption keys that were used by the
+    # application. This is used to decrypt messages that were encrypted with an older key.
+    previous_keys: SecretStr | None = None
+
     # Service providers
     #
     # You can list here the service providers that you want to register automatically

@@ -6,6 +6,9 @@ from typing import ClassVar
 from expanse.encryption.ciphers.aes256_gcm import AES256GCMCipher
 from expanse.encryption.ciphers.base_cipher import BaseCipher
 from expanse.encryption.compressors.zlib import ZlibCompressor
+from expanse.encryption.errors import DecryptionError
+from expanse.encryption.key import Key
+from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
 
@@ -21,12 +24,13 @@ class Encryptor:
 
     def __init__(
         self,
-        secret_key: bytes,
+        key_chain: KeyChain,
         salt: bytes,
         cipher: Cipher = Cipher.AES_256_GCM,
         compress: bool = True,
     ) -> None:
-        self._secret_key = secret_key
+        self._key_chain = key_chain
+        self._secret_key = key_chain.latest
         self._salt = salt
         self._cipher = cipher
         self._compress = compress
@@ -34,8 +38,8 @@ class Encryptor:
 
     def encrypt(self, data: str, deterministic: bool = False) -> Message:
         cipher_class = self.CIPHERS[self._cipher]
-        key = self.derive_key(length=cipher_class.key_length)
-        cipher = cipher_class(key, deterministic=deterministic)
+        key = self.derive_key(self._secret_key, length=cipher_class.key_length)
+        cipher = cipher_class(key.value, deterministic=deterministic)
 
         encoded: bytes = data.encode()
         if self._compress:
@@ -48,9 +52,19 @@ class Encryptor:
         return encrypted
 
     def decrypt(self, message: Message) -> str:
+        for key in self._key_chain:
+            try:
+                return self._decrypt(message, key)
+            except DecryptionError:
+                continue
+
+        raise DecryptionError("Unable to decrypt message")
+
+    def _decrypt(self, message: Message, key: Key) -> str:
         cipher_class = self.CIPHERS[self._cipher]
-        key = self.derive_key(length=cipher_class.key_length)
-        cipher = cipher_class(key)
+
+        key = self.derive_key(key, length=cipher_class.key_length)
+        cipher = cipher_class(key.value)
 
         decrypted = cipher.decrypt(message)
 
@@ -66,7 +80,9 @@ class Encryptor:
 
         return key
 
-    def derive_key(self, iterations: int | None = None, length: int = 32) -> bytes:
-        return KeyGenerator(self._secret_key, iterations=iterations).generate_key(
+    def derive_key(
+        self, key: Key, iterations: int | None = None, length: int = 32
+    ) -> Key:
+        return KeyGenerator(key, iterations=iterations).generate_key(
             self._salt, key_size=length
         )
