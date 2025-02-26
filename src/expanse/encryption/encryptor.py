@@ -28,6 +28,7 @@ class Encryptor:
         salt: bytes,
         cipher: Cipher = Cipher.AES_256_GCM,
         compress: bool = True,
+        derive: bool = True,
     ) -> None:
         self._key_chain = key_chain
         self._secret_key = key_chain.latest
@@ -35,10 +36,22 @@ class Encryptor:
         self._cipher = cipher
         self._compress = compress
         self._compressor = ZlibCompressor()
+        self._derive = derive
+
+    def has_compression(self) -> bool:
+        return self._compress
+
+    def has_derivation(self) -> bool:
+        return self._derive
 
     def encrypt(self, data: str, deterministic: bool = False) -> Message:
         cipher_class = self.CIPHERS[self._cipher]
-        key = self.derive_key(self._secret_key, length=cipher_class.key_length)
+
+        if self._derive:
+            key = self.derive_key(self._secret_key, length=cipher_class.key_length)
+        else:
+            key = self._secret_key
+
         cipher = cipher_class(key.value, deterministic=deterministic)
 
         encoded: bytes = data.encode()
@@ -63,7 +76,11 @@ class Encryptor:
     def _decrypt(self, message: Message, key: Key) -> str:
         cipher_class = self.CIPHERS[self._cipher]
 
-        key = self.derive_key(key, length=cipher_class.key_length)
+        if self._derive:
+            key = self.derive_key(key, length=cipher_class.key_length)
+        else:
+            key = key
+
         cipher = cipher_class(key.value)
 
         decrypted = cipher.decrypt(message)

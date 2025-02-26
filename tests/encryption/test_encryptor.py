@@ -30,10 +30,18 @@ def encryptor_without_compression(key_chain: KeyChain) -> Encryptor:
     return Encryptor(key_chain, SALT, compress=False)
 
 
+@pytest.fixture
+def encryptor_without_derivation(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, SALT, derive=False)
+
+
 def test_encryptor_can_encrypt_data(
     encryptor: Encryptor, mocker: MockerFixture
 ) -> None:
     compress = mocker.spy(ZlibCompressor, "compress")
+
+    assert encryptor.has_compression()
+    assert encryptor.has_derivation()
 
     message = encryptor.encrypt("Hello, World!")
 
@@ -49,6 +57,9 @@ def test_encryptor_can_encrypt_data(
 def test_encryptor_can_encrypt_data_without_compression(
     encryptor_without_compression: Encryptor, mocker: MockerFixture
 ) -> None:
+    assert not encryptor_without_compression.has_compression()
+    assert encryptor_without_compression.has_derivation()
+
     compress = mocker.spy(ZlibCompressor, "compress")
 
     message = encryptor_without_compression.encrypt("Hello, World!")
@@ -137,3 +148,15 @@ def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
 
     with pytest.raises(DecryptionError):
         encryptor.decrypt(message)
+
+
+def test_encryptor_can_be_used_without_key_derivation(
+    encryptor_without_derivation: Encryptor,
+) -> None:
+    assert not encryptor_without_derivation.has_derivation()
+
+    message = encryptor_without_derivation.encrypt("Hello, World!")
+
+    decrypted = encryptor_without_derivation.decrypt(message)
+
+    assert decrypted == "Hello, World!"
