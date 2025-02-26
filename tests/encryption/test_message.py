@@ -2,27 +2,31 @@ from expanse.encryption.message import Message
 
 
 def test_message_is_dumpable() -> None:
-    message = Message(b"payload", {"key": "value"})
+    message = Message(b"payload", {"key": "value", "foo": 42})
     dumped = message.dump()
 
-    assert dumped == {"p": "cGF5bG9hZA==", "h": {"key": "value"}}
-
-
-def test_message_with_null_payload_dumpable() -> None:
-    message = Message(None)
-    dumped = message.dump()
-
-    assert dumped == {"p": None, "h": {}}
+    assert dumped == {"p": "cGF5bG9hZA==", "h": {"key": "dmFsdWU=", "foo": 42}}
 
 
 def test_message_with_bytes_header_value_is_dumpable() -> None:
     message = Message(b"payload", {"key": "value", "bytes": b"bytes"})
     dumped = message.dump()
 
-    assert dumped == {"p": "cGF5bG9hZA==", "h": {"key": "value", "bytes": "Ynl0ZXM="}}
+    assert dumped == {
+        "p": "cGF5bG9hZA==",
+        "h": {"key": "dmFsdWU=", "bytes": "Ynl0ZXM="},
+    }
 
 
 def test_message_is_representable() -> None:
     message = Message(b"payload", {"key": "value"})
 
     assert repr(message) == "Message(b'payload', {'key': 'value'})"
+
+
+def test_message_can_be_loaded_from_dumped_data() -> None:
+    dumped = {"p": "cGF5bG9hZA==", "h": {"key": "dmFsdWU=", "foo": 42}}
+    message = Message.load(dumped)
+
+    assert message.payload == b"payload"
+    assert message.headers == {"key": b"value", "foo": 42}
