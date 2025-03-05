@@ -61,11 +61,13 @@ class MiddlewareStack:
         return [ManageCors]
 
     def get_default_groups(self) -> dict[str, MiddlewareGroup]:
+        from expanse.http.middleware.encrypt_cookies import EncryptCookies
         from expanse.session.middleware.load_session import LoadSession
 
         return {
             "web": MiddlewareGroup(
                 [
+                    EncryptCookies,
                     LoadSession,
                 ]
             ),
