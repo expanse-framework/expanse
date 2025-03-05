@@ -10,11 +10,15 @@ class MiddlewareStack:
             middlewares = self.get_default_middleware()
 
         self._middlewares: list[type[Middleware]] = middlewares
-        self._groups: dict[str, MiddlewareGroup] = {}
+        self._groups: dict[str, MiddlewareGroup] = self.get_default_groups()
 
     @property
     def middleware(self) -> list[type[Middleware]]:
         return self._middlewares
+
+    @property
+    def groups(self) -> dict[str, MiddlewareGroup]:
+        return self._groups
 
     def append(self, *middleware: type[Middleware]) -> Self:
         """
@@ -54,6 +58,16 @@ class MiddlewareStack:
     def get_default_middleware(self) -> list[type[Middleware]]:
         from expanse.http.middleware.manage_cors import ManageCors
 
-        return [
-            ManageCors,
-        ]
+        return [ManageCors]
+
+    def get_default_groups(self) -> dict[str, MiddlewareGroup]:
+        from expanse.session.middleware.load_session import LoadSession
+
+        return {
+            "web": MiddlewareGroup(
+                [
+                    LoadSession,
+                ]
+            ),
+            "api": MiddlewareGroup(),
+        }

@@ -7,6 +7,10 @@ class MiddlewareGroup:
     def __init__(self, middlewares: list[type[Middleware]] | None = None) -> None:
         self._middlewares = middlewares or []
 
+    @property
+    def middleware(self) -> list[type[Middleware]]:
+        return self._middlewares
+
     def append(self, *middleware: type[Middleware]) -> Self:
         """
         Append middleware to the middleware stack.

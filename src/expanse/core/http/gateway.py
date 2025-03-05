@@ -3,6 +3,7 @@ from typing import Self
 
 from expanse.core.application import Application
 from expanse.core.http.middleware.middleware import Middleware
+from expanse.core.http.middleware.middleware_group import MiddlewareGroup
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.routing.pipeline import Pipeline
@@ -22,7 +23,7 @@ class Gateway:
         self._app = app
         self._router = router
         self._middleware: list[type[Middleware]] = []
-        self._group_middleware: dict[str, list[type[Middleware]]] = {}
+        self._middleware_groups: dict[str, MiddlewareGroup] = {}
 
     async def handle(self, request: Request) -> Response:
         async with self._app.container.create_scoped_container() as container:
@@ -43,11 +44,15 @@ class Gateway:
     def set_middleware(self, middleware: list[type[Middleware]]) -> Self:
         self._middleware = middleware
 
+        self._configure_router()
+
         return self
 
     def prepend_middleware(self, middleware: type[Middleware]) -> Self:
         if middleware not in self._middleware:
             self._middleware.insert(0, middleware)
+
+        self._configure_router()
 
         return self
 
@@ -55,7 +60,20 @@ class Gateway:
         if middleware not in self._middleware:
             self._middleware.append(middleware)
 
+        self._configure_router()
+
         return self
+
+    def set_middleware_groups(self, groups: dict[str, MiddlewareGroup]) -> Self:
+        self._middleware_groups = groups
+
+        self._configure_router()
+
+        return self
+
+    def _configure_router(self) -> None:
+        for name, group in self._middleware_groups.items():
+            self._router.middleware_group(name, group.middleware)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         request = Request(scope, receive, send)
