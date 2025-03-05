@@ -38,11 +38,12 @@ Please check your .env file and that a APP_SECRET_KEY is present.
     assert command.output.fetch() == expected
 
 
-async def test_generate_key_with_env_file_and_with_empty_app_secret_key(
+async def test_generate_key_with_env_file_and_with_empty_app_keys(
     command_tester: CommandTester, app: Application, tmp_path: Path
 ) -> None:
     app.config["app.secret_key"] = ""
-    tmp_path.joinpath(".env").write_text("APP_SECRET_KEY=")
+    app.config["encryption.salt"] = ""
+    tmp_path.joinpath(".env").write_text("APP_SECRET_KEY=\nENCRYPTION_SALT=")
     app._environment_path = tmp_path
 
     command = command_tester.command("encryption key generate")
@@ -50,7 +51,8 @@ async def test_generate_key_with_env_file_and_with_empty_app_secret_key(
     return_code = command.run()
     assert return_code == 0
 
-    expected = """Application secret key generated successfully.
+    expected = """Application key generated successfully.
+Application salt generated successfully.
 """
 
     assert command.output.fetch() == expected
@@ -58,7 +60,7 @@ async def test_generate_key_with_env_file_and_with_empty_app_secret_key(
     assert app.config["app.secret_key"] != ""
     assert (
         tmp_path.joinpath(".env").read_text().strip()
-        == f"APP_SECRET_KEY={app.config['app.secret_key']}"
+        == f"APP_SECRET_KEY={app.config['app.secret_key']}\nENCRYPTION_SALT={app.config['encryption.salt']}"
     )
 
 
@@ -66,7 +68,8 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key(
     command_tester: CommandTester, app: Application, tmp_path: Path
 ) -> None:
     app.config["app.secret_key"] = "S" * 32
-    tmp_path.joinpath(".env").write_text(f"APP_SECRET_KEY={'S' * 32}")
+    app.config["encryption.salt"] = ""
+    tmp_path.joinpath(".env").write_text(f"APP_SECRET_KEY={'S' * 32}\nENCRYPTION_SALT=")
     app._environment_path = tmp_path
 
     command = command_tester.command("encryption key generate")
@@ -74,8 +77,9 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key(
     return_code = command.with_user_input("y\n").run()
     assert return_code == 0
 
-    expected = """Do you want to replace the existing application secret key? (yes/no) [no]\
- Application secret key generated successfully.
+    expected = """Do you want to replace the existing application key? (yes/no) [no]\
+ Application key generated successfully.
+Application salt generated successfully.
 """
 
     assert command.output.fetch() == expected
@@ -83,7 +87,7 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key(
     assert app.config["app.secret_key"] != "S" * 32
     assert (
         tmp_path.joinpath(".env").read_text().strip()
-        == f"APP_SECRET_KEY={app.config['app.secret_key']}"
+        == f"APP_SECRET_KEY={app.config['app.secret_key']}\nENCRYPTION_SALT={app.config['encryption.salt']}"
     )
 
 
@@ -99,9 +103,7 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key_and_
     return_code = command.with_user_input("n\n").run()
     assert return_code == 1
 
-    expected = (
-        "Do you want to replace the existing application secret key? (yes/no) [no] "
-    )
+    expected = "Do you want to replace the existing application key? (yes/no) [no] "
 
     assert command.output.fetch() == expected
 
@@ -118,3 +120,51 @@ async def test_generate_key_show_only(
     assert return_code == 0
 
     assert command.output.fetch().strip().startswith("base64:")
+
+
+async def test_generate_key_with_key_only(
+    command_tester: CommandTester, app: Application, tmp_path: Path
+) -> None:
+    app.config["app.secret_key"] = ""
+    tmp_path.joinpath(".env").write_text("APP_SECRET_KEY=")
+    app._environment_path = tmp_path
+
+    command = command_tester.command("encryption key generate")
+
+    return_code = command.with_user_input("y\n").run("--key")
+    assert return_code == 0
+
+    expected = """Application key generated successfully.
+"""
+
+    assert command.output.fetch() == expected
+
+    assert app.config["app.secret_key"] != "S" * 32
+    assert (
+        tmp_path.joinpath(".env").read_text().strip()
+        == f"APP_SECRET_KEY={app.config['app.secret_key']}"
+    )
+
+
+async def test_generate_key_with_salt_only(
+    command_tester: CommandTester, app: Application, tmp_path: Path
+) -> None:
+    app.config["encryption.salt"] = ""
+    tmp_path.joinpath(".env").write_text("ENCRYPTION_SALT=")
+    app._environment_path = tmp_path
+
+    command = command_tester.command("encryption key generate")
+
+    return_code = command.with_user_input("y\n").run("--salt")
+    assert return_code == 0
+
+    expected = """Application salt generated successfully.
+"""
+
+    assert command.output.fetch() == expected
+
+    assert app.config["encryption.salt"] != "S" * 32
+    assert (
+        tmp_path.joinpath(".env").read_text().strip()
+        == f"ENCRYPTION_SALT={app.config['encryption.salt']}"
+    )
