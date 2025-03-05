@@ -19,15 +19,12 @@ class EncryptorFactory:
         from expanse.encryption.key import Key
         from expanse.encryption.key_chain import KeyChain
 
-        secret_key: str | SecretStr = self._app.config.get("app.secret_key")
-        previous_keys: str | SecretStr = self._app.config.get("app.previous_keys")
+        secret_key: str = self._app.config.get("app.secret_key", raw=True)
+        previous_keys: str = self._app.config.get("app.previous_keys", raw=True)
         cipher: str = self._app.config.get("encryption.cipher")
-        salt: str | SecretStr = self._app.config.get("encryption.salt")
+        salt: str = self._app.config.get("encryption.salt", raw=True)
 
         key_chain = KeyChain([Key(self._normalize_key(secret_key))])
-
-        if isinstance(previous_keys, SecretStr):
-            previous_keys = previous_keys.get_secret_value()
 
         if previous_keys:
             for key in previous_keys.split(","):
@@ -51,9 +48,6 @@ class EncryptorFactory:
 
         if not key:
             raise MissingSecretKeyError()
-
-        if isinstance(key, SecretStr):
-            key = key.get_secret_value()
 
         if key.startswith("base64:"):
             return base64.urlsafe_b64decode(key[7:])
