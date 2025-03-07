@@ -56,6 +56,7 @@ def set_cookies() -> Response:
     response = Response("Hello, World!")
     response.set_cookie("name", "value")
     response.set_cookie("name2", "value2")
+    response.set_cookie("name3", "value3")
 
     return response
 
@@ -63,6 +64,7 @@ def set_cookies() -> Response:
 def read_cookies(request: Request) -> Response:
     assert request.cookies["name"] == "value"
     assert request.cookies["name2"] == "value2"
+    assert request.cookies["name3"] == "value3"
 
     return Response("Hello, World!")
 
@@ -80,6 +82,8 @@ async def test_response_cookies_are_encrypted(
     assert response.cookies[0].value != "value"
     assert response.cookies[1].name == "name2"
     assert response.cookies[1].value != "value2"
+    assert response.cookies[2].name == "name3"
+    assert response.cookies[2].value != "value3"
 
 
 async def test_request_cookies_are_decrypted(
@@ -90,6 +94,39 @@ async def test_request_cookies_are_decrypted(
     request = Request.create("http://localhost:8000", "GET")
     request.cookies["name"] = encrypt("value")
     request.cookies["name2"] = encrypt("value2")
+    request.cookies["name3"] = encrypt("value3")
+
+    container.instance(Request, request)
+
+    await router.handle(container, request)
+
+
+async def test_cookies_are_not_encrypted_if_they_are_disabled(
+    router: Router, container: Container, encrypt: Callable[[str], str]
+) -> None:
+    router.get("/", set_cookies).middleware(EncryptCookies.excluding("name3"))
+
+    request = Request.create("http://localhost:8000", "GET")
+
+    response = await router.handle(container, request)
+
+    assert response.cookies[0].name == "name"
+    assert response.cookies[0].value != "value"
+    assert response.cookies[1].name == "name2"
+    assert response.cookies[1].value != "value2"
+    assert response.cookies[2].name == "name3"
+    assert response.cookies[2].value == "value3"
+
+
+async def test_request_cookies_are_not_decrypted_if_they_are_disabled(
+    router: Router, container: Container, encrypt: Callable[[str], str]
+) -> None:
+    router.get("/", read_cookies).middleware(EncryptCookies.excluding("name3"))
+
+    request = Request.create("http://localhost:8000", "GET")
+    request.cookies["name"] = encrypt("value")
+    request.cookies["name2"] = encrypt("value2")
+    request.cookies["name3"] = "value3"
 
     container.instance(Request, request)
 
