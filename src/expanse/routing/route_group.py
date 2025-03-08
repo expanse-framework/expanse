@@ -21,7 +21,7 @@ class RouteGroup:
         self.prefix: str | None = prefix
         self.routes: list[Route] = []
 
-        self._middlewares: list[type[Middleware]] = []
+        self._middlewares: list[type[Middleware] | str] = []
 
     def add_route(self, route: Route) -> None:
         self.routes.append(self._build_route(route))
@@ -76,12 +76,12 @@ class RouteGroup:
 
         return route
 
-    def middleware(self, *middlewares: type[Middleware]) -> Self:
+    def middleware(self, *middlewares: type[Middleware] | str) -> Self:
         self._middlewares.extend(middlewares)
 
         return self
 
-    def prepend_middleware(self, *middlewares: type[Middleware]) -> Self:
+    def prepend_middleware(self, *middlewares: type[Middleware] | str) -> Self:
         self._middlewares = list(middlewares) + self._middlewares
 
         return self

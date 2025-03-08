@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import SecretStr
+
 
 _NOT_FOUND = object()
 
@@ -10,7 +12,9 @@ class Config:
     def __init__(self, config: dict) -> None:
         self._config = config
 
-    def get(self, key: str | None = None, default: Any = None) -> Any:
+    def get(
+        self, key: str | None = None, default: Any = None, raw: bool = False
+    ) -> Any:
         config: dict[str, Any] = self._config
 
         if not key:
@@ -22,6 +26,9 @@ class Config:
                 return default
 
             config = config[part]
+
+        if raw:
+            return self._get_raw_value(config)
 
         return config
 
@@ -62,3 +69,9 @@ class Config:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}({self._config!r})"
+
+    def _get_raw_value(self, value: Any) -> Any:
+        if isinstance(value, SecretStr):
+            return value.get_secret_value()
+
+        return value

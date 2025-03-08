@@ -72,6 +72,7 @@ class ApplicationBuilder:
             await callback(stack)
 
             gateway.set_middleware(stack.middleware)
+            gateway.set_middleware_groups(stack.groups)
 
         self._configure_middleware_stack = configure_middleware
 

@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from typing import Annotated
 from typing import NoReturn
+from typing import Self
 from typing import get_args
 from typing import get_origin
 
@@ -28,11 +29,14 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
     from collections.abc import Callable
 
+    from expanse.core.http.middleware.middleware import Middleware
+
 
 class Router:
     def __init__(self, container: Container) -> None:
         self._container: Container = container
         self._routes: RouteCollection = RouteCollection()
+        self._middleware_groups: dict[str, list[type[Middleware]]] = {}
 
     @property
     def routes(self) -> RouteCollection:
@@ -111,6 +115,11 @@ class Router:
 
         self.add_group(group)
 
+    def middleware_group(self, name: str, middleware: list[type["Middleware"]]) -> Self:
+        self._middleware_groups[name] = middleware
+
+        return self
+
     def find(self, name: str) -> Route | None:
         return self._routes.find(name)
 
@@ -127,11 +136,21 @@ class Router:
             # Set the route to the request
             request.set_route(route)
 
+            for middleware in route.get_middleware():
+                if isinstance(middleware, str):
+                    if middleware not in self._middleware_groups:
+                        raise ValueError(
+                            f"Middleware group '{middleware}' not found in the middleware groups."
+                        )
+
+                    for group_middleware in self._middleware_groups[middleware]:
+                        pipes.append((await container.get(group_middleware)).handle)
+
+                    continue
+
+                pipes.append((await container.get(middleware)).handle)
+
             handler = self._route_handler(route, container)
-            pipes = [
-                (await container.get(middleware)).handle
-                for middleware in route.get_middleware()
-            ]
 
         return await Pipeline(container).use(pipes).send(request).to(handler)
 
