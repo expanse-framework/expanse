@@ -70,7 +70,7 @@ class Route:
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.path}", {self.endpoint})'
 
-    def get_middleware(self) -> list[type[Middleware]]:
+    def get_middleware(self) -> list[type[Middleware] | str]:
         return self._middlewares
 
     def middleware(self, *middlewares: type[Middleware] | str) -> Self:
