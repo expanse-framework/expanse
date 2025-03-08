@@ -49,7 +49,7 @@ def test_encryptor_can_encrypt_data(
     assert isinstance(message.payload, bytes)
     assert "iv" in message.headers
     assert "at" in message.headers
-    assert message.headers["compressed"]
+    assert message.headers["z"] == 1
 
     assert compress.call_count == 1
 
@@ -68,7 +68,7 @@ def test_encryptor_can_encrypt_data_without_compression(
     assert isinstance(message.payload, bytes)
     assert "iv" in message.headers
     assert "at" in message.headers
-    assert "compressed" not in message.headers
+    assert "z" not in message.headers
 
     assert compress.call_count == 0
 

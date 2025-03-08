@@ -81,7 +81,7 @@ class Encryptor:
 
         encrypted = cipher.encrypt(encoded)
         if self._compress:
-            encrypted.headers["compressed"] = True
+            encrypted.headers["z"] = 1
 
         return encrypted
 
@@ -115,7 +115,7 @@ class Encryptor:
 
         decrypted = cipher.decrypt(message)
 
-        if message.headers.get("compressed"):
+        if message.headers.get("z"):
             decrypted = self._compressor.decompress(decrypted)
 
         return decrypted.decode()
