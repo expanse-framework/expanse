@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 async def setup_app(app: Application) -> None:
-    app.config["view"] = {
-        "paths": [Path(__file__).parent.joinpath("fixtures/resources/views")]
-    }
+    app.config["view"] = {"paths": [Path(__file__).parent.joinpath("fixtures/views")]}
 
     app.container.instance(Request, Request.create("http://example.com"))

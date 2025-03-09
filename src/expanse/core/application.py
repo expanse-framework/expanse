@@ -55,10 +55,7 @@ class Application:
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
         )
         self._config_path: Path | None = None
-        self._resources_path: Path | None = None
-        self._static_path: Path | None = None
         self._environment_path: Path | None = None
-        self._database_path: Path | None = None
 
         self._booted: bool = False
         self._has_been_bootstrapped: bool = False
