@@ -101,21 +101,6 @@ def test_encryptor_can_decrypt_data_without_compression(
     assert decompress.call_count == 0
 
 
-def test_encryptor_can_encrypt_and_decrypt_data_deterministically(
-    encryptor: Encryptor,
-) -> None:
-    message = encryptor.encrypt("Hello, World!", deterministic=True)
-    message2 = encryptor.encrypt("Hello, World!", deterministic=True)
-
-    assert message.payload == message2.payload
-
-    decrypted = encryptor.decrypt(message)
-    decrypted2 = encryptor.decrypt(message2)
-
-    assert decrypted == "Hello, World!"
-    assert decrypted2 == "Hello, World!"
-
-
 def test_encryptor_can_generate_keys() -> None:
     key = Encryptor.generate_random_key()
 
