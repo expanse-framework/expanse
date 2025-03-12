@@ -3,10 +3,10 @@ import re
 from typing import Any
 from urllib.parse import urlencode
 
+from expanse.contracts.routing.router import Router
 from expanse.http.request import Request
 from expanse.http.url import URL
 from expanse.routing.route_matcher import RouteMatcher
-from expanse.routing.router import Router
 
 
 class URLGenerator:
@@ -43,7 +43,7 @@ class URLGenerator:
     ) -> str:
         parameters = parameters or {}
         # If the URL is already valid, there is nothing to do, and we return it directly.
-        route = self._router.find(name)
+        route = self._router.routes.find(name)
 
         if route is None:
             raise ValueError(f"Route [{name}] is not defined")

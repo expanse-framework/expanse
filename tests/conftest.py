@@ -12,8 +12,8 @@ from expanse.testing.client import TestClient
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from expanse.contracts.routing.router import Router
     from expanse.core.http.middleware.middleware_stack import MiddlewareStack
-    from expanse.routing.router import Router
 
 
 @pytest.fixture()

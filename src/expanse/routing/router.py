@@ -10,6 +10,7 @@ from typing import get_origin
 from pydantic import BaseModel
 
 from expanse.container.container import Container
+from expanse.contracts.routing.router import Router as RouterContract
 from expanse.http.form import Form
 from expanse.http.helpers import abort
 from expanse.http.json import JSON
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from expanse.core.http.middleware.middleware import Middleware
 
 
-class Router:
+class Router(RouterContract):
     def __init__(self, container: Container) -> None:
         self._container: Container = container
         self._routes: RouteCollection = RouteCollection()
@@ -109,11 +110,10 @@ class Router:
         name: str | None = None,
         prefix: str | None = None,
     ) -> Generator[RouteGroup, None, None]:
-        group = RouteGroup(name=name, prefix=prefix)
+        with super().group(name=name, prefix=prefix) as group:
+            yield group
 
-        yield group
-
-        self.add_group(group)
+            self.add_group(group)
 
     def middleware_group(self, name: str, middleware: list[type["Middleware"]]) -> Self:
         self._middleware_groups[name] = middleware

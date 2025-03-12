@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from expanse.contracts.routing.router import Router as RouterContract
 from expanse.http.redirect import Redirect
 from expanse.routing.router import Router
 from expanse.routing.url_generator import URLGenerator
@@ -13,8 +14,8 @@ if TYPE_CHECKING:
 
 class RoutingServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        self._container.singleton(Router)
-        self._container.alias(Router, "router")
+        self._container.singleton(RouterContract, Router)
+        self._container.alias(RouterContract, "router")
         self._container.scoped(Redirect)
 
     async def boot(self) -> None:

@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from expanse.contracts.routing.router import Router
     from expanse.core.application import Application
-    from expanse.routing.router import Router
 
 
 class RouteServiceProvider(ServiceProvider):
