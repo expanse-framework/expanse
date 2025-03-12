@@ -3,6 +3,7 @@ import secrets
 from enum import Enum
 from typing import ClassVar
 
+from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
 from expanse.encryption.ciphers.aes256_gcm import AES256GCMCipher
 from expanse.encryption.ciphers.base_cipher import BaseCipher
 from expanse.encryption.compressors.zlib import ZlibCompressor
@@ -14,10 +15,10 @@ from expanse.encryption.message import Message
 
 
 class Cipher(Enum):
-    AES_256_GCM: str = "aes-256-gcm"
+    AES_256_GCM = "aes-256-gcm"
 
 
-class Encryptor:
+class Encryptor(EncryptorContract):
     CIPHERS: ClassVar[dict[Cipher, type[BaseCipher]]] = {
         Cipher.AES_256_GCM: AES256GCMCipher
     }
@@ -44,7 +45,7 @@ class Encryptor:
     def has_derivation(self) -> bool:
         return self._derive
 
-    def encrypt(self, data: str, deterministic: bool = False) -> Message:
+    def encrypt(self, data: str) -> Message:
         """
         Encrypt the given data, optionally in a deterministic way.
 
@@ -56,15 +57,7 @@ class Encryptor:
         will be derived from the secret key using the configured key derivation salt.
         Otherwise, the secret key will be used directly.
 
-        When using deterministic encryption, the same input data will always produce
-        the same encrypted output. This is useful when encrypting data that needs to be
-        compared or indexed, for instance values in a database that need to be searchable.
-
-        Note that you should always use non-deterministic encryption for sensitive data unless
-        you have a specific reason to use deterministic encryption.
-
-        @param data: The data to encrypt.
-        @param deterministic: Whether to encrypt the data in a deterministic way.
+        :param data: The data to encrypt.
         """
         cipher_class = self.CIPHERS[self._cipher]
 
@@ -73,7 +66,7 @@ class Encryptor:
         else:
             key = self._secret_key
 
-        cipher = cipher_class(key.value, deterministic=deterministic)
+        cipher = cipher_class(key.value)
 
         encoded: bytes = data.encode()
         if self._compress:

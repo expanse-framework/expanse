@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from expanse.console.commands.command import Command
-from expanse.routing.router import Router
+from expanse.contracts.routing.router import Router
 
 
 if TYPE_CHECKING:

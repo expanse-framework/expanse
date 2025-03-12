@@ -1,6 +1,6 @@
+from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.core.application import Application
 from expanse.encryption.encryption_service_provider import EncryptionServiceProvider
-from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.encryptor_factory import EncryptorFactory
 
 

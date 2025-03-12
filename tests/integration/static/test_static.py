@@ -2,10 +2,9 @@ from pathlib import Path
 
 from pydantic import HttpUrl
 
+from expanse.contracts.routing.router import Router
 from expanse.http.helpers import view
 from expanse.http.response import Response
-from expanse.routing.route import Route
-from expanse.routing.router import Router
 from expanse.static.static_service_provider import StaticServiceProvider
 from expanse.testing.client import TestClient
 from expanse.view.view_service_provider import ViewServiceProvider
@@ -52,7 +51,7 @@ async def test_view_static_function_is_registered_successfully(
     async def foo() -> Response:
         return await view("foo")
 
-    (await client.app.container.get(Router)).add_route(Route.get("/foo", foo))
+    (await client.app.container.get(Router)).get("/foo", foo)
 
     response = client.get("/foo")
     assert response.status_code == 200
@@ -73,7 +72,7 @@ async def test_static_url_includes_base_url(client: TestClient) -> None:
     async def foo() -> Response:
         return await view("foo")
 
-    (await client.app.container.get(Router)).add_route(Route.get("/foo", foo))
+    (await client.app.container.get(Router)).get("/foo", foo)
 
     response = client.get("/foo")
     assert response.status_code == 200
@@ -95,7 +94,7 @@ async def test_static_url_with_empty_prefix(client: TestClient) -> None:
     async def foo() -> Response:
         return await view("foo")
 
-    (await client.app.container.get(Router)).add_route(Route.get("/foo", foo))
+    (await client.app.container.get(Router)).get("/foo", foo)
 
     response = client.get("/foo")
     assert response.status_code == 200

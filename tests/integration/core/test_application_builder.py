@@ -4,11 +4,11 @@ from pathlib import Path
 
 from _pytest.logging import LogCaptureFixture
 
+from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.core.http.middleware.middleware_stack import MiddlewareStack
 from expanse.http.request import Request
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.types.http.middleware import RequestHandler
 

@@ -3,6 +3,9 @@ from collections.abc import Iterator
 from typing import ClassVar
 from typing import NoReturn
 
+from expanse.contracts.routing.route_collection import (
+    RouteCollection as RouteCollectionContract,
+)
 from expanse.core.http.exceptions import HTTPException
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -11,7 +14,7 @@ from expanse.routing.route_matcher import Match
 from expanse.routing.route_matcher import RouteMatcher
 
 
-class RouteCollection:
+class RouteCollection(RouteCollectionContract):
     METHODS: ClassVar[list[str]] = [
         "GET",
         "HEAD",
