@@ -78,12 +78,12 @@ async def test_response_cookies_are_encrypted(
 
     response = await router.handle(container, request)
 
-    assert response.cookies[0].name == "name"
-    assert response.cookies[0].value != "value"
-    assert response.cookies[1].name == "name2"
-    assert response.cookies[1].value != "value2"
-    assert response.cookies[2].name == "name3"
-    assert response.cookies[2].value != "value3"
+    assert response.cookies["name"].name == "name"
+    assert response.cookies["name"].value != "value"
+    assert response.cookies["name2"].name == "name2"
+    assert response.cookies["name2"].value != "value2"
+    assert response.cookies["name3"].name == "name3"
+    assert response.cookies["name3"].value != "value3"
 
 
 async def test_request_cookies_are_decrypted(
@@ -110,12 +110,12 @@ async def test_cookies_are_not_encrypted_if_they_are_disabled(
 
     response = await router.handle(container, request)
 
-    assert response.cookies[0].name == "name"
-    assert response.cookies[0].value != "value"
-    assert response.cookies[1].name == "name2"
-    assert response.cookies[1].value != "value2"
-    assert response.cookies[2].name == "name3"
-    assert response.cookies[2].value == "value3"
+    assert response.cookies["name"].name == "name"
+    assert response.cookies["name"].value != "value"
+    assert response.cookies["name2"].name == "name2"
+    assert response.cookies["name2"].value != "value2"
+    assert response.cookies["name3"].name == "name3"
+    assert response.cookies["name3"].value == "value3"
 
 
 async def test_request_cookies_are_not_decrypted_if_they_are_disabled(
