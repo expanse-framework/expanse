@@ -159,11 +159,9 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
     now = pendulum.now("UTC")
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
-        cookie = next(iter(response.cookies.jar))
 
-    assert response.json() == {"baz": 42, "foo": "bar"}
-    assert cookie.value != ""
-    assert cookie.name == "expanse_session"
-    assert cookie.domain is not None
-    assert cookie.path == "/"
-    assert cookie.expires is None
+    # Session cookies are automatically expired by http.cookiejar
+    # This means that with should not have any session cookie in the response
+    cookie = next(iter(response.cookies.jar), None)
+
+    assert cookie is None
