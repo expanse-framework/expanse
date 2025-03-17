@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from datetime import timezone
 from typing import TYPE_CHECKING
 from typing import Self
 
 from baize.asgi.responses import PlainTextResponse
 from baize.asgi.responses import Response as BaizeResponse
 from baize.asgi.responses import SmallResponse as BaizeSmallResponse
-from baize.datastructures import Cookie as BaizeCookie
 
 from expanse.http.cookie import Cookie
 from expanse.http.cookie import SameSite
+from expanse.http.request import Request
 
 
 if TYPE_CHECKING:
@@ -129,31 +128,23 @@ class Response:
             partitioned=partitioned,
         )
 
-    async def _prepare(self) -> None:
+    async def prepare(self, request: Request) -> None:
+        is_request_secure = request.is_secure()
+
         for name, cookie in self._cookies.items():
-            self._response.cookies.append(
-                BaizeCookie(
-                    name,
-                    cookie.value,
-                    expires=cookie.expires,
-                    path=cookie.path,
-                    domain=cookie.domain,
-                    secure=cookie.is_secure(),
-                    httponly=cookie.is_http_only(),
-                    samesite=cookie.same_site,
-                )
+            if is_request_secure:
+                cookie.set_secure_default(is_request_secure)
+
+            self._response.set_cookie(
+                name,
+                cookie.value,
+                expires=cookie.expires,
+                path=cookie.path,
+                domain=cookie.domain,
+                secure=cookie.is_secure(),
+                httponly=cookie.is_http_only(),
+                samesite=cookie.same_site,
             )
 
-    def _compute_expires(self, expires: int | datetime | None) -> datetime | None:
-        if expires is None:
-            return None
-
-        if isinstance(expires, datetime):
-            return expires
-
-        return datetime.fromtimestamp(expires, tz=timezone.utc)
-
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await self._prepare()
-
         return await self._response(scope=scope, receive=receive, send=send)

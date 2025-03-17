@@ -76,6 +76,9 @@ class Request(BaseRequest):
     def session(self) -> HTTPSession | None:
         return self._session
 
+    def is_secure(self) -> bool:
+        return self.url.scheme == "https"
+
     def is_from_trusted_proxy(self) -> bool:
         return False
 

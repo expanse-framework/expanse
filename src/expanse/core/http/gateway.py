@@ -29,7 +29,7 @@ class Gateway:
         async with self._app.container.create_scoped_container() as container:
             container.instance(Request, request)
 
-            return await (
+            response = await (
                 Pipeline(container)
                 .use(
                     [
@@ -40,6 +40,10 @@ class Gateway:
                 .send(request)
                 .to(partial(self._router.handle, container))
             )
+
+            await response.prepare(request)
+
+            return response
 
     def set_middleware(self, middleware: list[type[Middleware]]) -> Self:
         self._middleware = middleware
@@ -80,9 +84,4 @@ class Gateway:
 
         response = await self.handle(request)
 
-        return await self._prepare_response(response, scope, receive, send)
-
-    async def _prepare_response(
-        self, response: Response, scope: Scope, receive: Receive, send: Send
-    ) -> None:
         return await response(scope, receive, send)
