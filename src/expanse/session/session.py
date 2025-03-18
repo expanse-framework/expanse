@@ -265,7 +265,7 @@ class HTTPSession(MutableMapping[str, Any]):
         """
         Regenerate the CSRF token.
         """
-        self.set("_csrf_token", secrets.token_urlsafe(40))
+        self.set("_csrf_token", self._generate_csrf_token())
 
     def set_request(self, request: Request) -> None:
         self._request = request
@@ -296,6 +296,9 @@ class HTTPSession(MutableMapping[str, Any]):
 
     def _generate_id(self) -> str:
         return "".join(secrets.choice(ascii_letters + digits) for _ in range(40))
+
+    def _generate_csrf_token(self) -> str:
+        return secrets.token_urlsafe(40)
 
     def _serialize(self, data: dict) -> str:
         return json.dumps(data)

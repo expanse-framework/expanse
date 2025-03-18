@@ -38,6 +38,8 @@ async def app(unbootstrapped_app: Application) -> Application:
     await unbootstrapped_app.bootstrap()
 
     unbootstrapped_app.config["app.debug"] = True
+    unbootstrapped_app.config["app.secret_key"] = "b" * 32
+    unbootstrapped_app.config["encryption.salt"] = "s" * 32
 
     return unbootstrapped_app
 

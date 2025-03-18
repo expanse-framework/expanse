@@ -7,6 +7,8 @@ from expanse.testing.command_tester import CommandTester
 async def test_generate_key_without_env_file(
     command_tester: CommandTester, app: Application, tmp_path: Path
 ) -> None:
+    app.config["app.secret_key"] = ""
+    app.config["encryption.salt"] = ""
     app._environment_path = tmp_path
 
     command = command_tester.command("encryption key generate")
@@ -23,6 +25,8 @@ async def test_generate_key_without_env_file(
 async def test_generate_key_with_env_file_but_without_app_secret_key(
     command_tester: CommandTester, app: Application, tmp_path: Path
 ) -> None:
+    app.config["app.secret_key"] = ""
+    app.config["encryption.salt"] = ""
     tmp_path.joinpath(".env").write_text("")
     app._environment_path = tmp_path
 

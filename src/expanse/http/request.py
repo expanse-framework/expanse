@@ -14,6 +14,8 @@ from expanse.http.url import URL
 
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from expanse.routing.route import Route
     from expanse.session.session import HTTPSession
     from expanse.types import Receive
@@ -143,7 +145,7 @@ class Request(BaseRequest):
 
         :return: The input item.
         """
-        source: dict[str, Any] = {}
+        source: Mapping[str, Any] = {}
         if self.is_json():
             source = await self.json
 
@@ -154,7 +156,7 @@ class Request(BaseRequest):
         else:
             source = self.query_params
 
-        return {**source, **self.query_params}.get(name, default=default)
+        return {**source, **self.query_params}.get(name, default)
 
     @classmethod
     def create(
