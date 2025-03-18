@@ -54,9 +54,9 @@ def encrypt(encryptor: Encryptor) -> Callable[[str], str]:
 
 def set_cookies() -> Response:
     response = Response("Hello, World!")
-    response.set_cookie("name", "value")
-    response.set_cookie("name2", "value2")
-    response.set_cookie("name3", "value3")
+    response.with_cookie("name", "value")
+    response.with_cookie("name2", "value2")
+    response.with_cookie("name3", "value3")
 
     return response
 

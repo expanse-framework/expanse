@@ -1,8 +1,8 @@
 import re
 import string
+import time
 
 from datetime import datetime
-from datetime import timezone
 from enum import StrEnum
 from functools import cached_property
 from time import gmtime
@@ -114,7 +114,7 @@ class Cookie:
 
     @cached_property
     def max_age(self) -> int:
-        max_age: int = int(self._expires - datetime.now(timezone.utc).timestamp())
+        max_age: int = int(self._expires - time.time())
 
         return max_age if max_age > 0 else 0
 
@@ -263,6 +263,9 @@ class Cookie:
             parts.append("; partitioned")
 
         return "".join(parts)
+
+    def __bytes__(self) -> bytes:
+        return str(self).encode("ascii")
 
     def __repr__(self):
         return f"<Cookie {self.__str__()}>"
