@@ -133,6 +133,29 @@ class Request(BaseRequest):
 
         return self
 
+    async def input(self, name: str, default: Any = None) -> Any:
+        """
+        Retrieve an input item from the request.
+
+        It will search in the request body and query string.
+
+        :param name: The name of the input item.
+
+        :return: The input item.
+        """
+        source: dict[str, Any] = {}
+        if self.is_json():
+            source = await self.json
+
+            if not isinstance(source, dict):
+                source = {}
+        elif self.method in ("POST", "PUT", "PATCH"):
+            source = await self.form
+        else:
+            source = self.query_params
+
+        return {**source, **self.query_params}.get(name, default=default)
+
     @classmethod
     def create(
         cls, raw_url: str, method: str = "GET", scope: dict[str, Any] | None = None

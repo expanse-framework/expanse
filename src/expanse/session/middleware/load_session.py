@@ -1,6 +1,6 @@
-from datetime import datetime
+import time
 
-import pendulum
+from math import ceil
 
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -38,7 +38,7 @@ class LoadSession:
 
     async def _set_cookie(self, response: Response, session: HTTPSession) -> None:
         config = self._manager.get_config()
-        response.set_cookie(
+        response.with_cookie(
             session.get_name(),
             session.get_id(),
             expires=self._get_cookie_expiration_date(),
@@ -54,8 +54,8 @@ class LoadSession:
 
         return "store" in config and config["store"] is not None
 
-    def _get_cookie_expiration_date(self) -> int | datetime:
+    def _get_cookie_expiration_date(self) -> int:
         if self._manager.get_config()["clear_with_browser"]:
             return 0
 
-        return pendulum.now("UTC").add(minutes=self._manager.get_config()["lifetime"])
+        return ceil(time.time() + self._manager.get_config()["lifetime"] * 60)

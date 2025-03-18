@@ -45,7 +45,7 @@ def test_session_is_managed_for_each_request(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now("UTC")
+    now = pendulum.now()
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
@@ -55,6 +55,7 @@ def test_session_is_managed_for_each_request(
     assert cookie.name == "expanse_session"
     assert cookie.domain is not None
     assert cookie.path == "/"
+
     assert (
         cookie.expires
         == now.add(minutes=app.config["session"]["lifetime"]).int_timestamp
@@ -98,7 +99,7 @@ def test_session_is_managed_for_each_request_with_database_store(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now("UTC")
+    now = pendulum.now()
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
@@ -159,9 +160,11 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
     now = pendulum.now("UTC")
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
+        cookie = next(iter(response.cookies.jar))
 
-    # Session cookies are automatically expired by http.cookiejar
-    # This means that with should not have any session cookie in the response
-    cookie = next(iter(response.cookies.jar), None)
-
-    assert cookie is None
+    assert response.json() == {"baz": 42, "foo": "bar"}
+    assert cookie.value != ""
+    assert cookie.name == "expanse_session"
+    assert cookie.domain is not None
+    assert cookie.path == "/"
+    assert cookie.expires is None

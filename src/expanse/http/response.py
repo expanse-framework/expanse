@@ -92,18 +92,18 @@ class Response:
 
         return self
 
-    def set_cookie(
+    def with_cookie(
         self,
         name: str,
         value: str | None = None,
         expires: int | datetime = 0,
         domain: str | None = None,
         path: str | None = None,
-        secure: bool = False,
+        secure: bool | None = None,
         http_only: bool = False,
         same_site: SameSite = SameSite.LAX,
         partitioned: bool = False,
-    ):
+    ) -> Self:
         """
         :param name: The name of the cookie.
         :param value: The value of the cookie.
@@ -128,23 +128,34 @@ class Response:
             partitioned=partitioned,
         )
 
+        return self
+
     async def prepare(self, request: Request) -> None:
+        self._response.list_headers = self._list_headers  # type: ignore[method-assign]
+
         is_request_secure = request.is_secure()
 
-        for name, cookie in self._cookies.items():
+        for cookie in self._cookies.values():
             if is_request_secure:
                 cookie.set_secure_default(is_request_secure)
 
-            self._response.set_cookie(
-                name,
-                cookie.value,
-                expires=cookie.expires,
-                path=cookie.path,
-                domain=cookie.domain,
-                secure=cookie.is_secure(),
-                httponly=cookie.is_http_only(),
-                samesite=cookie.same_site,
-            )
+    def _list_headers(self, *, as_bytes):
+        """
+        Patched version of Baize's list_headers method to support our own cookies.
+        """
+        if as_bytes:
+            return [
+                *(
+                    (key.encode("latin-1"), value.encode("latin-1"))
+                    for key, value in self.headers.items()
+                ),
+                *((b"set-cookie", bytes(cookie)) for cookie in self._cookies.values()),
+            ]
+        else:
+            return [
+                *self.headers.items(),
+                *(("set-cookie", str(cookie)) for cookie in self._cookies.values()),
+            ]
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         return await self._response(scope=scope, receive=receive, send=send)
