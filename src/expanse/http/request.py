@@ -14,6 +14,8 @@ from expanse.http.url import URL
 
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from expanse.routing.route import Route
     from expanse.session.session import HTTPSession
     from expanse.types import Receive
@@ -76,6 +78,9 @@ class Request(BaseRequest):
     def session(self) -> HTTPSession | None:
         return self._session
 
+    def is_secure(self) -> bool:
+        return self.url.scheme == "https"
+
     def is_from_trusted_proxy(self) -> bool:
         return False
 
@@ -129,6 +134,29 @@ class Request(BaseRequest):
         self._session = session
 
         return self
+
+    async def input(self, name: str, default: Any = None) -> Any:
+        """
+        Retrieve an input item from the request.
+
+        It will search in the request body and query string.
+
+        :param name: The name of the input item.
+
+        :return: The input item.
+        """
+        source: Mapping[str, Any] = {}
+        if self.is_json():
+            source = await self.json
+
+            if not isinstance(source, dict):
+                source = {}
+        elif self.method in ("POST", "PUT", "PATCH"):
+            source = await self.form
+        else:
+            source = self.query_params
+
+        return {**source, **self.query_params}.get(name, default)
 
     @classmethod
     def create(

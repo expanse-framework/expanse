@@ -45,7 +45,7 @@ def test_session_is_managed_for_each_request(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now("UTC")
+    now = pendulum.now()
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
@@ -55,6 +55,7 @@ def test_session_is_managed_for_each_request(
     assert cookie.name == "expanse_session"
     assert cookie.domain is not None
     assert cookie.path == "/"
+
     assert (
         cookie.expires
         == now.add(minutes=app.config["session"]["lifetime"]).int_timestamp
@@ -98,7 +99,7 @@ def test_session_is_managed_for_each_request_with_database_store(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now("UTC")
+    now = pendulum.now()
     with pendulum.travel_to(now).freeze():
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))

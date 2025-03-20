@@ -34,14 +34,17 @@ class EncryptCookies:
         return cookie in self._exclude or cookie in self.__class__.exclude
 
     def _encrypt(self, response: Response) -> Response:
-        for cookie in response.cookies:
-            if self.is_disabled(cookie.name):
+        for name, cookie in response.cookies.items():
+            if self.is_disabled(name):
+                continue
+
+            if cookie.value is None:
                 continue
 
             message = self._encryptor.encrypt(cookie.value)
-            cookie.value = base64.urlsafe_b64encode(
-                json.dumps(message.dump()).encode()
-            ).decode()
+            response.cookies[name] = cookie.with_value(
+                base64.urlsafe_b64encode(json.dumps(message.dump()).encode()).decode()
+            )
 
         return response
 
