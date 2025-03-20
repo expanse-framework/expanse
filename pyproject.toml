@@ -32,7 +32,7 @@ filelock = "^3.16.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.3.3"
-treat = ">=0.3.0"
+treat = ">=0.4.0"
 pytest-asyncio = ">=0.21.1"
 aiosqlite = ">=0.19.0"
 greenlet = ">=3.0.3"
@@ -68,7 +68,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = ["asynchronous: Mark a test as asynchronous", "db: Mark a test as requiring a database connection"]
+markers = [
+    "asynchronous: Mark a test as asynchronous",
+    "db: Mark a test as requiring a database connection",
+]
 asyncio_default_fixture_loop_scope = "function"
 
 
@@ -86,24 +89,24 @@ extend-exclude = [
 
 [tool.ruff.lint]
 extend-select = [
-    "B", # flake8-bugbear
-    "C4", # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
     "ERA", # flake8-eradicate/eradicate
-    "I", # isort
-    "N", # pep8-naming
+    "I",   # isort
+    "N",   # pep8-naming
     "PIE", # flake8-pie
     "PGH", # pygrep
     "RUF", # ruff checks
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "TID", # flake8-tidy-imports
-    "UP", # pyupgrade
+    "UP",  # pyupgrade
 ]
 ignore = [
     "I002",
-    "B904", # use 'raise ... from err'
-    "B905", # use explicit 'strict=' parameter with 'zip()'
-    "N818", #  Exception name should be named with an Error suffix
+    "B904",   # use 'raise ... from err'
+    "B905",   # use explicit 'strict=' parameter with 'zip()'
+    "N818",   #  Exception name should be named with an Error suffix
     "RUF001",
 ]
 unfixable = [
@@ -151,7 +154,4 @@ omit = [
 ]
 
 [tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:"
-]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
