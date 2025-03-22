@@ -6,6 +6,7 @@ from collections.abc import Callable
 import pytest
 
 from expanse.container.container import Container
+from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
@@ -32,7 +33,7 @@ def encryptor(key_chain: KeyChain) -> Encryptor:
 @pytest.fixture
 def container(encryptor: Encryptor) -> Container:
     container = Container()
-    container.instance(Encryptor, encryptor)
+    container.instance(EncryptorContract, encryptor)
 
     return container
 
