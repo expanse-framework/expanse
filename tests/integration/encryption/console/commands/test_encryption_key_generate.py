@@ -8,6 +8,8 @@ async def test_generate_key_without_env_file(
     command_tester: CommandTester, app: Application, tmp_path: Path
 ) -> None:
     app._environment_path = tmp_path
+    app.config["app.secret_key"] = ""
+    app.config["encryption.salt"] = ""
 
     command = command_tester.command("encryption key generate")
 
@@ -25,6 +27,8 @@ async def test_generate_key_with_env_file_but_without_app_secret_key(
 ) -> None:
     tmp_path.joinpath(".env").write_text("")
     app._environment_path = tmp_path
+    app.config["app.secret_key"] = ""
+    app.config["encryption.salt"] = ""
 
     command = command_tester.command("encryption key generate")
 

@@ -63,12 +63,14 @@ class MiddlewareStack:
     def get_default_groups(self) -> dict[str, MiddlewareGroup]:
         from expanse.http.middleware.encrypt_cookies import EncryptCookies
         from expanse.session.middleware.load_session import LoadSession
+        from expanse.session.middleware.validate_csrf_token import ValidateCSRFToken
 
         return {
             "web": MiddlewareGroup(
                 [
                     EncryptCookies,
                     LoadSession,
+                    ValidateCSRFToken,
                 ]
             ),
             "api": MiddlewareGroup(),
