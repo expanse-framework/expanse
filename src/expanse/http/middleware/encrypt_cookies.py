@@ -3,7 +3,7 @@ import json
 
 from typing import ClassVar
 
-from expanse.encryption.encryptor import Encryptor
+from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.encryption.errors import DecryptionError
 from expanse.encryption.message import Message
 from expanse.http.request import Request
