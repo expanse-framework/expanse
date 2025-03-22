@@ -23,3 +23,19 @@ def test_route_group_with_middlewares(client: TestClient, router: Router) -> Non
     response = client.get("/")
 
     assert response.headers["X-Foo"] == "bar"
+
+
+def test_nested_groups(client: TestClient, router: Router) -> None:
+    with router.group("api") as group:
+        group.get("/", lambda: Response("Hello world!"))
+
+        with group.group("v1", prefix="/v1") as v1:
+            v1.get("", lambda: Response("Hello world (V1)!"))
+
+    response = client.get("/")
+
+    assert response.text == "Hello world!"
+
+    response = client.get("/v1")
+
+    assert response.text == "Hello world (V1)!"
