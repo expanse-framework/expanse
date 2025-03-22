@@ -6,5 +6,5 @@ from pydantic_settings import SettingsConfigDict
 
 
 class Config(BaseSettings):
-    paths: list[Path] = Field(default=[Path("resources/views")])
+    paths: list[Path] = Field(default=[Path("views")])
     model_config = SettingsConfigDict(env_prefix="view_")
