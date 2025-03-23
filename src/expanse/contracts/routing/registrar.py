@@ -1,3 +1,4 @@
+import inspect
 import sys
 
 from abc import ABC
@@ -9,12 +10,14 @@ from types import ModuleType
 from typing import TYPE_CHECKING
 
 from expanse.contracts.routing.route_collection import RouteCollection
+from expanse.routing.exceptions import UnconfiguredHandler
 from expanse.routing.route import Route
 from expanse.support._utils import module_from_path
 from expanse.types.routing import Endpoint
 
 
 if TYPE_CHECKING:
+    from expanse.routing.helpers import HandlerDefinition
     from expanse.routing.route_group import RouteGroup
 
 
@@ -113,6 +116,83 @@ class Registrar(ABC):
         group = RouteGroup(name=name, prefix=prefix)
 
         yield group
+
+    @abstractmethod
+    def add_route(self, route: Route) -> Route:
+        """
+        Add a route to the collection.
+
+        :param route: The route to add.
+        """
+        ...
+
+    def handler(self, handler: Endpoint) -> Route:
+        """
+        Add a route handler to the collection.
+
+        The handler must be decorated with a route decorator.
+
+        :param handler: The route handler to add.
+        """
+        definition: HandlerDefinition | None = getattr(
+            handler, "__route_definition__", None
+        )
+
+        if definition is None:
+            raise UnconfiguredHandler(
+                f"Route handler {handler} is not configured correctly."
+            )
+
+        route = self.add_route(
+            Route(
+                definition.uri,
+                handler,
+                methods=[definition.method],
+                name=definition.name,
+            )
+        )
+
+        if definition.middleware is not None:
+            route.middleware(definition.middleware)
+
+        return route
+
+    def controller(self, controller: type) -> None:
+        """
+        Add a controller to the collection.
+
+        The controller must have methods decorated with route decorators.
+
+        The controller can be optionally decorated with a route group decorator.
+
+        :param controller: The controller to add.
+        """
+        members = inspect.getmembers(controller)
+        handlers = []
+
+        for member in members:
+            if not inspect.isfunction(member[1]):
+                continue
+
+            definition: HandlerDefinition | None = getattr(
+                member[1], "__route_definition__", None
+            )
+
+            if definition is None:
+                continue
+
+            handlers.append(member[1])
+
+        group = getattr(controller, "__route_group__", None)
+
+        registrar: Registrar = self
+        if group is not None:
+            with registrar.group(name=group[0], prefix=group[1]) as route_group:
+                for handler in handlers:
+                    route_group.handler(handler)
+        else:
+            for handler in handlers:
+                registrar.handler(handler)
 
     def load_file(self, path: Path, base_path: Path | None = None) -> None:
         """
