@@ -145,7 +145,6 @@ omit = [
     "src/expanse/asynchronous/console/_adapters/*",
     "src/expanse/asynchronous/contracts/*",
     "src/expanse/asynchronous/types/*",
-    "src/expanse/contracts/*",
     "src/expanse/types/*",
     "src/expanse/common/types/*",
     "src/expanse/common/support/_compat.py",
@@ -154,4 +153,9 @@ omit = [
 ]
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "raise NotImplementedError",
+]

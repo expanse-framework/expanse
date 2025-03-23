@@ -32,8 +32,11 @@ class RouteGroup(Registrar):
     def routes(self) -> RouteCollection:
         return self._routes
 
-    def add_route(self, route: Route) -> None:
-        self._routes.add(self._build_route(route))
+    def add_route(self, route: Route) -> Route:
+        route = self._build_route(route)
+        self._routes.add(route)
+
+        return route
 
     def add_routes(self, routes: list[Route]) -> None:
         for route in routes:

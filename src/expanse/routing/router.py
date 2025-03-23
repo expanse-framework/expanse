@@ -43,8 +43,10 @@ class Router(RouterContract):
     def routes(self) -> RouteCollection:
         return self._routes
 
-    def add_route(self, route: Route) -> None:
+    def add_route(self, route: Route) -> Route:
         self._routes.add(route)
+
+        return route
 
     def add_routes(self, routes: list[Route]) -> None:
         for route in routes:
