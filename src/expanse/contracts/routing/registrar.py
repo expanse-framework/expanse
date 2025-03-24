@@ -145,9 +145,9 @@ class Registrar(ABC):
 
         route = self.add_route(
             Route(
+                definition.method,
                 definition.uri,
                 handler,
-                methods=[definition.method],
                 name=definition.name,
             )
         )

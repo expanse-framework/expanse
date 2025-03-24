@@ -2,9 +2,10 @@ from typing import Any
 
 import pytest
 
+from expanse.contracts.routing.router import Router
 from expanse.http.request import Request
+from expanse.routing.exceptions import InvalidURLParameter
 from expanse.routing.exceptions import NotEnoughURLParameters
-from expanse.routing.router import Router
 from expanse.routing.url_generator import URLGenerator
 
 
@@ -71,7 +72,7 @@ async def test_route_url_generation(
 ) -> None:
     router.get("/foo", lambda: "foo", name="foo")
     router.get("/foo/{bar}", lambda: "foo", name="foo.bar")
-    router.get("/foo/{bar}/{baz:int}", lambda: "foo", name="foo.bar.baz")
+    router.get("/foo/{bar}/{baz:\d+}", lambda: "foo", name="foo.bar.baz")
 
     assert (
         URLGenerator(router, Request.create("https://example.com")).to_route(
@@ -79,3 +80,12 @@ async def test_route_url_generation(
         )
         == expected
     )
+
+
+def test_url_generation_with_invalid_parameters(router: Router) -> None:
+    with pytest.raises(InvalidURLParameter) as e:
+        URLGenerator(router, Request.create("https://example.com")).to(
+            "/foo/{bar:\d+}", {"bar": "bim"}
+        )
+
+    assert str(e.value) == "Parameter [bar] does not match the regex [\d+]"

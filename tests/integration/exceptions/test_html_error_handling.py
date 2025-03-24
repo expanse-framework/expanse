@@ -1,9 +1,9 @@
 from expanse.contracts.debug.exception_renderer import (
     ExceptionRenderer as BaseExceptionRenderer,
 )
+from expanse.contracts.routing.router import Router
 from expanse.core.http.exceptions import HTTPException
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
 

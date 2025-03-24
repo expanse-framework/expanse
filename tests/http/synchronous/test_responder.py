@@ -2,12 +2,12 @@ from pathlib import Path
 
 import pytest
 
+from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.http.redirect import Redirect
 from expanse.http.request import Request
 from expanse.http.responder import Responder
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.routing.url_generator import URLGenerator
 from expanse.view.view_factory import ViewFactory
 from expanse.view.view_finder import ViewFinder

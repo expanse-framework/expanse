@@ -1,7 +1,7 @@
+from expanse.contracts.routing.router import Router
 from expanse.http.helpers import json
 from expanse.http.query import Query
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from tests.integration.http.fixtures.request.models import FooModel
 

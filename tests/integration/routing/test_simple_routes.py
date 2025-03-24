@@ -1,5 +1,6 @@
 import pytest
 
+from expanse.contracts.routing.router import Router
 from expanse.core.http.middleware.middleware import Middleware
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -9,7 +10,6 @@ from expanse.routing.helpers import group
 from expanse.routing.helpers import patch
 from expanse.routing.helpers import post
 from expanse.routing.helpers import put
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.types.http.middleware import RequestHandler
 

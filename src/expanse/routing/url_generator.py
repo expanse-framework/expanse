@@ -1,19 +1,24 @@
 import re
 
+from typing import TYPE_CHECKING
 from typing import Any
 from urllib.parse import urlencode
 
 from expanse.contracts.routing.router import Router
 from expanse.http.request import Request
 from expanse.http.url import URL
-from expanse.routing.route_matcher import RouteMatcher
+from expanse.routing.exceptions import InvalidURLParameter
+from expanse.routing.exceptions import NotEnoughURLParameters
+
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class URLGenerator:
     def __init__(self, router: Router, request: Request) -> None:
         self._router: Router = router
         self._request: Request = request
-        self._matcher: RouteMatcher = RouteMatcher()
 
     def to(
         self,
@@ -26,7 +31,7 @@ class URLGenerator:
             return path
 
         parameters = parameters or {}
-        url_path = self._matcher.url(path, **parameters)
+        url_path = self._compute_path(path, **parameters)
 
         url = self._request.url
 
@@ -50,7 +55,7 @@ class URLGenerator:
 
         assert route is not None
 
-        url = self._matcher.url(route.path, **parameters)
+        url = self._compute_path(route.path, **parameters)
 
         if absolute:
             return str(
@@ -69,3 +74,60 @@ class URLGenerator:
 
     def _is_valid_url(self, path: str) -> bool:
         return re.match(r"^(#|//|https?://|(mailto|tel|sms):)", path) is not None
+
+    def _compute_path(self, path: str, **parameters: Any) -> str:
+        matches: Iterator[re.Match[str]] = re.finditer(
+            r"\{([\w*]+):?([^/]*)}|\[|]|[^/\[\]{}]+", path
+        )
+
+        if not matches and parameters:
+            raise ValueError(f"Route [{path}] does not expect parameters")
+
+        if not matches:
+            return path
+
+        expected: set[str] = set()
+        substitutions: dict[str, str] = {}
+
+        print(matches)
+
+        for match in matches:
+            if match.group(0) in ("[", "]"):
+                continue
+
+            name = match.group(1)
+            if name is None:
+                continue
+
+            expected.add(name)
+
+            if name not in parameters:
+                continue
+
+            regex = match.group(2)
+            if regex and not re.match(regex, str(parameters[name])):
+                raise InvalidURLParameter(
+                    f"Parameter [{name}] does not match the regex [{regex}]"
+                )
+
+            if name.startswith("*"):
+                name = name[1:]
+
+            if regex:
+                path = path.replace(f"{{{name}:{regex}}}", f"{{{name}}}", 1)
+
+            substitutions[name] = parameters.pop(name)
+
+        if not expected.issubset(set(substitutions.keys())):
+            missing = ", ".join(sorted(expected.difference(set(substitutions.keys()))))
+
+            raise NotEnoughURLParameters(
+                f"Not enough parameters for URL {path}: missing {missing}"
+            )
+
+        path = path.format(**substitutions)
+
+        if parameters:
+            return f"{path}?{self._format_parameters(parameters)}"
+
+        return path

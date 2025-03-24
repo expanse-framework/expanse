@@ -1,8 +1,8 @@
+from expanse.contracts.routing.router import Router
 from expanse.http.helpers import redirect
 from expanse.http.redirect import Redirect
 from expanse.http.responder import AsyncResponder
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
 

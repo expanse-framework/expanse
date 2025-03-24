@@ -3,12 +3,12 @@ import pytest
 from treat.mock import Mockery
 
 from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
+from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.session.middleware.load_session import LoadSession
 from expanse.session.middleware.validate_csrf_token import ValidateCSRFToken
 from expanse.session.session import HTTPSession
