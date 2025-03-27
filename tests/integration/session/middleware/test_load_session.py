@@ -3,11 +3,11 @@ from pathlib import Path
 import pendulum
 import pytest
 
+from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.session.middleware.load_session import LoadSession
 from expanse.testing.client import TestClient
 from expanse.testing.command_tester import CommandTester

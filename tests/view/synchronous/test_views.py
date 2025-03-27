@@ -1,4 +1,4 @@
-from expanse.routing.router import Router
+from expanse.contracts.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.view.view import View
 from expanse.view.view_factory import ViewFactory

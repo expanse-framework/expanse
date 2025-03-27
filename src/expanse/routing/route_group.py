@@ -5,13 +5,16 @@ from typing import TYPE_CHECKING
 from typing import Self
 
 from expanse.contracts.routing.registrar import Registrar
+from expanse.routing.finder import Finder
 from expanse.routing.route import Route
-from expanse.routing.route_collection import RouteCollection
 
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from expanse.contracts.routing.route_collection import (
+        RouteCollection as RouteCollectionContract,
+    )
     from expanse.core.http.middleware.middleware import Middleware
     from expanse.types.routing import Endpoint
 
@@ -24,12 +27,12 @@ class RouteGroup(Registrar):
     ) -> None:
         self.name: str | None = name
         self.prefix: str | None = prefix
-        self._routes = RouteCollection()
+        self._routes = Finder()
 
         self._middlewares: list[type[Middleware] | str] = []
 
     @property
-    def routes(self) -> RouteCollection:
+    def routes(self) -> RouteCollectionContract:
         return self._routes
 
     def add_route(self, route: Route) -> Route:
@@ -127,7 +130,7 @@ class RouteGroup(Registrar):
             route_path = route.path
 
         route = route.__class__(
-            route_path, route.endpoint, methods=route.methods, name=route_name
+            route.methods, route_path, route.endpoint, name=route_name
         )
 
         if self._middlewares:

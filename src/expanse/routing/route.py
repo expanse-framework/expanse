@@ -10,6 +10,7 @@ from expanse.types.routing import Endpoint
 class Route:
     def __init__(
         self,
+        method: str | list[str],
         path: str,
         endpoint: Endpoint,
         *,
@@ -18,7 +19,10 @@ class Route:
     ) -> None:
         self.path: str = path
         self.endpoint: Endpoint = endpoint
-        self.methods = methods or ["GET", "HEAD"]
+        if isinstance(method, str):
+            method = [method]
+
+        self.methods = [m.upper() for m in method]
         self.name: str | None = name
         self._param_names: set[str] | None = None
         self._signature: inspect.Signature | None = None
@@ -27,36 +31,36 @@ class Route:
 
     @classmethod
     def get(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["GET", "HEAD"], name=name)
+        return cls("GET", path, endpoint, name=name)
 
     @classmethod
     def post(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["POST"], name=name)
+        return cls("POST", path, endpoint, name=name)
 
     @classmethod
     def put(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PUT"], name=name)
+        return cls("PUT", path, endpoint, name=name)
 
     @classmethod
     def patch(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["PATCH"], name=name)
+        return cls("PATCH", path, endpoint, name=name)
 
     @classmethod
     def delete(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["DELETE"], name=name)
+        return cls("DELETE", path, endpoint, name=name)
 
     @classmethod
     def options(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["OPTIONS"], name=name)
+        return cls("OPTIONS", path, endpoint, name=name)
 
     @classmethod
     def head(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
-        return cls(path, endpoint, methods=["HEAD"], name=name)
+        return cls("HEAD", path, endpoint, name=name)
 
     @property
     def param_names(self) -> set[str]:
         if self._param_names is None:
-            self._param_names = set(re.findall(r"{([^:]*)(?::.*)?}", self.path))
+            self._param_names = set(re.findall(r"{\*?([^:]*)(?::.*)?}", self.path))
 
         return self._param_names
 

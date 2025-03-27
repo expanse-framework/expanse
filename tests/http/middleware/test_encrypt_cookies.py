@@ -7,6 +7,7 @@ import pytest
 
 from expanse.container.container import Container
 from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
+from expanse.contracts.routing.router import Router as RouterContract
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
@@ -39,8 +40,8 @@ def container(encryptor: Encryptor) -> Container:
 
 
 @pytest.fixture
-def router(container: Container) -> Router:
-    return Router(container)
+def router() -> RouterContract:
+    return Router()
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
-from expanse.routing.router import Router
+from expanse.contracts.routing.router import Router
 from expanse.testing.client import TestClient
 
 

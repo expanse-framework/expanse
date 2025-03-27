@@ -1,7 +1,7 @@
+from expanse.contracts.routing.router import Router
 from expanse.http.helpers import respond
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
 

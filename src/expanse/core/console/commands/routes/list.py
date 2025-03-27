@@ -22,7 +22,7 @@ class RoutesListCommand(Command):
     name: str = "routes list"
 
     async def handle(self, router: Router) -> int:
-        routes: list[Route] = []
+        routes: set[Route] = set()
 
         max_methods_length = 0
 
@@ -31,13 +31,11 @@ class RoutesListCommand(Command):
                 max_methods_length,
                 sum(len(method) for method in route.methods) + len(route.methods) - 1,
             )
-            routes.append(route)
-
-        routes.sort(key=lambda route: route.path)
+            routes.add(route)
 
         self.line("")
 
-        for route in routes:
+        for route in sorted(routes, key=lambda route: route.path):
             methods_length = (
                 sum(len(method) for method in route.methods) + len(route.methods) - 1
             )

@@ -36,7 +36,7 @@ class StaticServiceProvider(ServiceProvider):
             prefix: str = config["static.prefix"].rstrip("/")
 
             router.get(
-                f"{prefix}/{{path:path}}",
+                f"{prefix}/{{*path}}",
                 (await self._container.get(Static)).get,
                 name="static",
             )

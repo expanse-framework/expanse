@@ -187,9 +187,9 @@ class ExceptionHandler(ExceptionHandlerContract):
                     }
                 )
 
+            from expanse.contracts.routing.router import Router
             from expanse.http.redirect import Redirect
             from expanse.http.responder import AsyncResponder
-            from expanse.routing.router import Router
             from expanse.view.view_factory import AsyncViewFactory
 
             router = await self._container.get(Router)

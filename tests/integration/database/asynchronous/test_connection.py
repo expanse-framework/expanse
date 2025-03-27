@@ -2,10 +2,10 @@ from typing import Annotated
 
 import pytest
 
+from expanse.contracts.routing.router import Router
 from expanse.database.connection import AsyncConnection
 from expanse.http.helpers import json
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 
 

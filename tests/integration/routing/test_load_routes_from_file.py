@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from expanse.routing.router import Router
+from expanse.contracts.routing.router import Router
 from expanse.testing.client import TestClient
 
 

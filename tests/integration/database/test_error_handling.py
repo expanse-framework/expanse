@@ -4,10 +4,10 @@ import pytest
 
 from sqlalchemy import select
 
+from expanse.contracts.routing.router import Router
 from expanse.database.session import Session
 from expanse.http.helpers import json
 from expanse.http.response import Response
-from expanse.routing.router import Router
 from expanse.testing.client import TestClient
 from tests.integration.database.fixtures.models.user import User
 
