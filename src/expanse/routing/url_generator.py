@@ -60,7 +60,7 @@ class URLGenerator:
         if absolute:
             return str(
                 URL(url).replace(
-                    scheme=self._request.url.scheme, netloc=self._request.url.netloc
+                    scheme=self._request.scheme, netloc=self._request.http_host
                 )
             )
 

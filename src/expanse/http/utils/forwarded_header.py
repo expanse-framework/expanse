@@ -1,7 +1,6 @@
 import re
 import string
 
-from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from ipaddress import IPv4Address
@@ -9,7 +8,11 @@ from ipaddress import IPv6Address
 from ipaddress import ip_address
 from re import Pattern
 from typing import Final
+from typing import NotRequired
 from typing import Self
+from typing import TypedDict
+
+from expanse.http.exceptions import InvalidForwardedHeaderError
 
 
 _TCHAR: Final[str] = string.digits + string.ascii_letters + r"!#$%&'*+.^_`|~-"
@@ -45,6 +48,13 @@ class Node:
     port: int | None
 
 
+class Nodes(TypedDict):
+    by: NotRequired[list[Node]]
+    for_: NotRequired[list[Node]]
+    host: NotRequired[str]
+    proto: NotRequired[str]
+
+
 @dataclass(frozen=True, slots=True)
 class ForwardedHeader:
     """
@@ -53,8 +63,8 @@ class ForwardedHeader:
 
     by: list[Node] | None = None
     for_: list[Node] | None = None
-    host: list[str] | None = None
-    proto: list[str] | None = None
+    host: str | None = None
+    proto: str | None = None
 
     @classmethod
     def parse(cls, header: str | Sequence[str]) -> Self:
@@ -64,7 +74,7 @@ class ForwardedHeader:
         if isinstance(header, str):
             header = [header]
 
-        elems: defaultdict[str, list[Node] | list[str]] = defaultdict(list)
+        elems: Nodes = {}
         for field_value in header:
             length = len(field_value)
             pos = 0
@@ -85,9 +95,28 @@ class ForwardedHeader:
                             # IPv6 address: remove brackets
                             value, port = m.groups()
 
-                        elems[name.lower()].append(
-                            Node(ip_address(value), int(port) if port else None)
-                        )
+                        name = name.lower()
+                        if name == "for":
+                            # for is a reserved word in Python, so we use for_ instead
+                            name = "for_"
+
+                        match name:
+                            case "by" | "for_":
+                                if name not in elems:
+                                    elems[name] = []
+
+                                elems[name].append(
+                                    Node(ip_address(value), int(port) if port else None)
+                                )
+                            case "host":
+                                elems[name] = value + (f":{port}" if port else "")
+                            case "proto":
+                                elems[name] = value.lower()
+                            case _:
+                                raise InvalidForwardedHeaderError(
+                                    f'Invalid directive "{name}" found in the Forwarded header'
+                                )
+
                         pos += len(match.group(0))
                         need_separator = True
                 elif (
@@ -103,9 +132,5 @@ class ForwardedHeader:
                 else:
                     # bad syntax here, skip to next comma
                     pos = field_value.find(",", pos)
-
-        if "for" in elems:
-            # for is a reserved word in Python, so we use for_ instead
-            elems["for_"] = elems.pop("for")
 
         return cls(**elems)

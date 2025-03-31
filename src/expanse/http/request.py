@@ -5,15 +5,14 @@ import ipaddress
 from functools import cached_property
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import Literal
 from typing import Self
-from typing import overload
 
 from baize.asgi import empty_receive
 from baize.asgi import empty_send
 from baize.asgi.requests import Request as BaseRequest
 
 from expanse.http.accept_header import AcceptHeader
+from expanse.http.exceptions import ConflictingForwardedHeadersError
 from expanse.http.trusted_header import TrustedHeader
 from expanse.http.url import URL
 
@@ -32,7 +31,7 @@ FORWARDED_PARAMS = {
     TrustedHeader.X_FORWARDED_FOR: "for",
     TrustedHeader.X_FORWARDED_HOST: "host",
     TrustedHeader.X_FORWARDED_PROTO: "proto",
-    TrustedHeader.X_FORWARDED_PORT: "for",
+    TrustedHeader.X_FORWARDED_PORT: "host",
 }
 
 
@@ -46,10 +45,11 @@ class Request(BaseRequest):
         self._session: HTTPSession | None = None
         self._trusted_proxies: list[str] = []
         self._trusted_headers: list[TrustedHeader] = []
+        self._url = URL(scope=scope)
 
     @cached_property
     def url(self) -> URL:  # type: ignore[override]
-        return URL(scope=self._scope)
+        return self._url.replace(scheme=self.scheme, hostname=self.http_host, port=None)
 
     @cached_property
     def host(self) -> str:
@@ -57,16 +57,37 @@ class Request(BaseRequest):
         if (
             self.is_from_trusted_proxy()
             and self.is_header_trusted(TrustedHeader.X_FORWARDED_HOST)
-            and (host := self.headers.get(TrustedHeader.X_FORWARDED_HOST))
+            and (hosts := self._get_trusted_values(TrustedHeader.X_FORWARDED_HOST))
         ):
-            host = self.headers.get(TrustedHeader.X_FORWARDED_HOST)
+            host = hosts[0]
+        elif "Host" in self.headers:
+            host = self.headers["Host"]
         else:
-            host = self.url.hostname
+            host = self._url.hostname or ""
 
-        return host
+        host = host.lower()
 
-    @property
-    def port(self) -> int | None:
+        return host.split(":")[0] if host else ""
+
+    @cached_property
+    def http_host(self) -> str:
+        """
+        Get the normalized HTTP host.
+
+        The port will only be appended if it is not the default port for the scheme.
+
+        :return: The HTTP host.
+        """
+        scheme = self.scheme
+        port = self.port
+
+        if (scheme == "https" and port == 443) or (scheme == "http" and port == 80):
+            return self.host
+
+        return f"{self.host}:{port}"
+
+    @cached_property
+    def port(self) -> int:
         """
         Get the port on which the request was made.
 
@@ -76,14 +97,26 @@ class Request(BaseRequest):
         :return: The port number.
         """
         if not self.is_from_trusted_proxy():
-            return self.url.port
+            return self._url.port or (443 if self.scheme == "https" else 80)
 
-        if self.is_header_trusted(TrustedHeader.X_FORWARDED_PORT):
-            ports = self._get_trusted_values(TrustedHeader.X_FORWARDED_PORT)
-            if ports:
-                return ports[0]
+        if self.is_header_trusted(TrustedHeader.X_FORWARDED_PORT) and (
+            ports := self._get_trusted_values(TrustedHeader.X_FORWARDED_PORT)
+        ):
+            return int(ports[0])
+        elif self.is_header_trusted(TrustedHeader.X_FORWARDED_HOST) and (
+            hosts := self._get_trusted_values(TrustedHeader.X_FORWARDED_HOST)
+        ):
+            if ":" in hosts[0]:
+                return int(hosts[0].split(":")[1])
 
-        return self.url.port
+            return 443 if self.scheme == "https" else 80
+        elif host := self.headers.get("Host"):
+            if ":" in host:
+                return int(host.split(":")[1])
+
+            return 443 if self.scheme == "https" else 80
+
+        return self._url.port or (443 if self.scheme == "https" else 80)
 
     @cached_property
     def acceptable_content_types(self) -> list[str]:
@@ -100,19 +133,20 @@ class Request(BaseRequest):
 
     @cached_property
     def ips(self) -> list[str]:
-        ips = [self.client.host]
+        ips: list[str] = []
+
+        if self.client.host is not None:
+            ips.append(self.client.host)
 
         if not self.is_from_trusted_proxy():
-            return [ip for ip in ips if ip is not None]
-
-        self._get_trusted_values(TrustedHeader.X_FORWARDED_FOR)
+            return ips
 
         if self.is_header_trusted(TrustedHeader.X_FORWARDED_FOR) and (
             forwarded_ips := self._get_trusted_values(TrustedHeader.X_FORWARDED_FOR)
         ):
             ips = forwarded_ips + ips
 
-        return [ip for ip in ips if ip is not None]
+        return ips
 
     @property
     def route(self) -> Route | None:
@@ -122,17 +156,21 @@ class Request(BaseRequest):
     def session(self) -> HTTPSession | None:
         return self._session
 
+    @property
+    def scheme(self) -> str:
+        return "https" if self.is_secure() else "http"
+
     def is_secure(self) -> bool:
         if not self.is_from_trusted_proxy() or not self.is_header_trusted(
-            TrustedHeader.X_FORWARDED_FOR
+            TrustedHeader.X_FORWARDED_PROTO
         ):
-            return self.url.scheme == "https"
+            return self._url.scheme == "https"
 
-        forwarded_proto = self.headers.get(TrustedHeader.X_FORWARDED_PROTO)
+        forwarded_proto = self._get_trusted_values(TrustedHeader.X_FORWARDED_PROTO)
         if forwarded_proto:
-            return forwarded_proto == "https"
+            return forwarded_proto[0] == "https"
 
-        return self.url.scheme == "https"
+        return self._url.scheme == "https"
 
     def set_trusted_proxies(self, trusted_proxies: list[str]) -> Self:
         """
@@ -150,12 +188,15 @@ class Request(BaseRequest):
 
         :param trusted_headers: List of trusted headers.
         """
-        self._trusted_headers = [header.value for header in trusted_headers]
+        self._trusted_headers = trusted_headers
 
         return self
 
     def is_from_trusted_proxy(self) -> bool:
         if not self._trusted_proxies:
+            return False
+
+        if not self.client.host:
             return False
 
         return any(
@@ -307,55 +348,64 @@ class Request(BaseRequest):
 
         return cls(scope=base_scope)
 
-    @overload
-    def _get_trusted_values(
-        self, header: Literal[TrustedHeader.X_FORWARDED_FOR]
-    ) -> list[str]: ...
-
-    @overload
-    def _get_trusted_values(
-        self, header: Literal[TrustedHeader.X_FORWARDED_PORT]
-    ) -> list[int]: ...
-
-    def _get_trusted_values(self, header: TrustedHeader) -> list[str] | list[int]:
+    def _get_trusted_values(self, header: TrustedHeader) -> list[str]:
         """
         Get the trusted values for the request.
 
         :return: The trusted values.
         """
-        client_values = []
-        forwarded_values = []
+        client_values: list[str] = []
+        forwarded_values: list[str] = []
 
         if header in self.headers:
             header_value = self.headers[header]
             for value in header_value.split(","):
-                client_values.append(
-                    int(value.strip())
-                    if header is TrustedHeader.X_FORWARDED_PORT
-                    else value.strip()
-                )
+                client_values.append(value.strip())
 
         if TrustedHeader.FORWARDED in self.headers and header in FORWARDED_PARAMS:
             from expanse.http.utils.forwarded_header import ForwardedHeader
 
+            param = FORWARDED_PARAMS[header]
+
             forwarded_header = ForwardedHeader.parse(
                 self.headers[TrustedHeader.FORWARDED]
             )
-            if header is TrustedHeader.X_FORWARDED_FOR:
-                forwarded_values = [
-                    str(node.ip)
-                    for node in forwarded_header.for_
-                    if node.ip is not None
-                ]
-            elif header is TrustedHeader.X_FORWARDED_PORT:
-                forwarded_values = [
-                    node.port for node in forwarded_header.for_ if node.port is not None
-                ]
+
+            match param:
+                case "for":
+                    if forwarded_header.for_ is not None:
+                        forwarded_values = [
+                            str(node.ip)
+                            for node in forwarded_header.for_
+                            if node.ip is not None
+                        ]
+                case "host":
+                    if forwarded_header.host is not None:
+                        forwarded_values = [forwarded_header.host]
+
+                        if header is TrustedHeader.X_FORWARDED_PORT:
+                            forwarded_values = [
+                                value.split(":")[1]
+                                if ":" in value
+                                else ("443" if self.is_secure() else "80")
+                                for value in forwarded_values
+                            ]
+
+                case "proto":
+                    if forwarded_header.proto is not None:
+                        forwarded_values = [forwarded_header.proto]
 
         if client_values == forwarded_values or not client_values:
             return forwarded_values
 
-        return client_values
+        if not forwarded_values:
+            return client_values
+
+        raise ConflictingForwardedHeadersError(
+            f"The request has both a {TrustedHeader.FORWARDED} header "
+            f"and a {header} header, which are conflicting. "
+            f"You should configure your proxy to remove one of them."
+        )
 
 
 __all__ = ["Request"]

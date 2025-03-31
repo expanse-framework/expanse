@@ -1,5 +1,3 @@
-from typing import Self
-
 from expanse.core.application import Application
 from expanse.core.http.middleware.middleware import Middleware
 from expanse.http.request import Request
@@ -17,11 +15,15 @@ class TrustProxies(Middleware):
 
         return await next_call(request)
 
-    async def set_trusted_proxies(self, request: Request) -> Self:
+    async def set_trusted_proxies(self, request: Request) -> None:
         trusted_proxies: list[str] | None = self._app.config.get("http.trusted_proxies")
 
         if trusted_proxies:
-            request.set_trusted_proxies(trusted_proxies)
+            if "*" in trusted_proxies and request.client.host:
+                # Trust the calling ip address
+                request.set_trusted_proxies([request.client.host])
+            else:
+                request.set_trusted_proxies(trusted_proxies)
 
         trusted_headers: list[str] | None = self._app.config.get("http.trusted_headers")
 

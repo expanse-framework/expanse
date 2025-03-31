@@ -127,8 +127,13 @@ class DatabaseStore(Store):
             return result.rowcount
 
     def _is_session_expired(self, session: SessionRow) -> bool:
+        last_activity: datetime = session.last_activity
+
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+
         return (
-            datetime.now(timezone.utc) - session.last_activity.astimezone(timezone.utc)
+            datetime.now(timezone.utc) - last_activity
         ).total_seconds() > self._lifetime * 60
 
     def _get_payload(self, data: str, request: Request | None = None) -> dict[str, Any]:
