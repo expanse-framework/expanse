@@ -57,8 +57,9 @@ class MiddlewareStack:
 
     def get_default_middleware(self) -> list[type[Middleware]]:
         from expanse.http.middleware.manage_cors import ManageCors
+        from expanse.http.middleware.trust_proxies import TrustProxies
 
-        return [ManageCors]
+        return [TrustProxies, ManageCors]
 
     def get_default_groups(self) -> dict[str, MiddlewareGroup]:
         from expanse.http.middleware.encrypt_cookies import EncryptCookies

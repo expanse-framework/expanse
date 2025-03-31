@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import ipaddress
+
 from functools import cached_property
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import Literal
 from typing import Self
+from typing import overload
 
 from baize.asgi import empty_receive
 from baize.asgi import empty_send
 from baize.asgi.requests import Request as BaseRequest
 
 from expanse.http.accept_header import AcceptHeader
+from expanse.http.trusted_header import TrustedHeader
 from expanse.http.url import URL
 
 
@@ -23,6 +28,14 @@ if TYPE_CHECKING:
     from expanse.types import Send
 
 
+FORWARDED_PARAMS = {
+    TrustedHeader.X_FORWARDED_FOR: "for",
+    TrustedHeader.X_FORWARDED_HOST: "host",
+    TrustedHeader.X_FORWARDED_PROTO: "proto",
+    TrustedHeader.X_FORWARDED_PORT: "for",
+}
+
+
 class Request(BaseRequest):
     def __init__(
         self, scope: Scope, receive: Receive = empty_receive, send: Send = empty_send
@@ -31,6 +44,8 @@ class Request(BaseRequest):
 
         self._route: Route | None = None
         self._session: HTTPSession | None = None
+        self._trusted_proxies: list[str] = []
+        self._trusted_headers: list[TrustedHeader] = []
 
     @cached_property
     def url(self) -> URL:  # type: ignore[override]
@@ -38,12 +53,37 @@ class Request(BaseRequest):
 
     @cached_property
     def host(self) -> str:
-        client = self.client
+        host: str
+        if (
+            self.is_from_trusted_proxy()
+            and self.is_header_trusted(TrustedHeader.X_FORWARDED_HOST)
+            and (host := self.headers.get(TrustedHeader.X_FORWARDED_HOST))
+        ):
+            host = self.headers.get(TrustedHeader.X_FORWARDED_HOST)
+        else:
+            host = self.url.hostname
 
-        if not client:
-            return ""
+        return host
 
-        return client.host or ""
+    @property
+    def port(self) -> int | None:
+        """
+        Get the port on which the request was made.
+
+        The port can be retrieved from the `X-Forwarded-Port` header when trusted proxies
+        were configured via the `set_trusted_proxies()` method.
+
+        :return: The port number.
+        """
+        if not self.is_from_trusted_proxy():
+            return self.url.port
+
+        if self.is_header_trusted(TrustedHeader.X_FORWARDED_PORT):
+            ports = self._get_trusted_values(TrustedHeader.X_FORWARDED_PORT)
+            if ports:
+                return ports[0]
+
+        return self.url.port
 
     @cached_property
     def acceptable_content_types(self) -> list[str]:
@@ -65,8 +105,12 @@ class Request(BaseRequest):
         if not self.is_from_trusted_proxy():
             return [ip for ip in ips if ip is not None]
 
-        if forwarded_ip := self.headers.get("X-Forwarded-For"):
-            ips.insert(0, forwarded_ip)
+        self._get_trusted_values(TrustedHeader.X_FORWARDED_FOR)
+
+        if self.is_header_trusted(TrustedHeader.X_FORWARDED_FOR) and (
+            forwarded_ips := self._get_trusted_values(TrustedHeader.X_FORWARDED_FOR)
+        ):
+            ips = forwarded_ips + ips
 
         return [ip for ip in ips if ip is not None]
 
@@ -79,10 +123,53 @@ class Request(BaseRequest):
         return self._session
 
     def is_secure(self) -> bool:
+        if not self.is_from_trusted_proxy() or not self.is_header_trusted(
+            TrustedHeader.X_FORWARDED_FOR
+        ):
+            return self.url.scheme == "https"
+
+        forwarded_proto = self.headers.get(TrustedHeader.X_FORWARDED_PROTO)
+        if forwarded_proto:
+            return forwarded_proto == "https"
+
         return self.url.scheme == "https"
 
+    def set_trusted_proxies(self, trusted_proxies: list[str]) -> Self:
+        """
+        Set trusted proxies for the request.
+
+        :param trusted_proxies: List of trusted proxies.
+        """
+        self._trusted_proxies = trusted_proxies
+
+        return self
+
+    def set_trusted_headers(self, trusted_headers: list[TrustedHeader]) -> Self:
+        """
+        Set trusted headers for the request.
+
+        :param trusted_headers: List of trusted headers.
+        """
+        self._trusted_headers = [header.value for header in trusted_headers]
+
+        return self
+
     def is_from_trusted_proxy(self) -> bool:
-        return False
+        if not self._trusted_proxies:
+            return False
+
+        return any(
+            ipaddress.ip_address(self.client.host) in ipaddress.ip_network(proxy)
+            for proxy in self._trusted_proxies
+        )
+
+    def is_header_trusted(self, header: TrustedHeader) -> bool:
+        """
+        Check if the header is trusted.
+
+        :param header: The header to check.
+        """
+        return header in self._trusted_headers
 
     def accepts_any_content_type(self) -> bool:
         """
@@ -191,18 +278,19 @@ class Request(BaseRequest):
         url = URL(raw_url)
 
         if url.hostname is not None:
-            base_scope["server"][0] = url.hostname
+            base_scope["server"] = (url.hostname, base_scope["server"][1])
 
         if url.scheme:
             base_scope["scheme"] = url.scheme
 
             if url.scheme == "https":
-                base_scope["server"][1] = 443
+                base_scope["server"] = (base_scope["server"][0], 443)
+                base_scope["scheme"] = "https"
             else:
-                base_scope["server"][1] = 80
+                base_scope["server"] = (base_scope["server"][0], 80)
 
         if url.port is not None:
-            base_scope["server"][1] = url.port
+            base_scope["server"] = (base_scope["server"][0], url.port)
 
         path = url.path
         if not path:
@@ -218,6 +306,56 @@ class Request(BaseRequest):
         base_scope["query_string"] = query_string
 
         return cls(scope=base_scope)
+
+    @overload
+    def _get_trusted_values(
+        self, header: Literal[TrustedHeader.X_FORWARDED_FOR]
+    ) -> list[str]: ...
+
+    @overload
+    def _get_trusted_values(
+        self, header: Literal[TrustedHeader.X_FORWARDED_PORT]
+    ) -> list[int]: ...
+
+    def _get_trusted_values(self, header: TrustedHeader) -> list[str] | list[int]:
+        """
+        Get the trusted values for the request.
+
+        :return: The trusted values.
+        """
+        client_values = []
+        forwarded_values = []
+
+        if header in self.headers:
+            header_value = self.headers[header]
+            for value in header_value.split(","):
+                client_values.append(
+                    int(value.strip())
+                    if header is TrustedHeader.X_FORWARDED_PORT
+                    else value.strip()
+                )
+
+        if TrustedHeader.FORWARDED in self.headers and header in FORWARDED_PARAMS:
+            from expanse.http.utils.forwarded_header import ForwardedHeader
+
+            forwarded_header = ForwardedHeader.parse(
+                self.headers[TrustedHeader.FORWARDED]
+            )
+            if header is TrustedHeader.X_FORWARDED_FOR:
+                forwarded_values = [
+                    str(node.ip)
+                    for node in forwarded_header.for_
+                    if node.ip is not None
+                ]
+            elif header is TrustedHeader.X_FORWARDED_PORT:
+                forwarded_values = [
+                    node.port for node in forwarded_header.for_ if node.port is not None
+                ]
+
+        if client_values == forwarded_values or not client_values:
+            return forwarded_values
+
+        return client_values
 
 
 __all__ = ["Request"]
