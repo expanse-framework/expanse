@@ -1,9 +1,9 @@
 import dataclasses
 
 from collections.abc import MutableMapping
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import Generic
-from typing import NotRequired
 from typing import TypeVar
 from typing import cast
 
@@ -11,18 +11,13 @@ from baize.datastructures import FormData
 from baize.datastructures import MultiMapping
 from pydantic import BaseModel
 from pydantic import ValidationError
-from typing_extensions import TypedDict
+
+
+if TYPE_CHECKING:
+    from pydantic_core import ErrorDetails
 
 
 Model = TypeVar("Model", bound=type[BaseModel])
-
-
-class ErrorDetails(TypedDict):
-    type: str
-    loc: tuple[int | str, ...]
-    msg: str
-    input: Any
-    ctx: NotRequired[dict[str, Any]]
 
 
 @dataclasses.dataclass
