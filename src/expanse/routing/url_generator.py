@@ -31,7 +31,7 @@ class URLGenerator:
             return path
 
         parameters = parameters or {}
-        url_path = self._compute_path(path, **parameters)
+        url_path = self._compute_path(path, parameters)
 
         url = self._request.url
 
@@ -55,7 +55,7 @@ class URLGenerator:
 
         assert route is not None
 
-        url = self._compute_path(route.path, **parameters)
+        url = self._compute_path(route.path, parameters)
 
         if absolute:
             return str(
@@ -75,7 +75,7 @@ class URLGenerator:
     def _is_valid_url(self, path: str) -> bool:
         return re.match(r"^(#|//|https?://|(mailto|tel|sms):)", path) is not None
 
-    def _compute_path(self, path: str, **parameters: Any) -> str:
+    def _compute_path(self, path: str, parameters: dict[str, Any]) -> str:
         matches: Iterator[re.Match[str]] = re.finditer(
             r"\{([\w*]+):?([^/]*)}|\[|]|[^/\[\]{}]+", path
         )
@@ -89,17 +89,20 @@ class URLGenerator:
         expected: set[str] = set()
         substitutions: dict[str, str] = {}
 
-        print(matches)
-
         for match in matches:
             if match.group(0) in ("[", "]"):
                 continue
 
-            name = match.group(1)
-            if name is None:
+            raw_name = match.group(1)
+            if raw_name is None:
                 continue
 
-            expected.add(name)
+            name = raw_name
+
+            if name.startswith("*"):
+                name = name[1:]
+
+            expected.add(raw_name)
 
             if name not in parameters:
                 continue
@@ -116,7 +119,7 @@ class URLGenerator:
             if regex:
                 path = path.replace(f"{{{name}:{regex}}}", f"{{{name}}}", 1)
 
-            substitutions[name] = parameters.pop(name)
+            substitutions[raw_name] = parameters.pop(name)
 
         if not expected.issubset(set(substitutions.keys())):
             missing = ", ".join(sorted(expected.difference(set(substitutions.keys()))))
