@@ -89,17 +89,20 @@ class URLGenerator:
         expected: set[str] = set()
         substitutions: dict[str, str] = {}
 
-        print(matches)
-
         for match in matches:
             if match.group(0) in ("[", "]"):
                 continue
 
-            name = match.group(1)
-            if name is None:
+            raw_name = match.group(1)
+            if raw_name is None:
                 continue
 
-            expected.add(name)
+            name = raw_name
+
+            if name.startswith("*"):
+                name = name[1:]
+
+            expected.add(raw_name)
 
             if name not in parameters:
                 continue
@@ -116,7 +119,7 @@ class URLGenerator:
             if regex:
                 path = path.replace(f"{{{name}:{regex}}}", f"{{{name}}}", 1)
 
-            substitutions[name] = parameters.pop(name)
+            substitutions[raw_name] = parameters.pop(name)
 
         if not expected.issubset(set(substitutions.keys())):
             missing = ", ".join(sorted(expected.difference(set(substitutions.keys()))))
