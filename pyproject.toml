@@ -24,8 +24,8 @@ httpx = ">=0.26.0"
 inflection = "^0.5.1"
 jinja2 = ">=3.1.6"
 pendulum = { version = "^3.0.0", extras = ["test"] }
-pydantic = "^2.3.0"
-pydantic-settings = "^2.1.0"
+pydantic = "^2.11.3"
+pydantic-settings = "^2.8.1"
 pygments = "^2.18.0"
 sqlalchemy = { version = "^2.0.25", extras = ["asyncio"] }
 uvicorn = { version = ">=0.23.2", extras = ["standard"] }
