@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "expanse"
 version = "0.5.0"
-description = ""
+description = "The limitless Python web framework"
 authors = ["Sébastien Eustace <sebastien@eustace.io>"]
 license = "MIT"
 readme = "README.md"
@@ -9,42 +9,41 @@ include = [{ path = "tests", format = "sdist" }]
 homepage = "https://expanse-framework.com/"
 repository = "https://github.com/expanse-framework/expanse"
 documentation = "https://expanse-framework.com/docs"
-keywords = ["expanse", "framework", "poetry"]
+keywords = ["expanse", "framework"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-uvicorn = { version = ">=0.23.2", extras = ["standard"] }
-cleo = "^2.1.0"
-jinja2 = ">=3.1.2"
-pydantic = "^2.3.0"
-pendulum = { version = "^3.0.0", extras = ["test"] }
-pydantic-settings = "^2.1.0"
-sqlalchemy = "^2.0.25"
-baize = "^0.22.0"
-crashtest = "^0.4.1"
-anyio = "^4.2.0"
-httpx = ">=0.26.0"
 alembic = "^1.13.2"
-pygments = "^2.18.0"
-inflection = "^0.5.1"
+anyio = "^4.2.0"
+baize = "^0.22.0"
+cleo = "^2.1.0"
+crashtest = "^0.4.1"
+cryptography = "^44.0.0"
 filelock = "^3.16.1"
-
+httpx = ">=0.26.0"
+inflection = "^0.5.1"
+jinja2 = ">=3.1.6"
+pendulum = { version = "^3.0.0", extras = ["test"] }
+pydantic = "^2.11.3"
+pydantic-settings = "^2.8.1"
+pygments = "^2.18.0"
+sqlalchemy = { version = "^2.0.25", extras = ["asyncio"] }
+uvicorn = { version = ">=0.23.2", extras = ["standard"] }
 
 [tool.poetry.group.test.dependencies]
-pytest = ">=8.3.3"
-treat = ">=0.4.0"
-pytest-asyncio = ">=0.21.1"
-aiosqlite = ">=0.19.0"
-greenlet = ">=3.0.3"
-psycopg2 = ">=2.9.9"
-psycopg = ">=3.1.18"
-asyncpg = ">=0.29.0"
-pg8000 = ">=1.30.4"
-pymysql = "^1.1.1"
-mysqlclient = "^2.2.4"
-asyncmy = "^0.2.9"
 aiomysql = "^0.2.0"
-cryptography = "^44.0.0"
+aiosqlite = ">=0.19.0"
+asyncmy = "^0.2.9"
+asyncpg = ">=0.29.0"
+greenlet = ">=3.0.3"
+mysqlclient = "^2.2.4"
+pg8000 = ">=1.30.4"
+psycopg = ">=3.1.18"
+psycopg2 = ">=2.9.9"
+pymysql = "^1.1.1"
+pytest = ">=8.3.3"
+pytest-asyncio = ">=0.21.1"
+treat = ">=0.4.0"
 
 
 [tool.poetry.group.dev.dependencies]

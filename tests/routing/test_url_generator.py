@@ -22,6 +22,7 @@ def test_generator_can_generate_route_urls(router: Router) -> None:
     router.get("/", lambda: "", name="index")
     router.get("/foo/bar", lambda: "", name="foo")
     router.get("/foo/bar/{baz}/boom/{boom}", lambda: "", name="bar")
+    router.get("/catch-all/{path:.*}", lambda: "", name="catch_all")
 
     assert url.to("foo/bar") == "http://example.com/foo/bar"
     assert url.to("foo/bar", secure=True) == "https://example.com/foo/bar"
@@ -47,4 +48,8 @@ def test_generator_can_generate_route_urls(router: Router) -> None:
     assert (
         url.to_route("bar", {"baz": "john", "boom": "doe"}, absolute=True)
         == "http://example.com/foo/bar/john/boom/doe"
+    )
+
+    assert (
+        url.to_route("catch_all", {"path": "foo/bar/baz"}) == "/catch-all/foo/bar/baz"
     )
