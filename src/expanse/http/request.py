@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 
 from functools import cached_property
 from typing import TYPE_CHECKING
@@ -13,6 +14,7 @@ from baize.asgi.requests import Request as BaseRequest
 
 from expanse.http.accept_header import AcceptHeader
 from expanse.http.exceptions import ConflictingForwardedHeadersError
+from expanse.http.exceptions import SuspiciousOperationError
 from expanse.http.trusted_header import TrustedHeader
 from expanse.http.url import URL
 
@@ -45,6 +47,7 @@ class Request(BaseRequest):
         self._session: HTTPSession | None = None
         self._trusted_proxies: list[str] = []
         self._trusted_headers: list[TrustedHeader] = []
+        self._trusted_hosts: list[str] = []
         self._url = URL(scope=scope)
 
     @cached_property
@@ -60,14 +63,35 @@ class Request(BaseRequest):
             and (hosts := self._get_trusted_values(TrustedHeader.X_FORWARDED_HOST))
         ):
             host = hosts[0]
-        elif "Host" in self.headers:
-            host = self.headers["Host"]
+        elif "Host" not in self.headers:
+            # If there is no Host header, we have to use the server name
+            server: tuple[str | None, int | None] | None = self._scope.get("server")
+            host = "" if not server or not server[0] else server[0]
         else:
-            host = self._url.hostname or ""
+            host = self.headers["Host"]
 
-        host = host.lower()
+        host = re.sub(":\d+$", "", host).lower()
 
-        return host.split(":")[0] if host else ""
+        is_trusted: bool = False
+        for trusted_host in self._trusted_hosts:
+            if trusted_host.startswith("."):
+                # Check if the host ends with the trusted host
+                if host.endswith(trusted_host[1:]):
+                    is_trusted = True
+                    break
+            elif host == trusted_host:
+                is_trusted = True
+                break
+            elif trusted_host == "*":
+                # If the trusted host is "*", we trust any host
+                is_trusted = True
+                break
+
+        if not is_trusted:
+            # If the host is not trusted, we should not return it
+            raise SuspiciousOperationError(f"Host '{host}' is not trusted")
+
+        return host
 
     @cached_property
     def http_host(self) -> str:
@@ -189,6 +213,16 @@ class Request(BaseRequest):
         :param trusted_headers: List of trusted headers.
         """
         self._trusted_headers = trusted_headers
+
+        return self
+
+    def set_trusted_hosts(self, trusted_hosts: list[str]) -> Self:
+        """
+        Set trusted hosts for the request.
+
+        :param trusted_hosts: List of trusted hosts.
+        """
+        self._trusted_hosts = trusted_hosts
 
         return self
 

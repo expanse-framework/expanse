@@ -14,7 +14,7 @@ from expanse.testing.client import TestClient
 
 @pytest.fixture()
 def request_() -> Request:
-    return Request.create(
+    request = Request.create(
         "http://example.com:8080",
         scope={
             "headers": [
@@ -27,6 +27,10 @@ def request_() -> Request:
             "client": ("192.168.1.1", 12345),
         },
     )
+
+    request.set_trusted_hosts(["*"])
+
+    return request
 
 
 def get_handler(
@@ -216,6 +220,7 @@ async def test_trusted_proxies_with_forwarded_header(
             "client": ("192.168.1.1", 12345),
         },
     )
+    request.set_trusted_hosts(["*"])
     client.app.config["http.trusted_proxies"] = ["192.168.1.1"]
     trust_proxies = TrustProxies(client.app)
 
@@ -263,6 +268,7 @@ async def test_trusted_proxies_with_forwarded_header_to_url(
             "client": ("192.168.1.1", 12345),
         },
     )
+    request.set_trusted_hosts(["*"])
     client.app.config["http.trusted_proxies"] = ["192.168.1.1"]
     trust_proxies = TrustProxies(client.app)
 
@@ -315,6 +321,7 @@ async def test_trusted_proxies_with_x_forwarded_headers_to_url(
             "client": ("192.168.1.1", 12345),
         },
     )
+    request.set_trusted_hosts(["*"])
     client.app.config["http.trusted_proxies"] = ["192.168.1.1"]
     trust_proxies = TrustProxies(client.app)
 
@@ -354,6 +361,7 @@ async def test_trusted_proxies_with_conflicting_headers(
             "client": ("192.168.1.1", 12345),
         },
     )
+    request.set_trusted_hosts(["*"])
     client.app.config["http.trusted_proxies"] = ["192.168.1.1"]
     trust_proxies = TrustProxies(client.app)
 
@@ -393,6 +401,7 @@ async def test_trusted_proxies_with_agreeing_headers(
             "client": ("192.168.1.1", 12345),
         },
     )
+    request.set_trusted_hosts(["*"])
     client.app.config["http.trusted_proxies"] = ["192.168.1.1"]
     trust_proxies = TrustProxies(client.app)
 
