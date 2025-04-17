@@ -15,13 +15,16 @@ class TrustHosts(Middleware):
         return await next_call(request)
 
     async def set_trusted_hosts(self, request: Request) -> None:
-        trusted_hosts: list[str] | None = self._app.config.get("http.trusted_hosts")
+        if self.should_trust_hosts():
+            return
 
-        if not trusted_hosts:
-            if self._app.config.get("app.debug"):
-                # If debug mode is enabled, we only trust local hosts
-                trusted_hosts = [".localhost", "127.0.0.1", "::1"]
-            else:
-                return
+        trusted_hosts: list[str] = self._app.config.get("http.trusted_hosts", [])
+
+        if not trusted_hosts and self._app.config.get("app.debug"):
+            # If debug mode is enabled, we only trust local hosts
+            trusted_hosts = [".localhost", "127.0.0.1", "::1"]
 
         request.set_trusted_hosts(trusted_hosts)
+
+    def should_trust_hosts(self) -> bool:
+        return self._app.environment == "test"

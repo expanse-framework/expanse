@@ -66,7 +66,7 @@ class Finder(RouteCollection):
 
     def match(self, request: Request) -> Route | None:
         method = request.method
-        path = request.url.path
+        path = request.path
 
         return self._match(request, method, path)
 

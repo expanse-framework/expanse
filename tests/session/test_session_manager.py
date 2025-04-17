@@ -19,6 +19,7 @@ async def test_stores_can_be_configured_through_environment_variables(
     )
 
     await unbootstrapped_app.bootstrap()
+    await unbootstrapped_app.boot()
 
     manager = SessionManager(unbootstrapped_app)
 

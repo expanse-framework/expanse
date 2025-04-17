@@ -1,11 +1,16 @@
+import pytest
+
 from expanse.contracts.routing.router import Router
 from expanse.http.request import Request
 from expanse.routing.url_generator import URLGenerator
 
 
-def test_generator_can_generate_simple_urls(router: Router) -> None:
-    url = URLGenerator(router, Request.create("http://example.com"))
+@pytest.fixture
+def url(router: Router) -> URLGenerator:
+    return URLGenerator(router, Request.create("http://example.com"))
 
+
+def test_generator_can_generate_simple_urls(router: Router, url: URLGenerator) -> None:
     assert url.to("foo/bar") == "http://example.com/foo/bar"
     assert url.to("foo/bar", secure=True) == "https://example.com/foo/bar"
     assert (
@@ -16,9 +21,7 @@ def test_generator_can_generate_simple_urls(router: Router) -> None:
     assert url.to("foo/bar") == "https://example.com/foo/bar"
 
 
-def test_generator_can_generate_route_urls(router: Router) -> None:
-    url = URLGenerator(router, Request.create("http://example.com"))
-
+def test_generator_can_generate_route_urls(router: Router, url: URLGenerator) -> None:
     router.get("/", lambda: "", name="index")
     router.get("/foo/bar", lambda: "", name="foo")
     router.get("/foo/bar/{baz}/boom/{boom}", lambda: "", name="bar")

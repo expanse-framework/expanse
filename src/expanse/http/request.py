@@ -47,7 +47,7 @@ class Request(BaseRequest):
         self._session: HTTPSession | None = None
         self._trusted_proxies: list[str] = []
         self._trusted_headers: list[TrustedHeader] = []
-        self._trusted_hosts: list[str] = []
+        self._trusted_hosts: list[str] = ["*"]
         self._url = URL(scope=scope)
 
     @cached_property
@@ -70,7 +70,7 @@ class Request(BaseRequest):
         else:
             host = self.headers["Host"]
 
-        host = re.sub(":\d+$", "", host).lower()
+        host = re.sub(r":\d+$", "", host).lower()
 
         is_trusted: bool = False
         for trusted_host in self._trusted_hosts:
@@ -183,6 +183,10 @@ class Request(BaseRequest):
     @property
     def scheme(self) -> str:
         return "https" if self.is_secure() else "http"
+
+    @property
+    def path(self) -> str:
+        return self._url.path
 
     def is_secure(self) -> bool:
         if not self.is_from_trusted_proxy() or not self.is_header_trusted(

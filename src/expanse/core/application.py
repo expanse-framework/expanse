@@ -85,6 +85,10 @@ class Application:
     def environment_path(self) -> Path:
         return self._environment_path or self._base_path
 
+    @property
+    def environment(self) -> str:
+        return self._config.get("app.env", "production")
+
     def path(self, path: str | Path, relative: bool = False) -> Path:
         path = self._base_path.joinpath("app").joinpath(path)
 
@@ -168,8 +172,6 @@ class Application:
         for callback in self._bootstrapping_callbacks:
             await callback(self._container)
 
-        await self.boot()
-
         self._has_been_bootstrapped = True
 
         return self
@@ -244,6 +246,7 @@ class Application:
                 if message["type"] == "lifespan.startup":
                     try:
                         await self.bootstrap()
+                        await self.boot()
                     except Exception as e:
                         await send(
                             {

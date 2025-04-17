@@ -44,6 +44,26 @@ class MiddlewareStack:
 
         return self
 
+    def replace(
+        self, middleware: type[Middleware], replacement: type[Middleware]
+    ) -> Self:
+        """
+        Replace a middleware with another middleware.
+        """
+        index = self._middlewares.index(middleware)
+
+        self._middlewares[index] = replacement
+
+        return self
+
+    def remove(self, middleware: type[Middleware]) -> Self:
+        """
+        Remove a middleware from the stack.
+        """
+        self._middlewares.remove(middleware)
+
+        return self
+
     def group(self, name: str) -> MiddlewareGroup:
         """
         Retrieve the middleware group with the given name.
@@ -57,9 +77,10 @@ class MiddlewareStack:
 
     def get_default_middleware(self) -> list[type[Middleware]]:
         from expanse.http.middleware.manage_cors import ManageCors
+        from expanse.http.middleware.trust_hosts import TrustHosts
         from expanse.http.middleware.trust_proxies import TrustProxies
 
-        return [TrustProxies, ManageCors]
+        return [TrustHosts, TrustProxies, ManageCors]
 
     def get_default_groups(self) -> dict[str, MiddlewareGroup]:
         from expanse.http.middleware.encrypt_cookies import EncryptCookies

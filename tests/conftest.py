@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from expanse.core.application import Application
+from expanse.http.middleware.trust_hosts import TrustHosts
 from expanse.testing.client import TestClient
 
 
@@ -22,9 +23,9 @@ def root() -> Path:
 
 
 @pytest.fixture()
-def unbootstrapped_app(root: Path) -> Application:
+async def unbootstrapped_app(root: Path) -> Application:
     async def configure_middleware(stack: MiddlewareStack) -> None:
-        stack.use([])
+        stack.use([TrustHosts])
 
     application = (
         Application.configure(root).with_middleware(configure_middleware).create()
@@ -34,14 +35,23 @@ def unbootstrapped_app(root: Path) -> Application:
 
 
 @pytest.fixture()
-async def app(unbootstrapped_app: Application) -> Application:
+async def unbooted_app(unbootstrapped_app: Application) -> Application:
     await unbootstrapped_app.bootstrap()
 
-    unbootstrapped_app.config["app.debug"] = True
-    unbootstrapped_app.config["app.secret_key"] = "k" * 32
-    unbootstrapped_app.config["encryption.salt"] = "s" * 32
+    unbootstrapped_app.config["app.env"] = "test"
 
     return unbootstrapped_app
+
+
+@pytest.fixture()
+async def app(unbooted_app: Application) -> Application:
+    await unbooted_app.boot()
+
+    unbooted_app.config["app.debug"] = True
+    unbooted_app.config["app.secret_key"] = "k" * 32
+    unbooted_app.config["encryption.salt"] = "s" * 32
+
+    return unbooted_app
 
 
 @pytest.fixture()

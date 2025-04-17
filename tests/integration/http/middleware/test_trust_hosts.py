@@ -1,6 +1,7 @@
 import pytest
 
 from expanse.contracts.routing.router import Router
+from expanse.core.application import Application
 from expanse.http.exceptions import SuspiciousOperationError
 from expanse.http.middleware.trust_hosts import TrustHosts
 from expanse.http.request import Request
@@ -20,6 +21,11 @@ def request_() -> Request:
             "server": ("foo.example.com", 80),
         },
     )
+
+
+@pytest.fixture(autouse=True)
+def configure_app(app: Application) -> None:
+    app.config["app.env"] = "production"
 
 
 async def handler(request: Request) -> Response:
@@ -125,3 +131,15 @@ async def test_hosts_trusted_in_debug_mode_by_default_are_local(
     await trust_hosts.handle(request_, handler)
 
     assert request_.host == "localhost"
+
+
+async def test_all_hosts_are_trusted_in_tests(
+    router: Router, client: TestClient, request_: Request
+) -> None:
+    client.app.config["app.env"] = "test"
+
+    trust_hosts = TrustHosts(client.app)
+
+    await trust_hosts.handle(request_, handler)
+
+    assert request_.host == "foo.example.com"
