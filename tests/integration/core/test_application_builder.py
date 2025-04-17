@@ -61,7 +61,7 @@ class Middleware4:
 
 
 async def configure_middleware(stack: MiddlewareStack) -> None:
-    stack.append(Middleware1, Middleware2, Middleware3)
+    stack.use([Middleware1, Middleware2, Middleware3])
 
     stack.group("group1").append(Middleware4)
 

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 async def setup_app(app: Application) -> None:
-    (await app.container.get(Gateway)).prepend_middleware(ManageCors)
+    (await app.container.get(Gateway)).append_middleware(ManageCors)
 
     router: Router = await app.container.get("router")
 

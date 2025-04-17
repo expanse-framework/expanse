@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from expanse.core.application import Application
+from expanse.http.middleware.trust_hosts import TrustHosts
 from expanse.testing.client import TestClient
 
 
@@ -24,11 +25,17 @@ def root() -> Path:
 @pytest.fixture()
 def unbootstrapped_app(root: Path) -> Application:
     async def configure_middleware(stack: MiddlewareStack) -> None:
-        stack.use([])
+        stack.use([TrustHosts])
 
     application = (
         Application.configure(root).with_middleware(configure_middleware).create()
     )
+    application.config["http.trusted_hosts"] = [
+        "testserver",
+        ".localhost",
+        "127.0.0.1",
+        "::1",
+    ]
 
     return application
 

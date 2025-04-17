@@ -16,6 +16,9 @@ class TrustHosts(Middleware):
 
     async def set_trusted_hosts(self, request: Request) -> None:
         trusted_hosts: list[str] | None = self._app.config.get("http.trusted_hosts")
+        print(trusted_hosts)
+        print("FOO")
+        print(self._app.config.get("app.debug"))
 
         if not trusted_hosts:
             if self._app.config.get("app.debug"):

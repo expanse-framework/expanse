@@ -2,7 +2,9 @@ from expanse.http.request import Request
 
 
 async def test_url() -> None:
-    request = Request.create("http://example.com:1234/foo/bar?foo=bar&bar=baz")
+    request = Request.create(
+        "http://example.com:1234/foo/bar?foo=bar&bar=baz"
+    ).set_trusted_hosts(["example.com"])
 
     url = request.url
 
