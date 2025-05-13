@@ -14,7 +14,7 @@ from expanse.testing.client import TestClient
 
 @pytest.fixture()
 def request_() -> Request:
-    return Request.create(
+    request = Request.create(
         "http://example.com:8080",
         scope={
             "headers": [
@@ -27,6 +27,8 @@ def request_() -> Request:
             "client": ("192.168.1.1", 12345),
         },
     )
+
+    return request
 
 
 def get_handler(

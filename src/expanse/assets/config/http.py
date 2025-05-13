@@ -19,6 +19,7 @@ class Config(BaseSettings):
             TrustedHeader.X_FORWARDED_PROTO,
         ]
     )
+    trusted_hosts: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(env_prefix="http_")
 
@@ -37,3 +38,11 @@ class Config(BaseSettings):
             return v
 
         return [TrustedHeader(header.lower().strip()) for header in v.split(",")]
+
+    @field_validator("trusted_hosts", mode="before")
+    @classmethod
+    def decode_hosts(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, list):
+            return v
+
+        return [v.strip() for v in v.split(",")]

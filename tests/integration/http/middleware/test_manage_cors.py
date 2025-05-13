@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 async def setup_app(app: Application) -> None:
-    (await app.container.get(Gateway)).prepend_middleware(ManageCors)
+    (await app.container.get(Gateway)).append_middleware(ManageCors)
 
     router: Router = await app.container.get("router")
 
@@ -42,7 +42,7 @@ async def setup_app(app: Application) -> None:
 
 
 def test_it_should_return_access_control_allow_origin_when_no_origin_on_request(
-    client: TestClient,
+    client: TestClient, app: Application
 ) -> None:
     response = client.options(
         "/api/ping", headers={"Access-Control-Request-Method": "POST"}

@@ -19,3 +19,11 @@ def test_trusted_headers(monkeypatch: MonkeyPatch) -> None:
         TrustedHeader.X_FORWARDED_FOR,
         TrustedHeader.X_FORWARDED_HOST,
     ]
+
+
+def test_trusted_hosts(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("HTTP_TRUSTED_HOSTS", "example.com, foo.bar")
+
+    config = Config()
+
+    assert config.trusted_hosts == ["example.com", "foo.bar"]

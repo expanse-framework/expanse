@@ -6,6 +6,14 @@ from expanse.http.trusted_header import TrustedHeader
 from expanse.types.http.middleware import RequestHandler
 
 
+_DEFAULT_TRUSTED_HEADERS: list[str] = [
+    "x-forwarded-for",
+    "x-forwarded-proto",
+    "x-forwarded-port",
+    "forwarded",
+]
+
+
 class TrustProxies(Middleware):
     def __init__(self, app: Application) -> None:
         self._app = app
@@ -26,6 +34,9 @@ class TrustProxies(Middleware):
                 request.set_trusted_proxies(trusted_proxies)
 
         trusted_headers: list[str] | None = self._app.config.get("http.trusted_headers")
+
+        if trusted_headers is None:
+            trusted_headers = _DEFAULT_TRUSTED_HEADERS.copy()
 
         if trusted_headers:
             request.set_trusted_headers(
