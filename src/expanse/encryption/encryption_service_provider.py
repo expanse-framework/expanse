@@ -6,7 +6,7 @@ from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.core.console.gateway import Gateway
+    from expanse.core.console.portal import Portal
     from expanse.encryption.encryptor import Encryptor
 
 
@@ -21,9 +21,9 @@ class EncryptionServiceProvider(ServiceProvider):
         self._container.singleton(EncryptorContract, self._create_encryptor)
 
     async def boot(self) -> None:
-        from expanse.core.console.gateway import Gateway
+        from expanse.core.console.portal import Portal
 
-        await self._container.on_resolved(Gateway, self._register_command_path)
+        await self._container.on_resolved(Portal, self._register_command_path)
 
     async def _create_encryptor(self, container: Container) -> "Encryptor":
         from expanse.encryption.encryptor_factory import EncryptorFactory
@@ -32,5 +32,5 @@ class EncryptionServiceProvider(ServiceProvider):
 
         return factory.make()
 
-    async def _register_command_path(self, gateway: "Gateway") -> None:
-        await gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
+    async def _register_command_path(self, portal: "Portal") -> None:
+        await portal.load_path(Path(__file__).parent.joinpath("console/commands"))

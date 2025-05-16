@@ -17,7 +17,7 @@ from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.core.console.gateway import Gateway
+    from expanse.core.console.portal import Portal
 
 
 class DatabaseServiceProvider(ServiceProvider):
@@ -32,9 +32,9 @@ class DatabaseServiceProvider(ServiceProvider):
         )
 
     async def boot(self) -> None:
-        from expanse.core.console.gateway import Gateway
+        from expanse.core.console.portal import Portal
 
-        await self._container.on_resolved(Gateway, self._register_command_path)
+        await self._container.on_resolved(Portal, self._register_command_path)
 
     async def _register_async(self) -> None:
         self._container.singleton(AsyncDatabaseManager)
@@ -84,8 +84,8 @@ class DatabaseServiceProvider(ServiceProvider):
 
         session.close()
 
-    async def _register_command_path(self, gateway: "Gateway") -> None:
-        await gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
+    async def _register_command_path(self, portal: "Portal") -> None:
+        await portal.load_path(Path(__file__).parent.joinpath("console/commands"))
 
     async def _create_migrator(self, app: Application, config: Config) -> Migrator:
         from expanse.database.orm.model import Model
