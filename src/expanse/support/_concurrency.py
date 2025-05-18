@@ -3,6 +3,8 @@ import functools
 
 from collections import deque
 from collections.abc import Callable
+from contextvars import Context
+from contextvars import copy_context
 from typing import ParamSpec
 from typing import TypeVar
 
@@ -13,13 +15,37 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
+def _restore_context(context: Context) -> None:
+    """
+    Copy the state of `context` to the current context.
+    """
+    for cvar in context:
+        new_val = context.get(cvar)
+        try:
+            if cvar.get() != new_val:
+                cvar.set(new_val)
+        except LookupError:
+            # the context variable was first set inside `context`
+            cvar.set(new_val)
+
+
 async def run_in_threadpool(
     func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
 ) -> T:
     if kwargs:  # pragma: no cover
         # run_sync doesn't accept 'kwargs', so bind them in here
         func = functools.partial(func, **kwargs)
-    return await anyio.to_thread.run_sync(func, *args)
+
+    context = copy_context()
+    func = functools.partial(context.run, func)
+
+    result = await anyio.to_thread.run_sync(func, *args)
+
+    if context is not None:
+        # restore the context
+        _restore_context(context)
+
+    return result
 
 
 class AsyncRLock:
