@@ -26,7 +26,7 @@ from expanse.core.bootstrap.register_providers import RegisterProviders
 from expanse.support._utils import string_to_class
 
 
-class Gateway:
+class Portal:
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,

@@ -13,9 +13,9 @@ from expanse.types import Scope
 from expanse.types import Send
 
 
-class Gateway:
+class Portal:
     """
-    The gateway is the layer between the ASGI spec/world and Expanse internal
+    The HTTP portal is the layer between the ASGI spec/world and Expanse internal
     architecture.
     """
 

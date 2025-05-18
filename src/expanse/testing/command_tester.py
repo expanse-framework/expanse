@@ -8,7 +8,7 @@ from cleo.io.outputs.buffered_output import BufferedOutput
 
 from expanse.contracts.debug.exception_handler import ExceptionHandler
 from expanse.core.application import Application
-from expanse.core.console.gateway import Gateway
+from expanse.core.console.portal import Portal
 
 
 class TestingCommand:
@@ -47,11 +47,11 @@ class TestingCommand:
             input.interactive()
 
         async def handle(input: StringInput) -> int:
-            gateway = await self._app.container.get(Gateway)
+            portal = await self._app.container.get(Portal)
             handler = await self._app.container.get(ExceptionHandler)
 
             with handler.raise_unhandled_exceptions():
-                return await gateway.handle(input, self._output)
+                return await portal.handle(input, self._output)
 
         with anyio.from_thread.start_blocking_portal() as portal:
             self._return_code = portal.call(handle, input)

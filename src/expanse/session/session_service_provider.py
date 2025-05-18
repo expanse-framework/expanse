@@ -9,7 +9,7 @@ from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.core.console.gateway import Gateway
+    from expanse.core.console.portal import Portal
     from expanse.exceptions.handler import ExceptionHandler
     from expanse.view.synchronous.view_factory import ViewFactory
 
@@ -27,9 +27,9 @@ class SessionServiceProvider(ServiceProvider):
         )
 
     async def boot(self) -> None:
-        from expanse.core.console.gateway import Gateway
+        from expanse.core.console.portal import Portal
 
-        await self._container.on_resolved(Gateway, self._register_command_path)
+        await self._container.on_resolved(Portal, self._register_command_path)
 
         await self._container.on_resolved("view", self._register_view_locals)
         await self._container.on_resolved(
@@ -44,8 +44,8 @@ class SessionServiceProvider(ServiceProvider):
 
         return LoadSession(session_manager)
 
-    async def _register_command_path(self, gateway: "Gateway") -> None:
-        await gateway.load_path(Path(__file__).parent.joinpath("console/commands"))
+    async def _register_command_path(self, portal: "Portal") -> None:
+        await portal.load_path(Path(__file__).parent.joinpath("console/commands"))
 
     async def _configure_exception_handler(self, handler: "ExceptionHandler") -> None:
         from expanse.core.http.exceptions import HTTPException

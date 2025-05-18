@@ -138,7 +138,7 @@ class Application:
             or Path(traceback.extract_stack(limit=2)[0].filename).parent.parent
         )
 
-        return ApplicationBuilder(base_path).with_kernels().with_commands()
+        return ApplicationBuilder(base_path).with_portals().with_commands()
 
     def set_config(self, config: Config) -> None:
         self._config = config
@@ -202,11 +202,11 @@ class Application:
         return provider
 
     async def handle_command(self, input: Input) -> int:
-        from expanse.core.console.gateway import Gateway
+        from expanse.core.console.portal import Portal
 
-        kernel = await self._container.get(Gateway)
+        portal = await self._container.get(Portal)
 
-        return await kernel.handle(input)
+        return await portal.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None
@@ -219,7 +219,7 @@ class Application:
             await self._container.call(provider.boot)
 
     def _register_base_bindings(self) -> None:
-        from expanse.core.http.gateway import Gateway
+        from expanse.core.http.portal import Portal
 
         self._container.instance(self.__class__, self)
         self._container.alias(self.__class__, "app")
@@ -228,7 +228,7 @@ class Application:
         self._container.instance(Config, self._config)
         self._container.alias(Config, "config")
 
-        self._container.singleton(Gateway)
+        self._container.singleton(Portal)
 
         self._container.singleton(ExceptionHandlerContract, ExceptionHandler)
 
@@ -261,8 +261,8 @@ class Application:
                     await send({"type": "lifespan.shutdown.complete"})
                     return
 
-        from expanse.core.http.gateway import Gateway
+        from expanse.core.http.portal import Portal
 
-        gateway = await self._container.get(Gateway)
+        portal = await self._container.get(Portal)
 
-        await gateway(scope, receive, send)
+        await portal(scope, receive, send)

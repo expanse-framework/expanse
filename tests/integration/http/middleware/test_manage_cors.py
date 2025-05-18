@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from expanse.core.application import Application
-from expanse.core.http.gateway import Gateway
+from expanse.core.http.portal import Portal
 from expanse.http.middleware.manage_cors import ManageCors
 from expanse.http.responder import AsyncResponder
 from expanse.http.response import Response
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 async def setup_app(app: Application) -> None:
-    (await app.container.get(Gateway)).append_middleware(ManageCors)
+    (await app.container.get(Portal)).append_middleware(ManageCors)
 
     router: Router = await app.container.get("router")
 

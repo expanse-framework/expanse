@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
     from expanse.console.commands.command import Command
     from expanse.core.application import Application
-    from expanse.core.console.gateway import Gateway as ConsoleKernel
-    from expanse.core.http.gateway import Gateway as HTTPGateway
+    from expanse.core.console.portal import Portal as ConsolePortal
+    from expanse.core.http.portal import Portal as HTTPPortal
 
 
 class ApplicationBuilder:
@@ -23,29 +23,29 @@ class ApplicationBuilder:
         self._base_path: Path = base_path
         self._container = Container()
         self._register_commands_callback: (
-            Callable[[ConsoleKernel], Awaitable[None]] | None
+            Callable[[ConsolePortal], Awaitable[None]] | None
         ) = None
         self._configure_middleware_stack: (
-            Callable[[HTTPGateway], Awaitable[None]] | None
+            Callable[[HTTPPortal], Awaitable[None]] | None
         ) = None
-        self._configure_kernels: Callable[[Container], None] | None = None
+        self._configure_portals: Callable[[Container], None] | None = None
 
-    def with_kernels(self) -> Self:
-        def configure_kernels(container: Container) -> None:
-            from expanse.core.console.gateway import Gateway
+    def with_portals(self) -> Self:
+        def configure_portals(container: Container) -> None:
+            from expanse.core.console.portal import Portal
 
-            container.singleton(Gateway)
+            container.singleton(Portal)
 
-        self._configure_kernels = configure_kernels
+        self._configure_portals = configure_portals
 
         return self
 
     def with_commands(self, commands: list[type[Command] | Path] | None = None) -> Self:
-        async def _register_commands(kernel: ConsoleKernel) -> None:
+        async def _register_commands(portal: ConsolePortal) -> None:
             nonlocal commands
 
             if not commands:
-                commands = [kernel._app.path("console/commands")]
+                commands = [portal._app.path("console/commands")]
 
             command_paths: list[Path] = []
             command_classes: list[type[Command]] = []
@@ -56,8 +56,8 @@ class ApplicationBuilder:
 
                 command_classes.append(command)
 
-            kernel.add_command_paths(command_paths)
-            kernel.add_commands(command_classes)
+            portal.add_command_paths(command_paths)
+            portal.add_commands(command_classes)
 
         self._register_commands_callback = _register_commands
 
@@ -66,13 +66,13 @@ class ApplicationBuilder:
     def with_middleware(
         self, callback: Callable[[MiddlewareStack], Awaitable[None]]
     ) -> Self:
-        async def configure_middleware(gateway: HTTPGateway) -> None:
+        async def configure_middleware(portal: HTTPPortal) -> None:
             stack = MiddlewareStack()
 
             await callback(stack)
 
-            gateway.set_middleware(stack.middleware)
-            gateway.set_middleware_groups(stack.groups)
+            portal.set_middleware(stack.middleware)
+            portal.set_middleware_groups(stack.groups)
 
         self._configure_middleware_stack = configure_middleware
 
@@ -82,18 +82,18 @@ class ApplicationBuilder:
         from expanse.core.application import Application
 
         app = Application(self._base_path, container=self._container)
-        if self._configure_kernels is not None:
-            self._configure_kernels(self._container)
+        if self._configure_portals is not None:
+            self._configure_portals(self._container)
 
         if self._register_commands_callback is not None:
 
             async def _register_commands(container: Container) -> None:
-                from expanse.core.console.gateway import Gateway as ConsoleGateway
+                from expanse.core.console.portal import Portal as ConsolePortal
 
                 assert self._register_commands_callback is not None
 
                 await container.on_resolved(
-                    ConsoleGateway, self._register_commands_callback
+                    ConsolePortal, self._register_commands_callback
                 )
 
             app.bootstrapping(_register_commands)
@@ -101,11 +101,11 @@ class ApplicationBuilder:
         if self._configure_middleware_stack:
 
             async def _configure_middleware(container: Container) -> None:
-                from expanse.core.http.gateway import Gateway
+                from expanse.core.http.portal import Portal
 
                 assert self._configure_middleware_stack is not None
 
-                await container.on_resolved(Gateway, self._configure_middleware_stack)
+                await container.on_resolved(Portal, self._configure_middleware_stack)
 
             app.bootstrapping(_configure_middleware)
 
