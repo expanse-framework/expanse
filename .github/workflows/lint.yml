@@ -1,0 +1,35 @@
+name: Linting
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+env:
+  PYTHONUTF8: 1
+
+jobs:
+  tests:
+    name: Type checking
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --with lint
+
+      - name: Run typechecking
+        run: poetry run mypy

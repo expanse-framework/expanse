@@ -1,0 +1,61 @@
+name: Integration
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+env:
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install CLI
+        run: pipx install expanse-cli
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - name: Create project
+        run: expanse new my-app
+
+      - name: Setup project
+        run: |
+          cd my-app
+          cp .env.example .env
+          uv add git+https://github.com/expanse-framework/expanse.git@${BRANCH_NAME}
+          uv sync --group test
+
+      - name: Create keys
+        run: |
+          cd my-app
+          uv run python ./beam encryption key generate
+
+      - name: Execute migrations
+        run: |
+          cd my-app
+          uv run python ./beam db migrate
+
+      - name: Execute tests
+        run: |
+          cd my-app
+          uv run pytest tests
+
+      #- name: Start server
+      #  run: |
+      #    cd my-app
+      #    poetry run python ./beam serve --port 8000 & curl -s http://localhost:8000
