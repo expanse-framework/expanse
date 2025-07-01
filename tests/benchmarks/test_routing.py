@@ -21,10 +21,14 @@ class Controller:
 def test_simple_routes(
     router: Router, client: TestClient, benchmark: BenchmarkFixture
 ) -> None:
+    router.handler(index)
+
     benchmark(client.get, "/")
 
 
 def test_controller_route(
     router: Router, client: TestClient, benchmark: BenchmarkFixture
 ) -> None:
+    router.controller(Controller)
+
     benchmark(client.get, "/controller")
