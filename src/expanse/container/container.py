@@ -192,32 +192,27 @@ class Container:
         return await self._resolve(abstract)
 
     async def call(
-        self, callable: Callable[..., Any], *args: Any, **kwargs: Any
+        self,
+        callable_: Callable[..., Any] | tuple[type[T], str],
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
-        if (
-            isinstance(callable, types.FunctionType)
-            and "." in callable.__qualname__
-            and not inspect.ismethod(callable)
-            and "<locals>" not in callable.__qualname__
-        ):
-            # We have an instance method, so we will retrieve the corresponding class,
-            # resolve it and call the method.
-            class_name, func_name = callable.__qualname__.rsplit(".", maxsplit=1)
-            class_: type = callable.__globals__[class_name]
+        if isinstance(callable_, tuple):
+            instance: Any = await self.get(callable_[0])
 
-            instance: Any = await self.get(class_)
+            callable_ = getattr(instance, callable_[1])
 
-            callable = getattr(instance, func_name)
+        assert callable(callable_)
 
         (
             positional,
             keywords,
-        ) = await self._resolve_callable_dependencies(callable, *args, **kwargs)
+        ) = await self._resolve_callable_dependencies(callable_, *args, **kwargs)
 
-        if asyncio.iscoroutinefunction(callable):
-            return await callable(*positional, **keywords)
+        if asyncio.iscoroutinefunction(callable_):
+            return await callable_(*positional, **keywords)
 
-        return await run_in_threadpool(callable, *positional, **keywords)
+        return await run_in_threadpool(callable_, *positional, **keywords)
 
     def has_scoped_bindings(self) -> bool:
         return bool(self._scoped["bindings"])
@@ -351,13 +346,28 @@ class Container:
     async def _resolve_callable_dependencies(
         self, callable: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> tuple[list[Any], dict[str, Any]]:
+        return await self._resolve_signature(
+            inspect.signature(callable), args, kwargs, callable=callable
+        )
+
+    async def _resolve_signature(
+        self,
+        signature: inspect.Signature,
+        args: tuple[Any, ...] | None = None,
+        kwargs: dict[str, Any] | None = None,
+        callable: Callable[..., Any] | None = None,
+    ) -> tuple[list[Any], dict[str, Any]]:
+        args = args or ()
+        kwargs = kwargs or {}
         positional: list[Any] = []
         keywords: dict[str, Any] = {}
         arguments = list(args)
-        _globals = getattr(callable, "__globals__", None)
+        _globals = (
+            getattr(callable, "__globals__", None) if callable is not None else None
+        )
 
-        for parameter in inspect.signature(callable).parameters.values():
-            klass = self._get_class(parameter)
+        for parameter in signature.parameters.values():
+            klass = self._get_class(parameter, _globals=_globals)
 
             if klass is None:
                 await self._resolve_primitive(
@@ -377,7 +387,7 @@ class Container:
                     raise ResolutionException(
                         f'Unable to resolve dependency with name "{parameter.name}" '
                         f'(type: {klass.__module__ + "." + klass.__qualname__}) '
-                        f'in "{callable.__module__ + "." + callable.__qualname__}"'
+                        f'{f"in {callable.__qualname__}" if callable else ""}'
                     ) from e
 
         return positional, keywords
@@ -657,9 +667,9 @@ class ScopedContainer(Container):
         self._base_container = base_container
 
         # Bind scoped bindings from the base container
-        self._bindings.update(
-            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
-        )
+        self._bindings = {
+            **self._base_container._scoped["bindings"],
+        }
 
         # Setup terminating callbacks
         self._terminating_callbacks = [
