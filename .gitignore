@@ -17,6 +17,7 @@ pip-log.txt
 .tox
 nosetests.xml
 .pytest_cache
+.codspeed
 
 .DS_Store
 .idea/*
