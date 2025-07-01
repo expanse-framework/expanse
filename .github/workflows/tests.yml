@@ -11,7 +11,7 @@ env:
 jobs:
   linux_tests:
     name: Ubuntu / ${{ matrix.python-version }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: [ "3.11", "3.12", "3.13" ]
