@@ -23,7 +23,13 @@ def test_simple_routes(
 ) -> None:
     router.handler(index)
 
-    benchmark(client.get, "/")
+    client.get("/")
+
+    def run() -> None:
+        for _ in range(1000):
+            client.get("/")
+
+    benchmark(run)
 
 
 def test_controller_route(
@@ -31,4 +37,10 @@ def test_controller_route(
 ) -> None:
     router.controller(Controller)
 
-    benchmark(client.get, "/controller")
+    client.get("/controller")
+
+    def run() -> None:
+        for _ in range(1000):
+            client.get("/controller")
+
+    benchmark(run)
