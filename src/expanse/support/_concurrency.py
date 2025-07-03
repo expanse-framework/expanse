@@ -5,6 +5,7 @@ import functools
 
 from collections import deque
 from collections.abc import AsyncGenerator
+from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Iterator
@@ -14,6 +15,7 @@ from typing import Generic
 from typing import ParamSpec
 from typing import TypeVar
 
+import anyio.from_thread
 import anyio.to_thread
 
 
@@ -84,6 +86,16 @@ class AsyncIteratorWrapper(Generic[T]):
 
     async def __anext__(self) -> T:
         return await self.generator.__anext__()
+
+
+def run_async_as_sync(
+    func: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
+) -> T:
+    """
+    Run an async function in a synchronous context.
+    """
+    with anyio.from_thread.start_blocking_portal() as portal:
+        return portal.call(func, *args, **kwargs)
 
 
 class AsyncRLock:

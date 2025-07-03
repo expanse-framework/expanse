@@ -166,7 +166,7 @@ class Container:
         (
             positional,
             keywords,
-        ) = await self._resolve_callable_dependencies(function, *args)
+        ) = await self.resolve_callable_dependencies(function, *args)
 
         if isasyncgenfunction(concrete):
             generator = concrete(*positional, **keywords)
@@ -219,7 +219,7 @@ class Container:
         (
             positional,
             keywords,
-        ) = await self._resolve_callable_dependencies(callable_, *args, **kwargs)
+        ) = await self.resolve_callable_dependencies(callable, *args, **kwargs)
 
         if asyncio.iscoroutinefunction(callable_):
             return await callable_(*positional, **keywords)
@@ -355,7 +355,7 @@ class Container:
 
         return obj
 
-    async def _resolve_callable_dependencies(
+    async def resolve_callable_dependencies(
         self, callable: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> tuple[list[Any], dict[str, Any]]:
         return await self._resolve_signature(
