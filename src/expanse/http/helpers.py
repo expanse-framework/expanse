@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import NoReturn
 
-from baize.asgi import JSONResponse
+import msgspec.json
 
 from expanse.core.helpers import _get_container
 from expanse.core.http.exceptions import HTTPException
@@ -34,9 +34,11 @@ def json(
     **kwargs: Any,
 ) -> Response:
     return Response(
-        response=JSONResponse(
-            content, status_code=status_code, headers=headers, **kwargs
-        )
+        msgspec.json.encode(content),
+        status_code=status_code,
+        content_type="application/json",
+        headers=headers,
+        **kwargs,
     )
 
 

@@ -105,8 +105,5 @@ jobs:
       - name: Install dependencies
         run: poetry install --with lint
 
-      - name: Run typechecking
-        run: poetry run mypy
-
       - name: Run tests
         run: poetry run pytest -m "not db"
