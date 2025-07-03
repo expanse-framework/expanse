@@ -24,6 +24,7 @@ from expanse.routing.finder import Finder
 from expanse.routing.pipeline import Pipeline
 from expanse.routing.route import Route
 from expanse.routing.route_group import RouteGroup
+from expanse.support._concurrency import run_in_threadpool
 from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
 
@@ -180,7 +181,22 @@ class Router(RouterContract):
                             request.query_params
                         )
 
-            raw_response = await container.call(route.endpoint, **arguments)
+            if isinstance(route.endpoint, tuple):
+                instance: type = await container.get(route.endpoint[0])
+                endpoint = getattr(instance, route.endpoint[1])
+            else:
+                endpoint = route.endpoint
+
+            positional, keywords = await container._resolve_signature(
+                route.signature, kwargs=arguments, callable=endpoint
+            )
+
+            if route.is_async:
+                raw_response = await endpoint(*positional, **keywords)
+            else:
+                raw_response = await run_in_threadpool(
+                    endpoint, *positional, **keywords
+                )
 
             # Do not go through the response adapter if the response is already a Response instance
             if isinstance(raw_response, Response):

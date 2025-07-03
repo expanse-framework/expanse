@@ -55,9 +55,19 @@ class RoutesListCommand(Command):
 
             self.line("".join(line))
 
+            endpoint = route.endpoint
+            if isinstance(endpoint, tuple):
+                endpoint_name = (
+                    endpoint[0].__module__
+                    + "."
+                    + endpoint[0].__qualname__
+                    + "."
+                    + endpoint[1]
+                )
+            else:
+                endpoint_name = route.endpoint.__module__ + "." + endpoint.__qualname__
             if self._io.is_verbose():
                 padding = " " * (methods_length + max_methods_length - methods_length)
-                endpoint = route.endpoint.__module__ + "." + route.endpoint.__qualname__
-                self.line(f"  {padding}  <options=dark>{endpoint}</>")
+                self.line(f"  {padding}  <options=dark>{endpoint_name}</>")
 
         return 0

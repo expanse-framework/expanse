@@ -244,11 +244,11 @@ async def test_call_can_call_instance_methods() -> None:
     container.instance(Container, container)
     container.register(Abstract, Concrete)
 
-    id1 = await container.call(Foo.get_id)
+    id1 = await container.call((Foo, "get_id"))
 
     assert isinstance(id1, str)
 
-    id2 = await container.call(Foo.get_id)
+    id2 = await container.call((Foo, "get_id"))
 
     assert isinstance(id2, str)
     assert id1 != id2
@@ -256,7 +256,9 @@ async def test_call_can_call_instance_methods() -> None:
     container.singleton(Foo)
     await container.get(Foo)
 
-    assert (await container.call(Foo.get_id)) == (await container.call(Foo.get_id))
+    assert (await container.call((Foo, "get_id"))) == (
+        await container.call((Foo, "get_id"))
+    )
 
 
 async def test_call_can_call_class_methods() -> None:
