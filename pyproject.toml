@@ -160,3 +160,8 @@ exclude_lines = [
     "@abstractmethod",
     "raise NotImplementedError",
 ]
+
+[tool.basedpyright]
+reportUnusedCallResult = false
+reportExplicitAny = false
+pythonVersion = "3.11"

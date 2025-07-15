@@ -15,6 +15,7 @@ from baize.asgi.requests import Request as BaseRequest
 from expanse.http.accept_header import AcceptHeader
 from expanse.http.exceptions import ConflictingForwardedHeadersError
 from expanse.http.exceptions import SuspiciousOperationError
+from expanse.http.header_bag import HeaderBag
 from expanse.http.trusted_header import TrustedHeader
 from expanse.http.url import URL
 
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
     from expanse.routing.route import Route
     from expanse.session.session import HTTPSession
+    from expanse.types import PartialScope
     from expanse.types import Receive
     from expanse.types import Scope
     from expanse.types import Send
@@ -41,18 +43,34 @@ class Request(BaseRequest):
     def __init__(
         self, scope: Scope, receive: Receive = empty_receive, send: Send = empty_send
     ):
-        super().__init__(scope=scope, receive=receive, send=send)
+        self._scope: Scope  # type: ignore[assignment]
+
+        super().__init__(scope=scope, receive=receive, send=send)  # type: ignore[arg-type]
 
         self._route: Route | None = None
         self._session: HTTPSession | None = None
         self._trusted_proxies: list[str] = []
         self._trusted_headers: list[TrustedHeader] = []
         self._trusted_hosts: list[str] = ["*"]
-        self._url = URL(scope=scope)
+        self._url: URL = URL.from_scope(scope)
 
     @cached_property
     def url(self) -> URL:  # type: ignore[override]
         return self._url.replace(scheme=self.scheme, hostname=self.http_host, port=None)
+
+    @cached_property
+    def headers(self) -> HeaderBag:  # type: ignore[override]
+        """
+        Get the request headers as a dictionary.
+
+        The keys are normalized to lowercase.
+        """
+        return HeaderBag(
+            {
+                key.decode("latin-1").lower(): value.decode("latin-1")
+                for key, value in self._scope.get("headers", [])
+            }
+        )
 
     @cached_property
     def host(self) -> str:
@@ -326,36 +344,44 @@ class Request(BaseRequest):
 
     @classmethod
     def create(
-        cls, raw_url: str, method: str = "GET", scope: dict[str, Any] | None = None
+        cls, raw_url: str, method: str = "GET", scope: PartialScope | None = None
     ) -> Request:
         default_headers = {
             b"User-Agent": b"Expanse",
             b"Accept": b"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             b"Accept-Language": b"en-us,en;q=0.5",
         }
-        base_scope = {
+        base_scope: Scope = {
             "type": "http",
+            "asgi": {
+                "version": "3.0",
+                "spec_version": "2.3",
+            },
+            "client": ("127.0.0.1", 80),
             "scheme": "http",
-            "server": ["localhost", 80],
+            "server": ("localhost", 80),
             "headers": [],
-            "REMOTE_ADDR": "127.0.0.1",
             "root_path": "",
             "http_version": "1.1",
             "path": "",
-            "raw_path": "",
+            "query_string": b"",
+            "raw_path": b"",
             "method": method.upper(),
-            **(scope or {}),
         }
+
+        if scope is not None:
+            base_scope.update(scope)
 
         headers = base_scope["headers"]
         header_names = {header[0] for header in headers}
 
         for default_header in default_headers:
             if default_header not in header_names:
-                headers.append([default_header, default_headers[default_header]])
+                headers.append((default_header, default_headers[default_header]))
 
         url = URL(raw_url)
 
+        assert base_scope["server"] is not None
         if url.hostname is not None:
             base_scope["server"] = (url.hostname, base_scope["server"][1])
 
@@ -376,13 +402,13 @@ class Request(BaseRequest):
             path = "/"
 
         base_scope["path"] = path
-        base_scope["raw_path"] = path
+        base_scope["raw_path"] = path.encode()
 
         query_string = ""
         if url.query:
             query_string = url.query
 
-        base_scope["query_string"] = query_string
+        base_scope["query_string"] = query_string.encode()
 
         return cls(scope=base_scope)
 
@@ -441,8 +467,8 @@ class Request(BaseRequest):
 
         raise ConflictingForwardedHeadersError(
             f"The request has both a {TrustedHeader.FORWARDED} header "
-            f"and a {header} header, which are conflicting. "
-            f"You should configure your proxy to remove one of them."
+            + f"and a {header} header, which are conflicting. "
+            + "You should configure your proxy to remove one of them."
         )
 
 

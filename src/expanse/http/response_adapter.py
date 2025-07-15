@@ -25,6 +25,7 @@ class ResponseAdapter:
         self._adapters: dict[type, _Adapter] = {
             str: self._adapt_string,
             Sequence: self._adapt_sequence,
+            dict: self._adapt_dict,
         }
 
     async def adapt(
@@ -62,22 +63,25 @@ class ResponseAdapter:
             return None
 
         async def _adapter(response: Any, **kwargs) -> Response:
-            from expanse.http.responder import AsyncResponder
+            from expanse.http.helpers import json
 
-            responder = await self._container.get(AsyncResponder)
-
-            return responder.json(await serializer(response))
+            return json(await serializer(response))
 
         return _adapter
 
     async def _adapt_string(
         self, response: str, container: Container, **kwargs
     ) -> Response:
-        from expanse.http.responder import AsyncResponder
+        from expanse.http.helpers import json
 
-        responder = await container.get(AsyncResponder)
+        return json(response)
 
-        return responder.json(response)
+    async def _adapt_dict(
+        self, response: dict[str, Any], container: Container
+    ) -> Response:
+        from expanse.http.helpers import json
+
+        return json(response)
 
     async def _adapt_sequence(
         self,
@@ -86,7 +90,7 @@ class ResponseAdapter:
         *,
         expected_type: type | None = None,
     ) -> Response:
-        from expanse.http.responder import AsyncResponder
+        from expanse.http.helpers import json
 
         if expected_type is not None:
             origin: type | None = get_origin(expected_type)
@@ -107,9 +111,7 @@ class ResponseAdapter:
             for item in response
         ]
 
-        responder = await container.get(AsyncResponder)
-
-        return responder.json(new_response)
+        return json(new_response)
 
     def _find_serializer(
         self, obj: Any, type_: type | None = None

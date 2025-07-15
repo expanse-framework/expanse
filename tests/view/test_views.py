@@ -1,10 +1,10 @@
 from expanse.contracts.routing.router import Router
 from expanse.testing.client import TestClient
 from expanse.view.view import View
-from expanse.view.view_factory import AsyncViewFactory
+from expanse.view.view_factory import ViewFactory
 
 
-async def simple_view(view: AsyncViewFactory) -> View:
+async def simple_view(view: ViewFactory) -> View:
     return view.make("simple")
 
 

@@ -48,7 +48,7 @@ def test_router_should_respond_to_head_requests(
     router: Router, client: TestClient
 ) -> None:
     router.get("/test", endpoint)
-    router.get("/test/{foo}", endpoint)
+    router.get("/test/{foo}", endpoint2)
 
     response = client.head("/test")
 

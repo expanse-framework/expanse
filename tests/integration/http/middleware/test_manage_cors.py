@@ -4,8 +4,9 @@ import pytest
 
 from expanse.core.application import Application
 from expanse.core.http.portal import Portal
+from expanse.http.helpers import abort
+from expanse.http.helpers import json
 from expanse.http.middleware.manage_cors import ManageCors
-from expanse.http.responder import AsyncResponder
 from expanse.http.response import Response
 from expanse.testing.client import TestClient
 
@@ -20,11 +21,11 @@ async def setup_app(app: Application) -> None:
 
     router: Router = await app.container.get("router")
 
-    async def ping(responder: AsyncResponder) -> Response:
-        return responder.json("pong")
+    async def ping() -> Response:
+        return json("pong")
 
-    async def error(responder: AsyncResponder) -> Response:
-        return responder.abort(500)
+    async def error() -> Response:
+        return abort(500)
 
     router.post("/api/ping", ping)
     router.post("/api/error", error)

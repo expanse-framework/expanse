@@ -1,15 +1,14 @@
-from typing import Any
-
 import pytest
 
 from expanse.http.request import Request
+from expanse.types import Scope
 
 
 @pytest.mark.parametrize(
     "content_type,expected",
     [("application/json", True), ("application/foo+json", True), ("text/html", False)],
 )
-def test_is_json(scope: dict[str, Any], content_type: str, expected: bool) -> None:
+def test_is_json(scope: Scope, content_type: str, expected: bool) -> None:
     scope["headers"].append((b"content-type", content_type.encode()))
 
     request = Request(scope)
@@ -29,7 +28,7 @@ def test_is_json(scope: dict[str, Any], content_type: str, expected: bool) -> No
         ("application/json;q=0.8, text/html;q=0.8", True),
     ],
 )
-def test_wants_json(scope: dict[str, Any], header: str, expected: bool) -> None:
+def test_wants_json(scope: Scope, header: str, expected: bool) -> None:
     del scope["headers"][2]
     scope["headers"].append((b"accept", header.encode()))
 

@@ -465,6 +465,7 @@ class Container:
         *,
         _globals: dict[str, Any] | None = None,
     ) -> Any:
+        result: Any | list[Any]
         match parameter.kind:
             case parameter.POSITIONAL_ONLY:
                 klass = self._get_class(parameter, _globals=_globals)

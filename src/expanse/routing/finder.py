@@ -3,11 +3,11 @@ import re
 from collections import defaultdict
 from collections.abc import Callable
 from collections.abc import Iterator
+from inspect import Parameter
 from typing import Any
 from typing import Literal
 from typing import NoReturn
 from typing import TypedDict
-from typing import get_type_hints
 
 from expanse.contracts.routing.route_collection import RouteCollection
 from expanse.core.http.exceptions import HTTPException
@@ -88,7 +88,6 @@ class Finder(RouteCollection):
         matches: Iterator[re.Match[str]] = re.finditer(
             r"\{([\w*]+):?([^/]*)}|\[|]|[^/\[\]{}]+", pattern
         )
-        hints = get_type_hints(route.endpoint)
 
         for match in matches:
             catch_all = False
@@ -119,7 +118,14 @@ class Finder(RouteCollection):
 
                 # Dynamic
                 if token not in node["children"]:
-                    converter = hints.get(param)
+                    converter: Callable[[str], Any] | None = None
+                    if (
+                        param in route.signature.parameters
+                        and route.signature.parameters[param].annotation
+                        and route.signature.parameters[param].annotation
+                        is not Parameter.empty
+                    ):
+                        converter = route.signature.parameters[param].annotation
 
                     node["children"][token] = {
                         "routes": {},

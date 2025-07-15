@@ -1,15 +1,22 @@
 from collections.abc import Mapping
 from collections.abc import MutableMapping
-from collections.abc import dict_items
 from typing import Literal
+from typing import TypeVar
 from typing import overload
 
 
-class HeaderBag(MutableMapping[str, str]):
-    __slots__ = ("_headers",)
+T = TypeVar("T")
 
-    def __init__(self, headers: MutableMapping[str, str] | None = None) -> None:
+
+class HeaderBag(MutableMapping[str, str]):
+    __slots__ = ("_headers", "_normalized")
+
+    def __init__(self, headers: Mapping[str, str] | None = None) -> None:
+        if headers is None:
+            headers = {}
+
         self._headers: dict[str, list[str | None]] = {}
+        self._normalized: dict[str, str] = {}
 
         for header_name, header_value in headers.items():
             self.set(header_name, header_value)
@@ -18,35 +25,38 @@ class HeaderBag(MutableMapping[str, str]):
     def all(self, key: str) -> list[str | None]: ...
 
     @overload
-    def all(self, key: Literal[None] = None) -> dict[str, list[str]]: ...
+    def all(self, key: Literal[None] = None) -> dict[str, list[str | None]]: ...
 
-    def all(self, key: str | None = None) -> dict[str, list[str]]:
+    def all(
+        self, key: str | None = None
+    ) -> list[str | None] | dict[str, list[str | None]]:
         if key is None:
             return self._headers
 
         normalized_key = self._normalize_name(key)
 
-        return {normalized_key: self._headers.get(normalized_key, [])}
+        return self._headers.get(normalized_key, []) or []
 
-    def get(self, key: str, default: str | None = None) -> str | None:
+    @overload
+    def get(self, key: str, /) -> str | None: ...
+
+    @overload
+    def get(self, key: str, /, default: str | T) -> str | T: ...
+
+    def get(self, key: str, /, default: str | T | None = None) -> str | T | None:
         headers = self.all(key)
 
-        normalized_key = self._normalize_name(key)
-
-        if normalized_key not in headers:
+        if not headers:
             return default
-
-        if headers[0] is None:
-            return None
 
         return headers[0]
 
     def set(
-        self, name: str, value: str | list[str] | None, replace: bool = True
+        self, name: str, value: str | list[str | None] | None, replace: bool = True
     ) -> None:
         name = self._normalize_name(name)
 
-        if isinstance(value, str):
+        if isinstance(value, str) or value is None:
             value = [value]
 
         if replace or name not in self._headers:
@@ -64,16 +74,25 @@ class HeaderBag(MutableMapping[str, str]):
             del self._headers[name]
 
     def _normalize_name(self, name: str) -> str:
-        return name.lower().replace("_", "-")
+        if name in self._normalized:
+            return self._normalized[name]
 
-    def __getitem__(self, name: str) -> str | None:
+        self._normalized[name] = name.lower()
+
+        return self._normalized[name]
+
+    def __getitem__(self, name: str) -> str:
         name = self._normalize_name(name)
         if name not in self._headers:
             raise KeyError(f"Header '{name}' not found.")
 
-        return self.get(name)
+        value = self.get(name)
 
-    def __setitem__(self, name: str, value: str | list[str] | None) -> None:
+        assert isinstance(value, str)
+
+        return value
+
+    def __setitem__(self, name: str, value: str | list[str | None] | None) -> None:
         self.set(name, value, replace=True)
 
     def __delitem__(self, name: str) -> None:
@@ -88,29 +107,25 @@ class HeaderBag(MutableMapping[str, str]):
     def __repr__(self) -> str:
         return f"HeaderBag({self._headers})"
 
-    def __contains__(self, name: str) -> bool:
-        return self.has(name)
-
-    def clear(self) -> None:
-        self._headers.clear()
-
-    def pop(self, name: str, default: str | None = None) -> str | None:
-        return self._headers.pop(name, default)
-
-    def setdefault(self, key, default=None, /) -> None:
-        key = self._normalize_name(key)
-
-        self._headers.setdefault(key, default)
-
-    def update(self, other: Mapping[str, str], **kwargs) -> None:
-        for key, value in {**other, **kwargs}.items():
-            self.set(key, value, replace=True)
-
-    def items(self) -> dict_items[str, list[str]]:
-        return self._headers.items()
-
     def encode(self) -> list[tuple[bytes, bytes]]:
         return [
-            (k.encode("latin-1"), ",".join(v).encode("latin-1"))
+            (
+                k.encode("latin-1"),
+                ",".join(_ for _ in v if _ is not None).encode("latin-1"),
+            )
             for k, v in self._headers.items()
         ]
+
+    def __str__(self) -> str:
+        if not self._headers:
+            return ""
+
+        headers = sorted(self._headers.items(), key=lambda x: x[0])
+
+        return (
+            "\r\n".join(
+                f"{k.title()}: {', '.join(_ for _ in v if _ is not None) if v else ''}"
+                for k, v in headers
+            )
+            + "\r\n"
+        )
