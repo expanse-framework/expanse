@@ -52,6 +52,18 @@ class _Scoped(TypedDict):
 
 
 class Container:
+    __slots__ = (
+        "_after_resolving_callbacks",
+        "_aliases",
+        "_bindings",
+        "_instances",
+        "_lock",
+        "_resolved",
+        "_scoped",
+        "_scoped_bindings",
+        "_terminating_callbacks",
+    )
+
     def __init__(self) -> None:
         self._bindings: dict[str | type, Any] = {}
         self._resolved: dict[str | type, bool] = {}
@@ -472,7 +484,12 @@ class Container:
 
                 assert klass is not None
 
-                if self.has(self._get_alias(klass)):
+                if klass is Container:
+                    # Shortcut for the container itself
+                    # We previously registered the container as an instance,
+                    # but it causes performance issues when creating scoped containers
+                    result = self
+                elif self.has(self._get_alias(klass)):
                     result = await self.get(self._get_alias(klass))
                 else:
                     try:
@@ -500,7 +517,12 @@ class Container:
 
                     assert klass is not None
 
-                    if self.has(self._get_alias(klass)):
+                    if klass is Container:
+                        # Shortcut for the container itself
+                        # We previously registered the container as an instance,
+                        # but it causes performance issues when creating scoped containers
+                        result = self
+                    elif self.has(self._get_alias(klass)):
                         result = await self.get(self._get_alias(klass))
                     else:
                         try:
@@ -530,7 +552,13 @@ class Container:
 
                     assert klass is not None
 
-                    result = await self.get(self._get_alias(klass))
+                    if klass is Container:
+                        # Shortcut for the container itself
+                        # We previously registered the container as an instance,
+                        # but it causes performance issues when creating scoped containers
+                        result = self
+                    else:
+                        result = await self.get(self._get_alias(klass))
 
                     keywords[parameter.name] = result
                 return
@@ -540,7 +568,13 @@ class Container:
 
                 assert klass is not None
 
-                result = await self.get(self._get_alias(klass))
+                if klass is Container:
+                    # Shortcut for the container itself
+                    # We previously registered the container as an instance,
+                    # but it causes performance issues when creating scoped containers
+                    result = self
+                else:
+                    result = await self.get(self._get_alias(klass))
 
                 result = [result] if not isinstance(result, tuple) else result
 
@@ -662,15 +696,17 @@ class Container:
 
 
 class ScopedContainer(Container):
+    __slots__ = ("_base_container",)
+
     def __init__(self, base_container: Container):
         super().__init__()
 
         self._base_container = base_container
 
         # Bind scoped bindings from the base container
-        self._bindings = {
-            **self._base_container._scoped["bindings"],
-        }
+        self._bindings.update(
+            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
+        )
 
         # Setup terminating callbacks
         self._terminating_callbacks = [
@@ -681,11 +717,6 @@ class ScopedContainer(Container):
         self._after_resolving_callbacks = {
             **self._base_container._scoped["after_resolving_callbacks"]
         }
-
-        # Copy instances from the base container
-        self._instances.update(self._base_container._instances)
-
-        self.instance(Container, self)
 
     def bound(self, abstract: str | type) -> bool:
         return self._base_container.bound(abstract) or super().bound(abstract)
