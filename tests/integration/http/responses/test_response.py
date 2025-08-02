@@ -24,3 +24,22 @@ def test_json_response(router: Registrar, client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, World!"}
     assert response.headers["Content-Type"] == "application/json"
+
+
+def test_deferred_action(router: Registrar, client: TestClient) -> None:
+    executed: bool = False
+
+    async def long_running_action() -> None:
+        nonlocal executed
+        executed = True
+
+    async def deferred_action() -> Response:
+        return Response("Response").defer(long_running_action)
+
+    router.get("/deferred", deferred_action)
+
+    response = client.get("/deferred")
+    assert response.status_code == 200
+    assert response.text == "Response"
+    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert executed
