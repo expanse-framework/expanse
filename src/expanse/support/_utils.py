@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import functools
+import inspect
 import re
 import unicodedata
 
@@ -10,12 +13,18 @@ from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ForwardRef
+from typing import Generic
+from typing import TypeVar
 from typing import _eval_type  # type: ignore[attr-defined]
+from typing import overload
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
     from types import ModuleType
+
+T = TypeVar("T")
 
 
 def string_to_class(string: str) -> type[Any]:
@@ -114,3 +123,32 @@ def slugify(value, allow_unicode=False):
         )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+class cached_property(Generic[T]):  # noqa: N801
+    """
+    A property that is only computed once per instance and then replaces
+    itself with an ordinary attribute. Deleting the attribute resets the
+    property.
+    """
+
+    def __init__(self, func: Callable[..., T]) -> None:
+        self.func: Callable[..., T] = func
+        functools.update_wrapper(self, func)  # type: ignore[arg-type]
+
+    @overload
+    def __get__(self, obj: None, cls: type) -> cached_property[T]: ...
+
+    @overload
+    def __get__(self, obj: object, cls: type) -> T: ...
+
+    def __get__(self, obj: object | None, cls: type) -> T | cached_property[T]:
+        value: T | cached_property[T]
+        if obj is None:
+            value = self
+        else:
+            result = self.func(obj)
+            if inspect.isawaitable(result):
+                result = asyncio.ensure_future(result)  # type: ignore[assignment]
+            value = obj.__dict__[self.func.__name__] = result
+        return value

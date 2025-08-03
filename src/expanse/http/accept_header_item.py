@@ -6,6 +6,8 @@ from typing import Self
 
 
 class AcceptHeaderItem:
+    __slots__ = ("_attributes", "_index", "_quality", "_value")
+
     def __init__(self, value: str, attributes: dict[str, str] | None = None) -> None:
         self._value: str = value
         self._attributes: dict[str, str] = {}
