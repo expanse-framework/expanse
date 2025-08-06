@@ -8,7 +8,6 @@ from datetime import datetime
 from datetime import timezone
 from email.utils import parsedate_to_datetime
 from http import cookies as http_cookies
-from json import JSONDecodeError
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
@@ -519,7 +518,7 @@ class Request:
                 return msgspec.json.decode(
                     data.decode(self.content_type.options.get("charset", "utf8"))
                 )
-            except JSONDecodeError as exc:
+            except msgspec.DecodeError as exc:
                 raise MalformedJSONError(str(exc)) from None
 
         raise UnsupportedContentTypeError("application/json")
