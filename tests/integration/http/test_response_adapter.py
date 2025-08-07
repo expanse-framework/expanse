@@ -1,5 +1,5 @@
 from expanse.contracts.routing.router import Router
-from expanse.http.helpers import respond
+from expanse.http.helpers import text
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
 from expanse.testing.client import TestClient
@@ -20,7 +20,7 @@ async def custom_response() -> CustomResponseType:
 
 async def configure_adapter(adapter: ResponseAdapter) -> None:
     async def adapt_response(response: CustomResponseType) -> Response:
-        return (await respond()).text(response.content)
+        return text(response.content)
 
     adapter.register_adapter(CustomResponseType, adapt_response)
 

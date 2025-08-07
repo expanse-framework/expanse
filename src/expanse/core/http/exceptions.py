@@ -1,4 +1,4 @@
-from collections.abc import MutableMapping
+from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any
 
@@ -8,14 +8,14 @@ class HTTPException(Exception):
         self,
         status_code: int,
         detail: str | None = None,
-        headers: MutableMapping[str, Any] | None = None,
+        headers: Mapping[str, Any] | None = None,
     ) -> None:
         if detail is None:
             detail = HTTPStatus(status_code).phrase
 
-        self.status_code = status_code
-        self.detail = detail
-        self.headers = headers
+        self.status_code: int = status_code
+        self.detail: str = detail
+        self.headers: Mapping[str, Any] = headers or {}
 
     def __str__(self) -> str:
         return self.detail

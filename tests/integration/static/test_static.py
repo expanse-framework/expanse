@@ -49,7 +49,7 @@ async def test_view_static_function_is_registered_successfully(
     await provider.boot()
 
     async def foo() -> Response:
-        return await view("foo")
+        return view("foo")
 
     (await client.app.container.get(Router)).get("/foo", foo)
 
@@ -70,7 +70,7 @@ async def test_static_url_includes_base_url(client: TestClient) -> None:
     await provider.boot()
 
     async def foo() -> Response:
-        return await view("foo")
+        return view("foo")
 
     (await client.app.container.get(Router)).get("/foo", foo)
 
@@ -92,7 +92,7 @@ async def test_static_url_with_empty_prefix(client: TestClient) -> None:
     await provider.boot()
 
     async def foo() -> Response:
-        return await view("foo")
+        return view("foo")
 
     (await client.app.container.get(Router)).get("/foo", foo)
 

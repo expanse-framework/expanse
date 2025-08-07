@@ -4,7 +4,7 @@ from expanse.view.view import View
 from expanse.view.view_factory import ViewFactory
 
 
-def simple_view(view: ViewFactory) -> View:
+async def simple_view(view: ViewFactory) -> View:
     return view.make("globals")
 
 

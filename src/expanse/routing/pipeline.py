@@ -15,6 +15,8 @@ class Pipeline:
     a request — and corresponding response — must go through.
     """
 
+    __slots__ = ("_container", "_pipes", "_request")
+
     def __init__(self, container: Container) -> None:
         self._container = container
         self._pipes: list[Callable[[Request, RequestHandler], Awaitable[Response]]] = []

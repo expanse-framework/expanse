@@ -33,4 +33,4 @@ class URLPath(str):
 
         netloc = self.host or base_url.netloc
         path = base_url.path.rstrip("/") + str(self)
-        return URL(scheme=scheme, netloc=netloc, path=path)
+        return URL.from_components(scheme=scheme, netloc=netloc, path=path)

@@ -11,7 +11,7 @@ from expanse.support.service_provider import ServiceProvider
 if TYPE_CHECKING:
     from expanse.core.console.portal import Portal
     from expanse.exceptions.handler import ExceptionHandler
-    from expanse.view.synchronous.view_factory import ViewFactory
+    from expanse.view.view_factory import ViewFactory
 
 
 class SessionServiceProvider(ServiceProvider):

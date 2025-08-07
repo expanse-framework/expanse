@@ -29,6 +29,7 @@ pydantic-settings = "^2.8.1"
 pygments = "^2.18.0"
 sqlalchemy = { version = "^2.0.25", extras = ["asyncio"] }
 uvicorn = { version = ">=0.23.2", extras = ["standard"] }
+msgspec = "^0.19.0"
 
 [tool.poetry.group.test.dependencies]
 aiomysql = "^0.2.0"
@@ -159,3 +160,8 @@ exclude_lines = [
     "@abstractmethod",
     "raise NotImplementedError",
 ]
+
+[tool.basedpyright]
+reportUnusedCallResult = false
+reportExplicitAny = false
+pythonVersion = "3.11"

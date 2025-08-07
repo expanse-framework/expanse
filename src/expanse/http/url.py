@@ -1,56 +1,51 @@
 import typing
 
-from collections.abc import MutableMapping
 from urllib.parse import SplitResult
 from urllib.parse import urlsplit
 
 from expanse.http.url_path import URLPath
 from expanse.support._utils import string_matches
+from expanse.types import Scope
 
 
 class URL:
     __slots__ = ("_components", "_url")
 
-    def __init__(
-        self,
-        url: str = "",
-        *,
-        scope: MutableMapping[str, typing.Any] | None = None,
-        environ: MutableMapping[str, typing.Any] | None = None,
-        **components: typing.Any,
-    ) -> None:
-        if components:
-            assert not url, 'Cannot set both "url" and "**components".'
-            url = URL("").replace(**components).components.geturl()
-        elif scope is not None:
-            scheme = scope.get("scheme", "http")
-            server = scope.get("server", None)
-            path = scope.get("root_path", "") + scope["path"]
-            query_string = scope.get("query_string", b"")
+    def __init__(self, url: str = "") -> None:
+        self._url: str = url
+        self._components: SplitResult = urlsplit(url)
 
-            host_header = None
-            for key, value in scope["headers"]:
-                if key == b"host":
-                    host_header = value.decode("latin-1")
-                    break
-            url = self._build_url(scheme, path, query_string, server, host_header)
-        elif environ is not None:
-            scheme = environ["wsgi.url_scheme"]
-            server = (environ["SERVER_NAME"], int(environ["SERVER_PORT"]))
-            path = (
-                (environ.get("SCRIPT_NAME", "") + environ.get("PATH_INFO", ""))
-                .encode("latin1")
-                .decode("utf8")
-            )
-            query_string = environ.get("QUERY_STRING", "").encode("latin-1")
-            host_header = environ.get("HTTP_HOST", None)
-            url = self._build_url(scheme, path, query_string, server, host_header)
+    @classmethod
+    def from_scope(cls, scope: Scope) -> "URL":
+        """
+        Create a URL instance from an ASGI scope.
+        """
+        scheme = scope.get("scheme", "http")
+        server = scope.get("server", None)
+        path = scope.get("root_path", "") + scope["path"]
+        query_string = scope.get("query_string", b"")
 
-        self._url = url
-        self._components = urlsplit(url)
+        host_header = None
+        for key, value in scope["headers"]:
+            if key == b"host":
+                host_header = value.decode("latin-1")
+                break
+        url = cls._build_url(scheme, path, query_string, server, host_header)
 
+        return cls(url)
+
+    @classmethod
+    def from_components(cls, **components: typing.Any) -> "URL":
+        """
+        Create a URL instance from components.
+        """
+        url = URL("").replace(**components).components.geturl()
+
+        return cls(url)
+
+    @classmethod
     def _build_url(
-        self,
+        cls,
         scheme: str,
         path: str,
         query_string: bytes | str = b"",

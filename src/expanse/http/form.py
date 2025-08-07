@@ -7,14 +7,16 @@ from typing import Generic
 from typing import TypeVar
 from typing import cast
 
-from baize.datastructures import FormData
-from baize.datastructures import MultiMapping
 from pydantic import BaseModel
 from pydantic import ValidationError
+
+from expanse.http._datastructures import FormData
 
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
+
+    from expanse.support._datastructures import MultiMapping
 
 
 Model = TypeVar("Model", bound=type[BaseModel])
@@ -42,7 +44,7 @@ class Form(Generic[T]):
         self.fields: dict[str, Field] = {}
         self.errors: list[ErrorDetails] = []
         self.data: T | None = None
-        form_data: MutableMapping[str, Any] | MultiMapping = {}
+        form_data: MutableMapping[str, Any] | MultiMapping[str, Any] = {}
         if self._submitted is not None:
             form_data = self._submitted
 
@@ -74,7 +76,7 @@ class Form(Generic[T]):
     def is_submitted(self) -> bool:
         return self._submitted is not None
 
-    def __class_getitem__(cls, item: type[T]) -> type["Form"]:
+    def __class_getitem__(cls, item: type[T]) -> type["Form[T]"]:
         klass = type(cls.__name__, (cls,), {"_model": item})
 
         assert issubclass(klass, Form)

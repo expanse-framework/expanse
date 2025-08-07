@@ -41,7 +41,7 @@ class Portal:
                 .to(partial(self._router.handle, container))
             )
 
-            await response.prepare(request)
+            await response.prepare(request, container)
 
             return response
 
@@ -84,4 +84,6 @@ class Portal:
 
         response = await self.handle(request)
 
-        return await response(scope, receive, send)
+        await response.start_response(send)
+        await response.send_body(send, receive)
+        await response.run_deferred()

@@ -1,29 +1,49 @@
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import re
 
-from functools import cached_property
+from datetime import datetime
+from datetime import timezone
+from email.utils import parsedate_to_datetime
+from http import cookies as http_cookies
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
+from urllib.parse import parse_qsl
+
+import msgspec
 
 from baize.asgi import empty_receive
 from baize.asgi import empty_send
-from baize.asgi.requests import Request as BaseRequest
+from baize.multipart_helper import parse_async_stream
 
+from expanse.http._datastructures import Address
+from expanse.http._datastructures import ContentType
+from expanse.http._datastructures import FormData
+from expanse.http._datastructures import QueryParams
+from expanse.http._datastructures import UploadFile
 from expanse.http.accept_header import AcceptHeader
+from expanse.http.exceptions import ClientDisconnectedError
 from expanse.http.exceptions import ConflictingForwardedHeadersError
+from expanse.http.exceptions import MalformedJSONError
+from expanse.http.exceptions import MalformedMultipartError
 from expanse.http.exceptions import SuspiciousOperationError
+from expanse.http.exceptions import UnsupportedContentTypeError
+from expanse.http.header_bag import HeaderBag
 from expanse.http.trusted_header import TrustedHeader
 from expanse.http.url import URL
+from expanse.support._utils import cached_property
 
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from collections.abc import Mapping
 
     from expanse.routing.route import Route
     from expanse.session.session import HTTPSession
+    from expanse.types import PartialScope
     from expanse.types import Receive
     from expanse.types import Scope
     from expanse.types import Send
@@ -37,22 +57,145 @@ FORWARDED_PARAMS = {
 }
 
 
-class Request(BaseRequest):
+class Request:
     def __init__(
         self, scope: Scope, receive: Receive = empty_receive, send: Send = empty_send
     ):
-        super().__init__(scope=scope, receive=receive, send=send)
-
+        self._scope: Scope = scope
+        self._receive: Receive = receive
+        self._send: Send = send
         self._route: Route | None = None
         self._session: HTTPSession | None = None
         self._trusted_proxies: list[str] = []
         self._trusted_headers: list[TrustedHeader] = []
         self._trusted_hosts: list[str] = ["*"]
-        self._url = URL(scope=scope)
+        self._url: URL = URL.from_scope(scope)
+        self._stream_consumed: bool = False
+        self._is_disconnected: bool = False
+        self.path_params: dict[str, Any] = {}
 
     @cached_property
-    def url(self) -> URL:  # type: ignore[override]
+    def method(self) -> str:
+        """
+        HTTP method. Uppercase string.
+        """
+        return self._scope["method"]
+
+    @cached_property
+    def content_type(self) -> ContentType:
+        """
+        The request's content-type
+        """
+        return ContentType.from_string(self.headers.get("content-type", ""))
+
+    @cached_property
+    def content_length(self) -> int | None:
+        """
+        The request's content-length
+        """
+        if self.headers.get("transfer-encoding", "") == "chunked":
+            return None
+
+        content_length = self.headers.get("content-length", None)
+        if content_length is None:
+            return None
+
+        try:
+            return max(0, int(content_length))
+        except (ValueError, TypeError):
+            return None
+
+    @cached_property
+    def cookies(self) -> dict[str, str]:
+        cookies: dict[str, str] = {}
+        cookie_header = self.headers.get("cookie", "")
+
+        # This function has been adapted from Django 3.1.0.
+        # Note: we are explicitly _NOT_ using `SimpleCookie.load` because it is based
+        # on an outdated spec and will fail on lots of input we want to support
+        for chunk in cookie_header.split(";"):
+            if not chunk:
+                continue
+            if "=" in chunk:
+                key, val = chunk.split("=", 1)
+            else:
+                # Assume an empty name per
+                # https://bugzilla.mozilla.org/show_bug.cgi?id=169091
+                key, val = "", chunk
+            key, val = key.strip(), val.strip()
+            if key or val:
+                # unquote using Python's algorithm.
+                cookies[key] = http_cookies._unquote(val)
+        return cookies
+
+    @cached_property
+    def date(self) -> datetime | None:
+        """
+        The sending time of the request.
+
+        NOTE: The datetime object is timezone-aware.
+        """
+        value = self.headers.get("date", None)
+        if value is None:
+            return None
+
+        try:
+            date = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+
+        if date.tzinfo is None:
+            return date.replace(tzinfo=timezone.utc)
+
+        return date
+
+    @cached_property
+    def referrer(self) -> URL | None:
+        """
+        The `Referer` HTTP request header contains an absolute or partial address
+        of the page making the request.
+        """
+        referrer = self.headers.get("referer", None)
+        if referrer is None:
+            return None
+
+        return URL(url=referrer)
+
+    @cached_property
+    def client(self) -> Address:
+        """
+        Client's IP and Port.
+
+        Note that this depends on the "client" value given by
+        the ASGI Server, and is not necessarily accurate.
+        """
+        host, port = self._scope.get("client") or (None, None)
+        return Address(host=host, port=port)
+
+    @cached_property
+    def query_params(self) -> QueryParams:
+        """
+        Query parameter. It is a multi-value mapping.
+        """
+        return QueryParams(self._scope["query_string"])
+
+    @cached_property
+    def url(self) -> URL:
         return self._url.replace(scheme=self.scheme, hostname=self.http_host, port=None)
+
+    @cached_property
+    def headers(self) -> HeaderBag:
+        """
+        Get the request headers as a dictionary.
+
+        The keys are normalized to lowercase.
+        """
+        return HeaderBag(
+            {
+                key.decode("latin-1").lower(): value.decode("latin-1")
+                for key, value in self._scope.get("headers", [])
+            }
+        )
 
     @cached_property
     def host(self) -> str:
@@ -324,38 +467,158 @@ class Request(BaseRequest):
 
         return {**source, **self.query_params}.get(name, default)
 
+    async def stream(self) -> AsyncIterator[bytes]:
+        """
+        Streaming read request body. e.g. `async for chunk in request.stream(): ...`
+
+        If you access `.stream()` then the byte chunks are provided
+        without storing the entire body to memory. Any subsequent
+        calls to `.body`, `.form`, or `.json` will raise an error.
+        """
+        if "body" in self.__dict__ and self.__dict__["body"].done():
+            yield await self.body
+            yield b""
+            return
+
+        if self._stream_consumed:
+            raise RuntimeError("Request stream has already been consumed.")
+
+        self._stream_consumed = True
+        while True:
+            message = await self._receive()
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                if body:
+                    yield body
+                if not message.get("more_body", False):
+                    break
+            elif message["type"] == "http.disconnect":
+                self._is_disconnected = True
+                raise ClientDisconnectedError()
+        yield b""
+
+    @cached_property
+    async def body(self) -> bytes:
+        """
+        Read all the contents of the request body into the memory and return it.
+        """
+        return b"".join([chunk async for chunk in self.stream()])
+
+    @cached_property
+    async def json(self) -> Any:
+        """
+        Call `await self.body` and use `json.loads` parse it.
+
+        If `content_type` is not equal to `application/json`,
+        an HTTPExcption exception will be thrown.
+        """
+        if self.content_type == "application/json":
+            data = await self.body
+            try:
+                return msgspec.json.decode(
+                    data.decode(self.content_type.options.get("charset", "utf8"))
+                )
+            except msgspec.DecodeError as exc:
+                raise MalformedJSONError(str(exc)) from None
+
+        raise UnsupportedContentTypeError("application/json")
+
+    async def _parse_multipart(self, boundary: bytes, charset: str) -> FormData:
+        return FormData(
+            await parse_async_stream(
+                self.stream(), boundary, charset, file_factory=UploadFile
+            )
+        )
+
+    @cached_property
+    async def form(self) -> FormData:
+        """
+        Parse the data in the form format and return it as a multi-value mapping.
+
+        If `content_type` is equal to `multipart/form-data`, it will directly
+        perform streaming analysis, and subsequent calls to `self.body`
+        or `self.json` will raise errors.
+
+        If `content_type` is not equal to `multipart/form-data` or
+        `application/x-www-form-urlencoded`, an HTTPExcption exception will be thrown.
+        """
+        if self.content_type == "multipart/form-data":
+            charset = self.content_type.options.get("charset", "utf8")
+            if "boundary" not in self.content_type.options:
+                raise MalformedMultipartError("Missing boundary in header content-type")
+            boundary = self.content_type.options["boundary"].encode("latin-1")
+            return await self._parse_multipart(boundary, charset)
+        if self.content_type == "application/x-www-form-urlencoded":
+            body = (await self.body).decode(
+                encoding=self.content_type.options.get("charset", "latin-1")
+            )
+            return FormData(parse_qsl(body, keep_blank_values=True))
+
+        raise UnsupportedContentTypeError(
+            "multipart/form-data, application/x-www-form-urlencoded"
+        )
+
+    async def close(self) -> None:
+        """
+        Close all temporary files in the `self.form`.
+
+        This can always be called, regardless of whether you use form or not.
+        """
+        if "form" in self.__dict__ and self.__dict__["form"].done():
+            await (await self.form).aclose()
+
+    async def is_disconnected(self) -> bool:
+        """
+        The method used to determine whether the connection is interrupted.
+        """
+        if not self._is_disconnected:
+            try:
+                message = await asyncio.wait_for(self._receive(), timeout=0.0000001)
+                self._is_disconnected = message.get("type") == "http.disconnect"
+            except asyncio.TimeoutError:
+                pass
+        return self._is_disconnected
+
     @classmethod
     def create(
-        cls, raw_url: str, method: str = "GET", scope: dict[str, Any] | None = None
+        cls, raw_url: str, method: str = "GET", scope: PartialScope | None = None
     ) -> Request:
         default_headers = {
             b"User-Agent": b"Expanse",
             b"Accept": b"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             b"Accept-Language": b"en-us,en;q=0.5",
         }
-        base_scope = {
+        base_scope: Scope = {
             "type": "http",
+            "asgi": {
+                "version": "3.0",
+                "spec_version": "2.3",
+            },
+            "client": ("127.0.0.1", 80),
             "scheme": "http",
-            "server": ["localhost", 80],
+            "server": ("localhost", 80),
             "headers": [],
-            "REMOTE_ADDR": "127.0.0.1",
             "root_path": "",
             "http_version": "1.1",
             "path": "",
-            "raw_path": "",
+            "query_string": b"",
+            "raw_path": b"",
             "method": method.upper(),
-            **(scope or {}),
         }
+
+        if scope is not None:
+            base_scope.update(scope)
 
         headers = base_scope["headers"]
         header_names = {header[0] for header in headers}
 
         for default_header in default_headers:
             if default_header not in header_names:
-                headers.append([default_header, default_headers[default_header]])
+                headers.append((default_header, default_headers[default_header]))
 
         url = URL(raw_url)
 
+        assert base_scope["server"] is not None
         if url.hostname is not None:
             base_scope["server"] = (url.hostname, base_scope["server"][1])
 
@@ -376,13 +639,13 @@ class Request(BaseRequest):
             path = "/"
 
         base_scope["path"] = path
-        base_scope["raw_path"] = path
+        base_scope["raw_path"] = path.encode()
 
         query_string = ""
         if url.query:
             query_string = url.query
 
-        base_scope["query_string"] = query_string
+        base_scope["query_string"] = query_string.encode()
 
         return cls(scope=base_scope)
 
@@ -441,8 +704,8 @@ class Request(BaseRequest):
 
         raise ConflictingForwardedHeadersError(
             f"The request has both a {TrustedHeader.FORWARDED} header "
-            f"and a {header} header, which are conflicting. "
-            f"You should configure your proxy to remove one of them."
+            + f"and a {header} header, which are conflicting. "
+            + "You should configure your proxy to remove one of them."
         )
 
 

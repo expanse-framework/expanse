@@ -72,7 +72,7 @@ async def test_route_url_generation(
 ) -> None:
     router.get("/foo", lambda: "foo", name="foo")
     router.get("/foo/{bar}", lambda: "foo", name="foo.bar")
-    router.get("/foo/{bar}/{baz:\d+}", lambda: "foo", name="foo.bar.baz")
+    router.get(r"/foo/{bar}/{baz:\d+}", lambda: "foo", name="foo.bar.baz")
 
     assert (
         URLGenerator(router, Request.create("https://example.com")).to_route(
@@ -85,7 +85,7 @@ async def test_route_url_generation(
 def test_url_generation_with_invalid_parameters(router: Router) -> None:
     with pytest.raises(InvalidURLParameter) as e:
         URLGenerator(router, Request.create("https://example.com")).to(
-            "/foo/{bar:\d+}", {"bar": "bim"}
+            r"/foo/{bar:\d+}", {"bar": "bim"}
         )
 
-    assert str(e.value) == "Parameter [bar] does not match the regex [\d+]"
+    assert str(e.value) == r"Parameter [bar] does not match the regex [\d+]"

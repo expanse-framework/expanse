@@ -27,7 +27,7 @@ class Registrar(ABC):
     def routes(self) -> RouteCollection: ...
 
     @abstractmethod
-    def get(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def get(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         """
         Register a new GET route.
 
@@ -38,7 +38,7 @@ class Registrar(ABC):
         ...
 
     @abstractmethod
-    def post(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def post(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         """
         Register a new POST route.
 
@@ -49,7 +49,7 @@ class Registrar(ABC):
         ...
 
     @abstractmethod
-    def put(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def put(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         """
         Register a new PUT route.
 
@@ -60,7 +60,7 @@ class Registrar(ABC):
         ...
 
     @abstractmethod
-    def patch(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def patch(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         """
         Register a new PATCH route.
 
@@ -71,7 +71,9 @@ class Registrar(ABC):
         ...
 
     @abstractmethod
-    def delete(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def delete(
+        self, path: str, endpoint: Endpoint, *, name: str | None = None
+    ) -> Route:
         """
         Register a new DELETE route.
 
@@ -82,7 +84,7 @@ class Registrar(ABC):
         ...
 
     @abstractmethod
-    def head(self, uri: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
+    def head(self, path: str, endpoint: Endpoint, *, name: str | None = None) -> Route:
         """
         Register a new HEAD route.
 
@@ -94,7 +96,7 @@ class Registrar(ABC):
 
     @abstractmethod
     def options(
-        self, uri: str, endpoint: Endpoint, *, name: str | None = None
+        self, path: str, endpoint: Endpoint, *, name: str | None = None
     ) -> Route:
         """
         Register a new OPTIONS route.

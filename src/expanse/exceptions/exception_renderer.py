@@ -9,7 +9,7 @@ from crashtest.inspector import Inspector
 from expanse.contracts.debug.exception_renderer import (
     ExceptionRenderer as ExceptionRendererContract,
 )
-from expanse.view.view_factory import AsyncViewFactory
+from expanse.view.view_factory import ViewFactory
 from expanse.view.view_finder import ViewFinder
 
 
@@ -38,7 +38,7 @@ class Trace(TypedDict):
 
 
 class ExceptionRenderer(ExceptionRendererContract):
-    def __init__(self, view: AsyncViewFactory, finder: ViewFinder) -> None:
+    def __init__(self, view: ViewFactory, finder: ViewFinder) -> None:
         self._view = view
 
         finder.add_paths([Path(__file__).parent.joinpath("views")])
@@ -58,7 +58,7 @@ class ExceptionRenderer(ExceptionRendererContract):
             },
         )
 
-        return await self._view.render(view, raw=True)
+        return await self._view.render(view)
 
     def asset_content(self, asset_name: str) -> str:
         return Path(__file__).parent.joinpath("assets").joinpath(asset_name).read_text()

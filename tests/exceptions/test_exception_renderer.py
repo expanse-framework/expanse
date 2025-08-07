@@ -4,7 +4,7 @@ from pytest_mock import MockerFixture
 
 from expanse.core.application import Application
 from expanse.exceptions.exception_renderer import ExceptionRenderer
-from expanse.view.view_factory import AsyncViewFactory
+from expanse.view.view_factory import ViewFactory
 from expanse.view.view_finder import ViewFinder
 from tests.exceptions.fixtures.exceptions import foo
 
@@ -12,7 +12,7 @@ from tests.exceptions.fixtures.exceptions import foo
 async def test_the_correct_stack_trace_representation_is_passed_to_view(
     app: Application, mocker: MockerFixture
 ) -> None:
-    view = await app.container.get(AsyncViewFactory)
+    view = await app.container.get(ViewFactory)
 
     renderer = ExceptionRenderer(view, await app.container.get(ViewFinder))
 

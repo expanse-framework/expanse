@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 
 from collections import deque
+from collections.abc import AsyncGenerator
 from collections.abc import Callable
+from collections.abc import Iterable
+from collections.abc import Iterator
 from contextvars import Context
 from contextvars import copy_context
+from typing import Generic
 from typing import ParamSpec
 from typing import TypeVar
 
@@ -46,6 +52,38 @@ async def run_in_threadpool(
         _restore_context(context)
 
     return result
+
+
+class AsyncIteratorWrapper(Generic[T]):
+    __slots__ = ("generator", "iterator")
+
+    def __init__(self, iterator: Iterator[T] | Iterable[T]) -> None:
+        """Take a sync iterator or iterable and yields values from it asynchronously.
+
+        Args:
+            iterator: A sync iterator or iterable.
+        """
+        self.iterator = iterator if isinstance(iterator, Iterator) else iter(iterator)
+        self.generator = self._async_generator()
+
+    def _call_next(self) -> T:
+        try:
+            return next(self.iterator)
+        except StopIteration as e:
+            raise ValueError from e
+
+    async def _async_generator(self) -> AsyncGenerator[T, None]:
+        while True:
+            try:
+                yield await run_in_threadpool(self._call_next)
+            except ValueError:
+                return
+
+    def __aiter__(self) -> AsyncIteratorWrapper[T]:
+        return self
+
+    async def __anext__(self) -> T:
+        return await self.generator.__anext__()
 
 
 class AsyncRLock:
