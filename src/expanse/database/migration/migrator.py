@@ -16,6 +16,7 @@ from alembic.command import upgrade
 from cleo.io.io import IO
 from cleo.io.null_io import NullIO
 from cleo.ui.progress_indicator import ProgressIndicator
+from sqlalchemy.schema import SchemaItem
 
 from expanse.core.application import Application
 from expanse.database.migration.config import Config as AlembicConfig
@@ -158,6 +159,33 @@ class Migrator:
                 return name in Model.metadata.tables
             case _:
                 return True
+
+    def include_object(
+        self,
+        object: SchemaItem,
+        name: str | None,
+        type_: Literal[
+            "schema",
+            "table",
+            "column",
+            "index",
+            "unique_constraint",
+            "foreign_key_constraint",
+        ],
+        reflected: bool,
+        compare_to: SchemaItem | None = None,
+    ) -> bool:
+        match type_:
+            case "column":
+                if (
+                    object.primary_key is True
+                    and object.identity is not None
+                    and compare_to is not None
+                    and compare_to.identity is None
+                ):
+                    return False
+
+        return True
 
     def _load_models(self) -> None:
         model_directory = self._app.path("models")

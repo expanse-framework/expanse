@@ -16,14 +16,7 @@ class AsyncQueueManager:
     async def queue(self, name: str | None = None) -> AsyncQueue:
         name = name or self.get_default_queue()
 
-        if name in self._queues:
-            return self._queues[name]
-
-        queue = await self._resolve(name)
-
-        self._queues[name] = queue
-
-        return self._queues[name]
+        return await self._resolve(name)
 
     def add_connector(
         self, name: str, connector: Callable[[], Awaitable[AsyncConnector]]

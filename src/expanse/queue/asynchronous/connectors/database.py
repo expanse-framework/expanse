@@ -1,6 +1,7 @@
 from typing import NotRequired
 from typing import TypedDict
 
+from expanse.container.container import Container
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.queue.asynchronous.connectors.connector import AsyncConnector
 from expanse.queue.asynchronous.queues.database_queue import AsyncDatabaseQueue
@@ -20,7 +21,7 @@ class AsyncDatabaseConnector(AsyncConnector):
     This class is used to connect to a database asynchronously.
     """
 
-    def __init__(self, db: AsyncDatabaseManager) -> None:
+    def __init__(self, container: Container) -> None:
         self._db: AsyncDatabaseManager = db
 
     async def connect(self, config: Config) -> AsyncDatabaseQueue:
