@@ -93,6 +93,7 @@ class DatabaseServiceProvider(ServiceProvider):
         migrator = Migrator(app)
         migrator.config.attributes["db"] = await self._container.get(DatabaseManager)
         migrator.config.attributes["include_name"] = migrator.include_name
+        migrator.config.attributes["include_object"] = migrator.include_object
         migrator.config.attributes["target_metadata"] = Model.metadata
 
         return migrator
