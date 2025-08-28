@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from expanse.container.container import Container
 from expanse.support.service_provider import ServiceProvider
 
 
@@ -26,14 +27,16 @@ class QueueServiceProvider(ServiceProvider):
     async def _register_queue_manager(self) -> None:
         from expanse.queue.asynchronous.queue_manager import AsyncQueueManager
 
-        self._container.singleton(AsyncQueueManager, self._create_queue_manager)
+        self._container.scoped(AsyncQueueManager, self._create_queue_manager)
 
-    async def _create_queue_manager(self) -> "AsyncQueueManager":
-        from expanse.core.application import Application
+    async def _create_queue_manager(self, container: Container) -> "AsyncQueueManager":
         from expanse.queue.asynchronous.queue_manager import AsyncQueueManager
+        from expanse.queue.asynchronous.registry import AsyncQueueConnectorRegistry
 
-        manager = AsyncQueueManager(await self._container.get(Application))
-        manager.add_connector("database", self._create_database_connector)
+        registry = AsyncQueueConnectorRegistry()
+        registry.add_connector("database", self._create_database_connector)
+
+        manager = AsyncQueueManager(container, registry)
 
         return manager
 

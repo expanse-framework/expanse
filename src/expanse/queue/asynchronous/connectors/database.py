@@ -2,7 +2,6 @@ from typing import NotRequired
 from typing import TypedDict
 
 from expanse.container.container import Container
-from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.queue.asynchronous.connectors.connector import AsyncConnector
 from expanse.queue.asynchronous.queues.database_queue import AsyncDatabaseQueue
 
@@ -22,14 +21,15 @@ class AsyncDatabaseConnector(AsyncConnector):
     """
 
     def __init__(self, container: Container) -> None:
-        self._db: AsyncDatabaseManager = db
+        self._container: Container = container
 
     async def connect(self, config: Config) -> AsyncDatabaseQueue:
         """
         Connect to the database asynchronously.
         """
         return AsyncDatabaseQueue(
-            self._db.connection(config["connection"]),
+            self._db,
+            config["connection"],
             config["table"],
             config["queue"],
             retry_after=config.get("retry_after", 60),
