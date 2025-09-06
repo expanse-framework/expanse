@@ -14,6 +14,7 @@ class AsyncQueueManager:
         self._container: Container = container
         self._registry: AsyncQueueConnectorRegistry = registry
         self._queues: dict[str, AsyncQueue] = {}
+        self._connectors: dict[str, AsyncConnector] = {}
 
     async def queue(self, name: str | None = None) -> AsyncQueue:
         name = name or await self.get_default_queue()
@@ -27,6 +28,10 @@ class AsyncQueueManager:
 
         return queue
 
+    async def terminate(self) -> None:
+        for connector in self._connectors.values():
+            await connector.disconnect()
+
     async def _resolve(self, name: str) -> AsyncQueue:
         config = await self._configuration(name)
 
@@ -38,7 +43,11 @@ class AsyncQueueManager:
             self._registry.connector(driver)
         )
 
-        return await connector.connect(config)
+        queue = await connector.connect(config)
+
+        self._connectors[name] = connector
+
+        return queue
 
     async def get_default_queue(self) -> str:
         config = await self._container.get(Config)

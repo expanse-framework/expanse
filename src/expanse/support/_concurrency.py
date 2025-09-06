@@ -5,15 +5,18 @@ import functools
 
 from collections import deque
 from collections.abc import AsyncGenerator
+from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
 from contextvars import copy_context
+from typing import Any
 from typing import Generic
 from typing import ParamSpec
 from typing import TypeVar
 
+import anyio.from_thread
 import anyio.to_thread
 
 
@@ -52,6 +55,14 @@ async def run_in_threadpool(
         _restore_context(context)
 
     return result
+
+
+def run_async(func: Callable[P, Awaitable[T]], *args: Any) -> T:
+    """
+    Decorator to run a sync function in an async context.
+    """
+    with anyio.from_thread.start_blocking_portal() as portal:
+        return portal.call(func, *args)
 
 
 class AsyncIteratorWrapper(Generic[T]):

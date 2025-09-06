@@ -16,3 +16,10 @@ class AsyncConnector(ABC):
         Connect to the queue.
         """
         ...
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """
+        Disconnect from the queue.
+        """
+        ...

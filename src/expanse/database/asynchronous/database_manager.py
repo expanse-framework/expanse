@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.util import immutabledict
 
 from expanse.core.application import Application
+from expanse.database._callback import execute_after_commit_callbacks_sync
 from expanse.database._utils import create_engine
 from expanse.database.config import DatabaseConfig
 from expanse.database.config import MySQLConfig
@@ -43,7 +44,13 @@ class AsyncDatabaseManager:
 
         self._factories[name] = factory
 
-        return self._factories[name]()
+        session = self._factories[name]()
+
+        event.listens_for(session.sync_session, "after_commit")(
+            execute_after_commit_callbacks_sync
+        )
+
+        return session
 
     def create_base_engine(self, url: URL, **kwargs) -> AsyncEngine:
         sync_engine = create_engine(url, **kwargs)
@@ -61,7 +68,9 @@ class AsyncDatabaseManager:
         if not config:
             raise
 
-        self._engines[name] = self._create_engine(config)
+        engine = self._create_engine(config)
+
+        self._engines[name] = engine
 
         return self._engines[name]
 

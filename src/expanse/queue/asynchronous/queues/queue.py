@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import Self
 
 from expanse.container.container import Container
+from expanse.database._callback import add_after_commit_callback
 from expanse.types.queue.job import JobType
 
 
@@ -46,17 +47,18 @@ class AsyncQueue(ABC):
         queue: str | None,
         func: Callable[[dict[str, str | tuple[str, str]], str | None], Awaitable[None]],
     ) -> None:
-        from expanse.database.session import Session
-
         assert (
             self._container is not None
         ), "Container must be set before using the queue."
 
-        if not self._dispatch_after_commit or not self._container.has(Session):
+        if not self._should_dispatch_after_commit(job):
             await func(payload, queue)
             return
 
-        await func(payload, queue)
+        async def callback() -> None:
+            await func(payload, queue)
+
+        add_after_commit_callback(callback)
 
     async def _create_payload(
         self, job: JobType, queue: str, data: str = ""

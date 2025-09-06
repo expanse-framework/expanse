@@ -14,6 +14,13 @@ def simple_job() -> None:
     pass
 
 
+class JobAfterCommit:
+    dispatch_after_commit: bool = True
+
+    async def handle(self) -> None:
+        pass
+
+
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_jobs_can_be_put_in_the_queue(
@@ -25,9 +32,11 @@ async def test_jobs_can_be_put_in_the_queue(
 
     db = await app.container.get(AsyncDatabaseManager)
     app.container.instance(Session, db.session(name))
-    queue = AsyncDatabaseQueue(db, name, "jobs").set_container(app.container)
 
-    await queue.put(simple_job, data="test_data")
+    async with db.connection(name) as conn:
+        queue = AsyncDatabaseQueue(conn, name).set_container(app.container)
+
+        await queue.put(simple_job, data="test_data")
 
     async with db.connection(name) as conn:
         result = (await conn.execute("SELECT * FROM jobs")).fetchall()
@@ -54,11 +63,60 @@ async def test_size_of_queue_can_be_computed(
 
     db = await app.container.get(AsyncDatabaseManager)
     app.container.instance(Session, db.session(name))
-    queue = AsyncDatabaseQueue(db, name, "jobs").set_container(app.container)
 
-    await queue.put(simple_job, data="test_data")
-    await queue.put(simple_job, queue="jobs2")
-    await queue.put(simple_job, queue="jobs2")
+    async with db.connection(name) as conn:
+        queue = AsyncDatabaseQueue(conn, name, "jobs").set_container(app.container)
 
-    assert await queue.size() == 1
-    assert await queue.size("jobs2") == 2
+        await queue.put(simple_job, data="test_data")
+        await queue.put(simple_job, queue="jobs2")
+        await queue.put(simple_job, queue="jobs2")
+
+        assert await queue.size() == 1
+        assert await queue.size("jobs2") == 2
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_deferred_jobs_are_not_put_in_the_queue_if_no_commit(
+    app: Application, command_tester: CommandTester, name: str
+) -> None:
+    app.config["database"]["default"] = name
+
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    app.container.instance(Session, db.session(name))
+
+    async with db.connection(name) as conn:
+        queue = AsyncDatabaseQueue(conn, name).set_container(app.container)
+
+        await queue.put(JobAfterCommit)
+
+    async with db.connection(name) as conn:
+        result = (await conn.execute("SELECT * FROM jobs")).fetchall()
+        assert len(result) == 0
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_deferred_jobs_are_not_put_in_the_queue_if_async_session_is_committed(
+    app: Application, command_tester: CommandTester, name: str
+) -> None:
+    app.config["database"]["default"] = name
+
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    session = db.session(name)
+
+    async with db.connection(name) as conn:
+        queue = AsyncDatabaseQueue(conn, name).set_container(app.container)
+
+        await queue.put(JobAfterCommit)
+
+        await session.commit()
+        await session.commit()
+
+    async with db.connection(name) as conn:
+        result = (await conn.execute("SELECT * FROM jobs")).fetchall()
+        assert len(result) == 1

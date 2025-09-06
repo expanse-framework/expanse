@@ -38,7 +38,9 @@ class QueueServiceProvider(ServiceProvider):
 
         manager = AsyncQueueManager(container, registry)
 
-        return manager
+        yield manager
+
+        await manager.terminate()
 
     async def _create_queue(
         self, manager: "AsyncQueueManager", name: str | None = None
