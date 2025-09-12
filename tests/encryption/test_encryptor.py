@@ -43,15 +43,17 @@ def test_encryptor_can_encrypt_data(
     assert encryptor.has_compression()
     assert encryptor.has_derivation()
 
-    message = encryptor.encrypt("Hello, World!")
+    encrypted_string = encryptor.encrypt("Hello, World!")
+    message = encryptor.encrypt_raw("Hello, World!")
 
+    assert isinstance(encrypted_string, str)
     assert isinstance(message, Message)
     assert isinstance(message.payload, bytes)
     assert "iv" in message.headers
     assert "at" in message.headers
     assert message.headers["z"] == 1
 
-    assert compress.call_count == 1
+    assert compress.call_count == 2
 
 
 def test_encryptor_can_encrypt_data_without_compression(
@@ -62,8 +64,10 @@ def test_encryptor_can_encrypt_data_without_compression(
 
     compress = mocker.spy(ZlibCompressor, "compress")
 
-    message = encryptor_without_compression.encrypt("Hello, World!")
+    encrypted_string = encryptor_without_compression.encrypt("Hello, World!")
+    message = encryptor_without_compression.encrypt_raw("Hello, World!")
 
+    assert isinstance(encrypted_string, str)
     assert isinstance(message, Message)
     assert isinstance(message.payload, bytes)
     assert "iv" in message.headers
@@ -78,9 +82,9 @@ def test_encryptor_can_decrypt_messages(
 ) -> None:
     decompress = mocker.spy(ZlibCompressor, "decompress")
 
-    message = encryptor.encrypt("Hello, World!")
+    encrypted_string = encryptor.encrypt("Hello, World!")
 
-    decrypted = encryptor.decrypt(message)
+    decrypted = encryptor.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"
 
@@ -92,13 +96,21 @@ def test_encryptor_can_decrypt_data_without_compression(
 ) -> None:
     decompress = mocker.spy(ZlibCompressor, "decompress")
 
-    message = encryptor_without_compression.encrypt("Hello, World!")
+    encrypted_string = encryptor_without_compression.encrypt("Hello, World!")
 
-    decrypted = encryptor_without_compression.decrypt(message)
+    decrypted = encryptor_without_compression.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"
 
     assert decompress.call_count == 0
+
+
+def test_encryptor_can_decrypt_string_messages(encryptor: Encryptor) -> None:
+    encrypted_string = encryptor.encrypt("Hello, World!")
+
+    decrypted = encryptor.decrypt(encrypted_string)
+
+    assert decrypted == "Hello, World!"
 
 
 def test_encryptor_can_generate_keys() -> None:
@@ -112,12 +124,12 @@ def test_encryptor_iterates_over_keys_to_decrypt() -> None:
     key_chain = KeyChain([Key(SECRET2)])
     encryptor = Encryptor(key_chain, SALT)
 
-    message = encryptor.encrypt("Hello, World!")
+    encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET), Key(SECRET2)])
     encryptor = Encryptor(key_chain, SALT)
 
-    decrypted = encryptor.decrypt(message)
+    decrypted = encryptor.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"
 
@@ -126,13 +138,13 @@ def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
     key_chain = KeyChain([Key(SECRET2)])
     encryptor = Encryptor(key_chain, SALT)
 
-    message = encryptor.encrypt("Hello, World!")
+    encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET)])
     encryptor = Encryptor(key_chain, SALT)
 
     with pytest.raises(DecryptionError):
-        encryptor.decrypt(message)
+        encryptor.decrypt(encrypted_string)
 
 
 def test_encryptor_can_be_used_without_key_derivation(
@@ -140,8 +152,8 @@ def test_encryptor_can_be_used_without_key_derivation(
 ) -> None:
     assert not encryptor_without_derivation.has_derivation()
 
-    message = encryptor_without_derivation.encrypt("Hello, World!")
+    encrypted_string = encryptor_without_derivation.encrypt("Hello, World!")
 
-    decrypted = encryptor_without_derivation.decrypt(message)
+    decrypted = encryptor_without_derivation.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"

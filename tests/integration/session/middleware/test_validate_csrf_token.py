@@ -102,7 +102,7 @@ async def test_middleware_retrieves_token_from_xsrf_header(
     response = client.post(
         "/",
         json={},
-        headers={"X-XSRF-TOKEN": encryptor.encrypt("foo").dump("base64")},
+        headers={"X-XSRF-TOKEN": encryptor.encrypt("foo")},
     )
 
     assert response.status_code == 200

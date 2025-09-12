@@ -1,11 +1,8 @@
-import base64
-import json
-
 from typing import ClassVar
 
 from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.encryption.errors import DecryptionError
-from expanse.encryption.message import Message
+from expanse.encryption.errors import MessageDecodeError
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.types.http.middleware import RequestHandler
@@ -41,10 +38,8 @@ class EncryptCookies:
             if cookie.value is None:
                 continue
 
-            message = self._encryptor.encrypt(cookie.value)
-            response.cookies[name] = cookie.with_value(
-                base64.urlsafe_b64encode(json.dumps(message.dump()).encode()).decode()
-            )
+            value = self._encryptor.encrypt(cookie.value)
+            response.cookies[name] = cookie.with_value(value)
 
         return response
 
@@ -54,17 +49,9 @@ class EncryptCookies:
                 continue
 
             try:
-                raw_value = json.loads(base64.urlsafe_b64decode(value).decode())
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                request.cookies[key] = ""
-
-                continue
-
-            message = Message.load(raw_value)
-            try:
-                decrypted_value = self._encryptor.decrypt(message)
+                decrypted_value = self._encryptor.decrypt(value)
                 request.cookies[key] = decrypted_value
-            except DecryptionError:
+            except (MessageDecodeError, DecryptionError):
                 request.cookies[key] = ""
 
                 continue

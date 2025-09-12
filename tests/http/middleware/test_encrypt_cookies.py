@@ -1,6 +1,3 @@
-import json
-
-from base64 import urlsafe_b64encode
 from collections.abc import Callable
 
 import pytest
@@ -47,9 +44,7 @@ def router() -> RouterContract:
 @pytest.fixture
 def encrypt(encryptor: Encryptor) -> Callable[[str], str]:
     def _encrypt(value: str) -> str:
-        message = encryptor.encrypt(value)
-
-        return urlsafe_b64encode(json.dumps(message.dump()).encode()).decode()
+        return encryptor.encrypt(value)
 
     return _encrypt
 

@@ -45,9 +45,21 @@ class Encryptor(EncryptorContract):
     def has_derivation(self) -> bool:
         return self._derive
 
-    def encrypt(self, data: str) -> Message:
+    def encrypt(self, value: str) -> str:
         """
-        Encrypt the given data, optionally in a deterministic way.
+        Encrypt the given data as a base64-encoded string.
+
+        Similar to `encrypt_raw`, but returns the Message as a base64-encoded string.
+
+        :param value: The data to encrypt.
+        """
+        message = self.encrypt_raw(value)
+
+        return message.encode()
+
+    def encrypt_raw(self, value: str) -> Message:
+        """
+        Encrypt the given data.
 
         The result of the encryption will be a Message object containing the encrypted
         data and any additional headers needed to decrypt it. Additional headers can be added
@@ -57,7 +69,7 @@ class Encryptor(EncryptorContract):
         will be derived from the secret key using the configured key derivation salt.
         Otherwise, the secret key will be used directly.
 
-        :param data: The data to encrypt.
+        :param value: The data to encrypt.
         """
         cipher_class = self.CIPHERS[self._cipher]
 
@@ -68,7 +80,7 @@ class Encryptor(EncryptorContract):
 
         cipher = cipher_class(key.value)
 
-        encoded: bytes = data.encode()
+        encoded: bytes = value.encode()
         if self._compress:
             encoded = self._compressor.compress(encoded)
 
@@ -78,16 +90,21 @@ class Encryptor(EncryptorContract):
 
         return encrypted
 
-    def decrypt(self, message: Message) -> str:
+    def decrypt(self, message: Message | str) -> str:
         """
         Decrypt the given message.
+
+        The message can be provided as a Message object or as a base64-encoded string.
 
         To decrypt the message, the encryptor will try to use each key in the configured key chain
         until it finds the correct one. If none of the keys can decrypt the message, an exception
         will be raised.
 
-        @param message: The message to decrypt.
+        :param message: The message to decrypt.
         """
+        if isinstance(message, str):
+            message = Message.decode(message)
+
         for key in self._key_chain:
             try:
                 return self._decrypt(message, key)

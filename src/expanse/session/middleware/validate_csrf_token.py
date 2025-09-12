@@ -3,7 +3,6 @@ import time
 
 from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.core.application import Application
-from expanse.encryption.message import Message
 from expanse.http.cookie import SameSite
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -52,9 +51,7 @@ class ValidateCSRFToken:
 
         if not token and (header := request.headers.get("X-XSRF-TOKEN")):
             try:
-                message = Message.load(header, "base64")
-
-                token = self._encryptor.decrypt(message)
+                token = self._encryptor.decrypt(header)
             except Exception:
                 token = ""
 
