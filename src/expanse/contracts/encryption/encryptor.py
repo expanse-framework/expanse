@@ -6,7 +6,14 @@ from expanse.encryption.message import Message
 
 class Encryptor(ABC):
     @abstractmethod
-    def encrypt(self, value: str) -> Message:
+    def encrypt(self, value: str) -> str:
+        """
+        Encrypt the given data.
+        """
+        ...
+
+    @abstractmethod
+    def encrypt_raw(self, value: str) -> Message:
         """
         Encrypt the given data, optionally in a deterministic way.
 
@@ -17,7 +24,7 @@ class Encryptor(ABC):
         ...
 
     @abstractmethod
-    def decrypt(self, value: Message) -> str:
+    def decrypt(self, message: Message | str) -> str:
         """
         Decrypt the given message.
         """

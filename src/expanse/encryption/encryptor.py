@@ -26,28 +26,36 @@ class Encryptor(EncryptorContract):
     def __init__(
         self,
         key_chain: KeyChain,
-        salt: bytes,
+        key_generator: KeyGenerator,
         cipher: Cipher = Cipher.AES_256_GCM,
+        *,
         compress: bool = True,
-        derive: bool = True,
     ) -> None:
         self._key_chain = key_chain
         self._secret_key = key_chain.latest
-        self._salt = salt
         self._cipher = cipher
         self._compress = compress
         self._compressor = ZlibCompressor()
-        self._derive = derive
+        self._key_generator = key_generator
 
     def has_compression(self) -> bool:
         return self._compress
 
-    def has_derivation(self) -> bool:
-        return self._derive
-
-    def encrypt(self, data: str) -> Message:
+    def encrypt(self, value: str) -> str:
         """
-        Encrypt the given data, optionally in a deterministic way.
+        Encrypt the given data as a base64-encoded string.
+
+        Similar to `encrypt_raw`, but returns the Message as a base64-encoded string.
+
+        :param value: The data to encrypt.
+        """
+        message = self.encrypt_raw(value)
+
+        return message.encode()
+
+    def encrypt_raw(self, value: str) -> Message:
+        """
+        Encrypt the given data.
 
         The result of the encryption will be a Message object containing the encrypted
         data and any additional headers needed to decrypt it. Additional headers can be added
@@ -57,18 +65,17 @@ class Encryptor(EncryptorContract):
         will be derived from the secret key using the configured key derivation salt.
         Otherwise, the secret key will be used directly.
 
-        :param data: The data to encrypt.
+        :param value: The data to encrypt.
         """
         cipher_class = self.CIPHERS[self._cipher]
 
-        if self._derive:
-            key = self.derive_key(self._secret_key, length=cipher_class.key_length)
-        else:
-            key = self._secret_key
+        key = self._key_generator.generate_key(
+            self._secret_key, key_size=cipher_class.key_length
+        )
 
         cipher = cipher_class(key.value)
 
-        encoded: bytes = data.encode()
+        encoded: bytes = value.encode()
         if self._compress:
             encoded = self._compressor.compress(encoded)
 
@@ -78,16 +85,21 @@ class Encryptor(EncryptorContract):
 
         return encrypted
 
-    def decrypt(self, message: Message) -> str:
+    def decrypt(self, message: Message | str) -> str:
         """
         Decrypt the given message.
+
+        The message can be provided as a Message object or as a base64-encoded string.
 
         To decrypt the message, the encryptor will try to use each key in the configured key chain
         until it finds the correct one. If none of the keys can decrypt the message, an exception
         will be raised.
 
-        @param message: The message to decrypt.
+        :param message: The message to decrypt.
         """
+        if isinstance(message, str):
+            message = Message.decode(message)
+
         for key in self._key_chain:
             try:
                 return self._decrypt(message, key)
@@ -99,10 +111,7 @@ class Encryptor(EncryptorContract):
     def _decrypt(self, message: Message, key: Key) -> str:
         cipher_class = self.CIPHERS[self._cipher]
 
-        if self._derive:
-            key = self.derive_key(key, length=cipher_class.key_length)
-        else:
-            key = key
+        key = self._key_generator.generate_key(key, key_size=cipher_class.key_length)
 
         cipher = cipher_class(key.value)
 
@@ -119,10 +128,3 @@ class Encryptor(EncryptorContract):
         key = secrets.token_bytes(cipher_class.key_length)
 
         return key
-
-    def derive_key(
-        self, key: Key, iterations: int | None = None, length: int = 32
-    ) -> Key:
-        return KeyGenerator(key, iterations=iterations).generate_key(
-            self._salt, key_size=length
-        )

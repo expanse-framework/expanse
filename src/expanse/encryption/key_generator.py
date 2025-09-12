@@ -1,20 +1,20 @@
-import hashlib
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from expanse.encryption.key import Key
 
 
 class KeyGenerator:
-    def __init__(self, secret: Key, iterations: int | None = None) -> None:
-        self._secret = secret
-        self._iterations = iterations
+    def __init__(self, salt: bytes | None = None, label: bytes | None = None) -> None:
+        self._salt: bytes | None = salt
+        self._label: bytes | None = label
 
-    def generate_key(self, salt: bytes, key_size: int = 32) -> Key:
-        return Key(
-            hashlib.pbkdf2_hmac(
-                "sha256",
-                self._secret.value,
-                salt,
-                self._iterations or 2**16,
-                dklen=key_size,
-            )
+    def generate_key(self, secret_key: Key, key_size: int = 32) -> Key:
+        kdf = HKDF(
+            algorithm=hashes.SHA384(),
+            length=key_size,
+            salt=self._salt,
+            info=self._label,
         )
+
+        return Key(kdf.derive(secret_key.value))
