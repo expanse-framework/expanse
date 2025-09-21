@@ -29,17 +29,29 @@ class Portal:
         async with self._app.container.create_scoped_container() as container:
             container.instance(Request, request)
 
-            response = await (
-                Pipeline(container)
-                .use(
-                    [
-                        (await container.get(middleware)).handle
-                        for middleware in self._middleware
-                    ]
+            try:
+                response = await (
+                    Pipeline(container)
+                    .use(
+                        [
+                            (await container.get(middleware)).handle
+                            for middleware in self._middleware
+                        ]
+                    )
+                    .send(request)
+                    .to(partial(self._router.handle, container))
                 )
-                .send(request)
-                .to(partial(self._router.handle, container))
-            )
+            except Exception as e:
+                from expanse.contracts.debug.exception_handler import ExceptionHandler
+
+                if not self._app.container.has(ExceptionHandler):
+                    raise e
+
+                exception_handler = await self._app.container.get(ExceptionHandler)
+
+                await exception_handler.report(e)
+
+                response = await exception_handler.render(request, e)
 
             await response.prepare(request, container)
 
