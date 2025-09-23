@@ -41,6 +41,8 @@ class Portal:
                     .send(request)
                     .to(partial(self._router.handle, container))
                 )
+
+                await response.prepare(request, container)
             except Exception as e:
                 from expanse.contracts.debug.exception_handler import ExceptionHandler
 
@@ -53,7 +55,7 @@ class Portal:
 
                 response = await exception_handler.render(request, e)
 
-            await response.prepare(request, container)
+                await response.prepare(request, container)
 
             return response
 
