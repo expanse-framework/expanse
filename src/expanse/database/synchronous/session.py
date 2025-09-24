@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
 from typing import overload
@@ -6,6 +9,7 @@ from sqlalchemy import CursorResult
 from sqlalchemy import Executable
 from sqlalchemy import Result
 from sqlalchemy import ScalarResult
+from sqlalchemy import Table
 from sqlalchemy import UpdateBase
 from sqlalchemy import text
 from sqlalchemy import util
@@ -15,6 +19,13 @@ from sqlalchemy.orm import Session as BaseSession
 from sqlalchemy.orm._typing import OrmExecuteOptionsParameter
 from sqlalchemy.orm.session import _BindArguments
 from sqlalchemy.sql.selectable import TypedReturnsRows
+
+from expanse.database.pagination import prepare_pagination
+from expanse.pagination.cursor import Cursor
+
+
+if TYPE_CHECKING:
+    from expanse.database.synchronous.cursor_paginator import CursorPaginator
 
 
 _T = TypeVar("_T", bound=Any)
@@ -183,4 +194,82 @@ class Session(BaseSession):
             execution_options=execution_options,
             bind_arguments=bind_arguments,
             **kw,
+        )
+
+    @overload
+    def paginate(
+        self,
+        statement: TypedReturnsRows[tuple[_T]],
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        cursor: Cursor | None = None,
+        per_page: int | None = None,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: _BindArguments | None = None,
+        **kw: Any,
+    ) -> CursorPaginator[_T]: ...
+
+    @overload
+    def paginate(
+        self,
+        statement: Executable,
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        cursor: Cursor | None = None,
+        per_page: int | None = None,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: _BindArguments | None = None,
+        **kw: Any,
+    ) -> CursorPaginator[Any]: ...
+
+    def paginate(
+        self,
+        statement: TypedReturnsRows[tuple[_T]] | Executable,
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        cursor: Cursor | None = None,
+        per_page: int | None = None,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: dict[str, Any] | None = None,
+        **kw: Any,
+    ) -> CursorPaginator[Any]:
+        from expanse.database.synchronous.cursor_paginator import CursorPaginator
+
+        if isinstance(statement, str):
+            statement = text(statement)
+
+        statement, parameters, cursor = prepare_pagination(
+            statement, per_page or 20, cursor=cursor
+        )
+
+        # Determine if we need to return scalars or raw rows.
+        # by checking if all the columns are tables, i.e. complete models in an ORM context.
+        # Only in that case do we return scalars.
+        raw_results = not all(
+            isinstance(column, Table) for column in statement._raw_columns
+        )
+        if raw_results:
+            results = self.execute(
+                statement,
+                params,
+                execution_options=execution_options,
+                bind_arguments=bind_arguments,
+                **kw,
+            ).all()
+        else:
+            results = self.scalars(
+                statement,
+                params,
+                execution_options=execution_options,
+                bind_arguments=bind_arguments,
+                **kw,
+            ).all()
+
+        return CursorPaginator(
+            items=results,
+            query=statement,
+            session=self,
+            per_page=per_page,
+            cursor=cursor,
+            parameters=parameters,
         )
