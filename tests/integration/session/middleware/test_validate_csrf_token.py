@@ -8,6 +8,7 @@ from expanse.core.application import Application
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
+from expanse.encryption.key_generator import KeyGenerator
 from expanse.http.response import Response
 from expanse.session.middleware.load_session import LoadSession
 from expanse.session.middleware.validate_csrf_token import ValidateCSRFToken
@@ -92,7 +93,7 @@ async def test_middleware_retrieves_token_from_query_string(
 async def test_middleware_retrieves_token_from_xsrf_header(
     client: TestClient, router: Router, mockery: Mockery
 ) -> None:
-    encryptor = Encryptor(KeyChain([Key(b"b" * 32)]), b"s" * 32)
+    encryptor = Encryptor(KeyChain([Key(b"b" * 32)]), KeyGenerator(b"s" * 32))
     client.app.container.instance(EncryptorContract, encryptor)
 
     mockery.mock(HTTPSession).should_receive("_generate_csrf_token").and_return("foo")
@@ -102,7 +103,7 @@ async def test_middleware_retrieves_token_from_xsrf_header(
     response = client.post(
         "/",
         json={},
-        headers={"X-XSRF-TOKEN": encryptor.encrypt("foo").dump("base64")},
+        headers={"X-XSRF-TOKEN": encryptor.encrypt("foo")},
     )
 
     assert response.status_code == 200

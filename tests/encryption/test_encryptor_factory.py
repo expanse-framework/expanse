@@ -17,7 +17,6 @@ def test_encryptor_factory_can_create_encryptor(factory: EncryptorFactory) -> No
     encryptor = factory.make()
 
     assert encryptor.has_compression()
-    assert encryptor.has_derivation()
 
 
 def test_encryptor_factory_can_create_encryptor_without_compression(
@@ -26,13 +25,3 @@ def test_encryptor_factory_can_create_encryptor_without_compression(
     encryptor = factory.make(compress=False)
 
     assert not encryptor.has_compression()
-    assert encryptor.has_derivation()
-
-
-def test_encryptor_factory_can_create_encryptor_without_derivation(
-    factory: EncryptorFactory,
-) -> None:
-    encryptor = factory.make(derive=False)
-
-    assert encryptor.has_compression()
-    assert not encryptor.has_derivation()
