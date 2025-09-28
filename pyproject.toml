@@ -3,7 +3,7 @@ name = "expanse"
 version = "0.5.0"
 description = "The limitless Python web framework"
 authors = [{ name = "Sébastien Eustace", email = "sebastien@eustace.io" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 readme = "README.md"
 license = "MIT"
 keywords = [
@@ -80,7 +80,7 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 fix = true
 line-length = 88
-target-version = "py310"
+target-version = "py312"
 src = ["src"]
 extend-exclude = [
     # External to the project's coding standards:
@@ -165,4 +165,4 @@ exclude_lines = [
 [tool.basedpyright]
 reportUnusedCallResult = false
 reportExplicitAny = false
-pythonVersion = "3.11"
+pythonVersion = "3.12"

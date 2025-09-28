@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
     defaults:
       run:
         shell: bash
@@ -57,7 +57,7 @@ jobs:
     strategy:
       matrix:
         os: [macOS, Windows]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
         include:
           - os: Windows
             image: windows-2022
@@ -65,7 +65,7 @@ jobs:
             image: macos-latest
         exclude:
           - os: Windows
-            python-version: "3.13"
+            python-version: ["3.13", "3.14"]
     env:
       DATABASE_HOST: localhost
       DATABASE_NAME: expanse

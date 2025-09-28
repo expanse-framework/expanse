@@ -41,7 +41,7 @@ This will apply the next two migrations.
 
         revision = "head"
         if self.option("step"):
-            revision = f'+{self.option("step").removeprefix("+")}'
+            revision = f"+{self.option('step').removeprefix('+')}"
 
         await run_in_threadpool(
             migrator.migrate,

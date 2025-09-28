@@ -4,8 +4,8 @@ import asyncio
 import ipaddress
 import re
 
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from email.utils import parsedate_to_datetime
 from http import cookies as http_cookies
 from typing import TYPE_CHECKING
@@ -145,7 +145,7 @@ class Request:
             return None
 
         if date.tzinfo is None:
-            return date.replace(tzinfo=timezone.utc)
+            return date.replace(tzinfo=UTC)
 
         return date
 
@@ -575,7 +575,7 @@ class Request:
             try:
                 message = await asyncio.wait_for(self._receive(), timeout=0.0000001)
                 self._is_disconnected = message.get("type") == "http.disconnect"
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
         return self._is_disconnected
 

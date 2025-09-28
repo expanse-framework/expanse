@@ -13,7 +13,6 @@ from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import ForwardRef
-from typing import Generic
 from typing import TypeVar
 from typing import _eval_type  # type: ignore[attr-defined]
 from typing import overload
@@ -125,7 +124,7 @@ def slugify(value, allow_unicode=False):
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
-class cached_property(Generic[T]):  # noqa: N801
+class cached_property[T]:  # noqa: N801
     """
     A property that is only computed once per instance and then replaces
     itself with an ordinary attribute. Deleting the attribute resets the

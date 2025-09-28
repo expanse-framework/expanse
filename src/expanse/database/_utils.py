@@ -1,7 +1,6 @@
 import inspect
 
 from typing import Any
-from typing import TypeVar
 from typing import cast
 from typing import overload
 
@@ -21,11 +20,10 @@ from sqlalchemy.pool import _AdhocProxiedConnection
 from sqlalchemy.sql import compiler
 
 
-_T = TypeVar("_T", bound=Engine)
-
-
 @overload
-def create_engine(url: str | URL, engine_class: type[_T], **kwargs: Any) -> _T: ...
+def create_engine[T: Engine](
+    url: str | URL, engine_class: type[T], **kwargs: Any
+) -> T: ...
 
 
 @overload
@@ -34,9 +32,9 @@ def create_engine(
 ) -> base.Engine: ...
 
 
-def create_engine(
-    url: str | URL, engine_class: type[_T] | None = None, **kwargs: Any
-) -> _T | base.Engine:
+def create_engine[T: Engine](
+    url: str | URL, engine_class: type[T] | None = None, **kwargs: Any
+) -> T | base.Engine:
     """
     This is a direct copy of the create_engine function from SQLAlchemy with added
     support for specifying the engine class. This is mainly useful to help with typing
@@ -143,7 +141,7 @@ def create_engine(
             if dialect._has_events:
                 for fn in dialect.dispatch.do_connect:
                     connection = cast(
-                        DBAPIConnection,
+                        "DBAPIConnection",
                         fn(dialect, connection_record, cargs, cparams),
                     )
                     if connection is not None:
@@ -175,8 +173,7 @@ def create_engine(
     # create engine.
     if not pop_kwarg("future", True):
         raise exc.ArgumentError(
-            "The 'future' parameter passed to "
-            "create_engine() may only be set to True."
+            "The 'future' parameter passed to create_engine() may only be set to True."
         )
 
     engineclass = engine_class or base.Engine

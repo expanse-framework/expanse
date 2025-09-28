@@ -36,7 +36,7 @@ The --reset option can be used to rollback all migrations.
 
         revision = "-1"
         if self.option("step"):
-            revision = f'-{self.option("step").removeprefix("-")}'
+            revision = f"-{self.option('step').removeprefix('-')}"
 
         if self.option("reset"):
             revision = "base"

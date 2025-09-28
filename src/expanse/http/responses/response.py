@@ -4,7 +4,6 @@ import asyncio
 
 from typing import TYPE_CHECKING
 from typing import Self
-from typing import TypeAlias
 from typing import TypeVar
 from typing import overload
 
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
-Cookies: TypeAlias = dict[str, Cookie]
+type Cookies = dict[str, Cookie]
 
 
 class Response:

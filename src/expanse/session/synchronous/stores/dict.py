@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from typing import TYPE_CHECKING
 from typing import Any
 
@@ -24,7 +24,7 @@ class DictStore(Store):
 
         data = self._sessions[session_id]
 
-        expiration = datetime.now(timezone.utc) - timedelta(minutes=self._lifetime)
+        expiration = datetime.now(UTC) - timedelta(minutes=self._lifetime)
 
         if "time" in data and data["time"] >= expiration:
             return data["data"]
@@ -33,7 +33,7 @@ class DictStore(Store):
 
     def write(self, session_id: str, data: str, request: Request | None = None) -> None:
         self._sessions[session_id] = {
-            "time": datetime.now(timezone.utc),
+            "time": datetime.now(UTC),
             "data": data,
         }
 
@@ -47,7 +47,7 @@ class DictStore(Store):
             if "time" not in session_data:
                 continue
 
-            expiration = datetime.now(timezone.utc) - timedelta(minutes=self._lifetime)
+            expiration = datetime.now(UTC) - timedelta(minutes=self._lifetime)
 
             if session_data["time"] < expiration:
                 expired_ids.append(session_id)
