@@ -13,17 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Poetry
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: 3.13
-          cache: poetry
       - name: Install dependencies
-        run: poetry install --with test
+        run: uv sync --group test
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          run: poetry run pytest tests/benchmarks
+          run: uv run pytest tests/benchmarks

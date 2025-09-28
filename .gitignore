@@ -1,3 +1,7 @@
+# Lock files
+poetry.lock
+uv.lock
+
 *.pyc
 
 # Packages

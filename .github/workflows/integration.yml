@@ -3,7 +3,7 @@ name: Integration
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [main]
 
 env:
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
@@ -22,16 +22,13 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Install CLI
-        run: pipx install expanse-cli
-
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
           python-version: 3.13
 
       - name: Create project
-        run: expanse new my-app
+        run: uvx --from expanse-cli expanse new my-app
 
       - name: Setup project
         run: |
@@ -58,4 +55,4 @@ jobs:
       #- name: Start server
       #  run: |
       #    cd my-app
-      #    poetry run python ./beam serve --port 8000 & curl -s http://localhost:8000
+      #    uv run python ./beam serve --port 8000 & curl -s http://localhost:8000
