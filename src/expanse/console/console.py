@@ -325,7 +325,7 @@ class Console:
         return exit_code
 
     def get_help_command(self, command: Command) -> Command:
-        help_command: HelpCommand = cast(HelpCommand, self.get("help"))
+        help_command: HelpCommand = cast("HelpCommand", self.get("help"))
         help_command.set_command(command)
 
         return help_command

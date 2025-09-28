@@ -9,4 +9,4 @@ class Engine(BaseEngine):
     _connection_cls = Connection
 
     def connect(self) -> Connection:
-        return cast(Connection, super().connect())
+        return cast("Connection", super().connect())

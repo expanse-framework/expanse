@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import base64
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import NamedTuple
@@ -58,7 +58,7 @@ class AsyncDatabaseStore(AsyncStore):
     async def read(self, session_id: str) -> str:
         async with self._db.connection(self._database_name) as connection:
             session: SessionRow | None = cast(
-                SessionRow | None,
+                "SessionRow | None",
                 (
                     await connection.execute(
                         self._table.select().where(column("id") == session_id)
@@ -127,7 +127,7 @@ class AsyncDatabaseStore(AsyncStore):
             result = await connection.execute(
                 self._table.delete().where(
                     column("last_activity")
-                    < datetime.now(timezone.utc) - timedelta(minutes=self._lifetime)
+                    < datetime.now(UTC) - timedelta(minutes=self._lifetime)
                 )
             )
 
@@ -138,16 +138,14 @@ class AsyncDatabaseStore(AsyncStore):
     def _is_session_expired(self, session: SessionRow) -> bool:
         last_activity = session.last_activity
         if last_activity.tzinfo is None:
-            last_activity = last_activity.replace(tzinfo=timezone.utc)
+            last_activity = last_activity.replace(tzinfo=UTC)
 
-        return (
-            datetime.now(timezone.utc) - last_activity
-        ).total_seconds() > self._lifetime * 60
+        return (datetime.now(UTC) - last_activity).total_seconds() > self._lifetime * 60
 
     def _get_payload(self, data: str, request: Request | None = None) -> dict[str, Any]:
         payload = {
             "payload": base64.b64encode(data.encode()).decode(),
-            "last_activity": datetime.now(timezone.utc),
+            "last_activity": datetime.now(UTC),
         }
 
         if not request:

@@ -4,17 +4,14 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 from collections.abc import Mapping
 from typing import Any
-from typing import Generic
 from typing import TypeVar
 from typing import cast
 
 
 T = TypeVar("T")  # Any type.
-KT = TypeVar("KT")  # Key type.
-VT = TypeVar("VT")  # Value type.
 
 
-class MultiMapping(Generic[KT, VT], Mapping[KT, VT]):
+class MultiMapping[KT, VT](Mapping[KT, VT]):
     __slots__ = ("_dict", "_list")
 
     def __init__(
@@ -25,9 +22,9 @@ class MultiMapping(Generic[KT, VT], Mapping[KT, VT]):
         if raw is None:
             _items = []
         elif isinstance(raw, MultiMapping):
-            _items = cast(list[tuple[KT, VT]], list(raw.multi_items()))
+            _items = cast("list[tuple[KT, VT]]", list(raw.multi_items()))
         elif isinstance(raw, Mapping):
-            _items = cast(list[tuple[KT, VT]], list(raw.items()))
+            _items = cast("list[tuple[KT, VT]]", list(raw.items()))
         else:
             _items = list(raw)
 

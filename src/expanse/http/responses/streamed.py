@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 from collections.abc import Mapping
 from functools import partial
-from typing import TypeAlias
 from typing import TypeVar
 
 from anyio import CancelScope
@@ -20,7 +19,7 @@ from expanse.types import Send
 
 T = TypeVar("T")
 
-StreamType: TypeAlias = Iterable[T] | Iterator[T] | AsyncIterable[T] | AsyncIterator[T]
+type StreamType[T] = Iterable[T] | Iterator[T] | AsyncIterable[T] | AsyncIterator[T]
 
 
 class StreamedResponse(Response):

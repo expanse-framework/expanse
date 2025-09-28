@@ -3,7 +3,6 @@ import dataclasses
 from collections.abc import MutableMapping
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import Generic
 from typing import TypeVar
 from typing import cast
 
@@ -32,10 +31,7 @@ class Field:
         return self.error is not None
 
 
-T = TypeVar("T", bound=BaseModel)
-
-
-class Form(Generic[T]):
+class Form[T: BaseModel]:
     data: T | None
     _model: type[T] | None = None
 
@@ -61,7 +57,7 @@ class Form(Generic[T]):
                     self.errors = e.errors()
 
                     for error in self.errors:
-                        field = self.fields.get(cast(str, error["loc"][0]))
+                        field = self.fields.get(cast("str", error["loc"][0]))
                         if not field:
                             continue
 

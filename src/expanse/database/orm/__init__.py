@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from typing import Any
 from typing import Literal
-from typing import TypeVar
 
 from sqlalchemy.orm import MappedColumn
 from sqlalchemy.orm import mapped_column
@@ -15,17 +14,14 @@ from sqlalchemy.sql.schema import SchemaConst
 from sqlalchemy.sql.schema import _ServerDefaultArgument
 
 
-_T = TypeVar("_T")
-
-
-def column(
+def column[T](
     __name_pos: str | _TypeEngineArgument | SchemaEventTarget | None = None,
     __type_pos: _TypeEngineArgument | SchemaEventTarget | None = None,
     *args: SchemaEventTarget,
     init: bool = False,
     repr: _NoArg | bool = _NoArg.NO_ARG,
     default: Any | None = _NoArg.NO_ARG,
-    default_factory: _NoArg | Callable[[], _T] = _NoArg.NO_ARG,
+    default_factory: _NoArg | Callable[[], T] = _NoArg.NO_ARG,
     compare: _NoArg | bool = _NoArg.NO_ARG,
     kw_only: _NoArg | bool = _NoArg.NO_ARG,
     nullable: bool

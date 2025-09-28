@@ -50,7 +50,7 @@ class MakeModelCommand(MigrationCommand):
 
         if models_path.joinpath(f"{module_name}.py").exists():
             self.line(
-                f'  - <warning>Model file <c1>{app.path(f"models/{module_name}.py", relative=True)}</c1> already exists.</warning>'
+                f"  - <warning>Model file <c1>{app.path(f'models/{module_name}.py', relative=True)}</c1> already exists.</warning>"
             )
 
             return 1
@@ -64,7 +64,7 @@ class MakeModelCommand(MigrationCommand):
         )
 
         self.line(
-            f'  - Generated file: <c1>{app.path(f"models/{module_name}.py", relative=True)}</c1>'
+            f"  - Generated file: <c1>{app.path(f'models/{module_name}.py', relative=True)}</c1>"
         )
 
         return 0

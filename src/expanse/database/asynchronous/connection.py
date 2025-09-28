@@ -147,4 +147,4 @@ class AsyncConnection(BaseAsyncConnection):
         return self
 
     def __await__(self) -> Generator[Any, None, Self]:
-        return cast(Generator[Any, None, Self], super().__await__())
+        return cast("Generator[Any, None, Self]", super().__await__())

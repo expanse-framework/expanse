@@ -1,8 +1,8 @@
 import json
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 
 from expanse.session.asynchronous.stores.wrapper import AsyncWrapperStore
 from expanse.session.synchronous.stores.dict import DictStore
@@ -13,7 +13,7 @@ async def test_store_can_read_from_the_dict() -> None:
 
     store = DictStore(120)
     store._sessions[session_id] = {
-        "time": datetime.now(timezone.utc),
+        "time": datetime.now(UTC),
         "data": json.dumps({"foo": "bar"}),
     }
     async_store = AsyncWrapperStore(store)
@@ -26,7 +26,7 @@ async def test_store_can_write_session_data() -> None:
 
     store = DictStore(120)
     store._sessions[session_id] = {
-        "time": datetime.now(timezone.utc),
+        "time": datetime.now(UTC),
         "data": json.dumps({"foo": "bar"}),
     }
     async_store = AsyncWrapperStore(store)
@@ -36,7 +36,7 @@ async def test_store_can_write_session_data() -> None:
     session = store._sessions[session_id]
 
     assert session["data"] == json.dumps({"bar": "baz"})
-    assert session["time"] <= datetime.now(timezone.utc)
+    assert session["time"] <= datetime.now(UTC)
 
 
 async def test_store_can_delete_session_data() -> None:
@@ -44,7 +44,7 @@ async def test_store_can_delete_session_data() -> None:
 
     store = DictStore(120)
     store._sessions[session_id] = {
-        "time": datetime.now(timezone.utc),
+        "time": datetime.now(UTC),
         "data": json.dumps({"foo": "bar"}),
     }
     async_store = AsyncWrapperStore(store)
@@ -59,11 +59,11 @@ async def test_expired_sessions_can_be_cleared() -> None:
 
     store = DictStore(120)
     store._sessions[session_id] = {
-        "time": datetime.now(timezone.utc),
+        "time": datetime.now(UTC),
         "data": json.dumps({"foo": "bar"}),
     }
     store._sessions["t" * 40] = {
-        "time": datetime.now(timezone.utc) - timedelta(minutes=180),
+        "time": datetime.now(UTC) - timedelta(minutes=180),
         "data": json.dumps({"foo": "bar"}),
     }
     async_store = AsyncWrapperStore(store)

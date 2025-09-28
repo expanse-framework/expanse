@@ -10,7 +10,6 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
 from contextvars import copy_context
-from typing import Generic
 from typing import ParamSpec
 from typing import TypeVar
 
@@ -54,7 +53,7 @@ async def run_in_threadpool(
     return result
 
 
-class AsyncIteratorWrapper(Generic[T]):
+class AsyncIteratorWrapper[T]:
     __slots__ = ("generator", "iterator")
 
     def __init__(self, iterator: Iterator[T] | Iterable[T]) -> None:

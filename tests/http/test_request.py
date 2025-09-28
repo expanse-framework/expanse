@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from datetime import timezone
+from datetime import UTC
 from email.utils import formatdate
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -404,7 +404,7 @@ class TestRequestDate:
 
         date = request.date
         assert date is not None
-        assert date.tzinfo == timezone.utc
+        assert date.tzinfo == UTC
 
     def test_date_invalid(self) -> None:
         scope: PartialScope = {"headers": [(b"date", b"invalid-date")]}
@@ -422,7 +422,7 @@ class TestRequestDate:
 
         date = request.date
         assert date is not None
-        assert date.tzinfo == timezone.utc
+        assert date.tzinfo == UTC
 
 
 class TestRequestReferrer:

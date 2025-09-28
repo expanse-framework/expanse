@@ -1,4 +1,3 @@
-# ruff: noqa: I002
 import asyncio
 import builtins
 import collections
@@ -398,8 +397,8 @@ class Container:
                 except ContainerException as e:
                     raise ResolutionException(
                         f'Unable to resolve dependency with name "{parameter.name}" '
-                        f'(type: {klass.__module__ + "." + klass.__qualname__}) '
-                        f'{f"in {callable.__qualname__}" if callable else ""}'
+                        f"(type: {klass.__module__ + '.' + klass.__qualname__}) "
+                        f"{f'in {callable.__qualname__}' if callable else ''}"
                     ) from e
 
         return positional, keywords

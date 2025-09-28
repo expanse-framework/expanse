@@ -1,9 +1,9 @@
 import base64
 import json
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 
 import pytest
 
@@ -44,7 +44,7 @@ async def test_store_can_read_from_the_database(
                     "payload": base64.b64encode(
                         json.dumps({"foo": "bar"}).encode()
                     ).decode(),
-                    "last_activity": datetime.now(timezone.utc),
+                    "last_activity": datetime.now(UTC),
                 }
             )
         )
@@ -79,7 +79,7 @@ async def test_store_can_write_to_the_database(
                     "payload": base64.b64encode(
                         json.dumps({"foo": "bar"}).encode()
                     ).decode(),
-                    "last_activity": datetime.now(timezone.utc),
+                    "last_activity": datetime.now(UTC),
                 }
             )
         )
@@ -125,7 +125,7 @@ async def test_store_can_delete_from_the_database(
                     "payload": base64.b64encode(
                         json.dumps({"foo": "bar"}).encode()
                     ).decode(),
-                    "last_activity": datetime.now(timezone.utc),
+                    "last_activity": datetime.now(UTC),
                 }
             )
         )
@@ -171,7 +171,7 @@ async def test_writing_to_store_works_for_non_natively_supported_dialect(
                     "payload": base64.b64encode(
                         json.dumps({"foo": "bar"}).encode()
                     ).decode(),
-                    "last_activity": datetime.now(timezone.utc),
+                    "last_activity": datetime.now(UTC),
                 }
             )
         )
@@ -217,7 +217,7 @@ async def test_expired_sessions_can_be_cleared(
                         "payload": base64.b64encode(
                             json.dumps({"foo": "bar"}).encode()
                         ).decode(),
-                        "last_activity": datetime.now(timezone.utc),
+                        "last_activity": datetime.now(UTC),
                     },
                     {
                         "id": "t" * 40,
@@ -226,8 +226,7 @@ async def test_expired_sessions_can_be_cleared(
                         "payload": base64.b64encode(
                             json.dumps({"foo": "bar"}).encode()
                         ).decode(),
-                        "last_activity": datetime.now(timezone.utc)
-                        - timedelta(minutes=180),
+                        "last_activity": datetime.now(UTC) - timedelta(minutes=180),
                     },
                 ]
             )

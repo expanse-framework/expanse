@@ -1,5 +1,5 @@
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 import pytest
 
@@ -74,7 +74,7 @@ def test_cookies_get_expires() -> None:
             hour=12,
             minute=34,
             second=56,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
     )
 
@@ -148,9 +148,9 @@ def test_cookies_to_string() -> None:
     )
     expected = "name=value; expires=Wed, 12 Mar 2025 12:34:56 GMT; Max-Age=0; domain=example.com; path=/; secure; httponly"
 
-    assert (
-        str(cookie) == expected
-    ), "__str__() returns the correct string representation"
+    assert str(cookie) == expected, (
+        "__str__() returns the correct string representation"
+    )
 
     cookie = Cookie(
         "name",
@@ -178,9 +178,9 @@ def test_cookies_to_string() -> None:
     )
     expected = "name=deleted; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; domain=example.com; path=/path; secure; httponly"
 
-    assert (
-        str(cookie) == expected
-    ), "__str__() returns the correct string representation for cleared cookies"
+    assert str(cookie) == expected, (
+        "__str__() returns the correct string representation for cleared cookies"
+    )
 
     cookie = Cookie(
         "name",
@@ -194,9 +194,9 @@ def test_cookies_to_string() -> None:
     )
     expected = 'name="value with spaces"; expires=Wed, 12 Mar 2025 12:34:56 GMT; Max-Age=0; domain=example.com; path=/; secure; httponly; samesite=strict'
 
-    assert (
-        str(cookie) == expected
-    ), "__str__() returns the correct string representation with same site"
+    assert str(cookie) == expected, (
+        "__str__() returns the correct string representation with same site"
+    )
 
     cookie = Cookie(
         "name",
@@ -211,9 +211,9 @@ def test_cookies_to_string() -> None:
     )
     expected = 'name="value with spaces"; expires=Wed, 12 Mar 2025 12:34:56 GMT; Max-Age=0; domain=example.com; path=/; secure; httponly; samesite=strict; partitioned'
 
-    assert (
-        str(cookie) == expected
-    ), "__str__() returns the correct string representation with partitioned cookies"
+    assert str(cookie) == expected, (
+        "__str__() returns the correct string representation with partitioned cookies"
+    )
 
 
 def test_cookies_set_secure_default() -> None:

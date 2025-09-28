@@ -38,7 +38,7 @@ class MakeMiddlewareCommand(Command):
 
         if middleware_path.joinpath(f"{module_name}.py").exists():
             self.line(
-                f'  - <warning>The middleware file <c1>{app.path(f"http/middleware/{module_name}.py", relative=True)}</c1> already exists.</warning>'
+                f"  - <warning>The middleware file <c1>{app.path(f'http/middleware/{module_name}.py', relative=True)}</c1> already exists.</warning>"
             )
 
             return 1
@@ -50,7 +50,7 @@ class MakeMiddlewareCommand(Command):
 
         self.line("")
         self.line(
-            f'  - Generated file: <c1>{app.path(f"http/middleware/{module_name}.py", relative=True)}</c1>'
+            f"  - Generated file: <c1>{app.path(f'http/middleware/{module_name}.py', relative=True)}</c1>"
         )
 
         return 0
