@@ -26,3 +26,6 @@ class GeneratorConfig:
         prefix = self._config.get("api_path", "/api").rstrip("/")
 
         return route.path.startswith(f"{prefix}/") or route.path == f"/{prefix}"
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return self._config.get(key, default)

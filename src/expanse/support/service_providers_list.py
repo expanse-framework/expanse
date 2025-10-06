@@ -38,5 +38,6 @@ class ServiceProvidersList:
                 "expanse.encryption.encryption_service_provider.EncryptionServiceProvider",
                 "expanse.session.session_service_provider.SessionServiceProvider",
                 "expanse.schematic.schematic_service_provider.SchematicServiceProvider",
+                "expanse.openapi.openapi_service_provider.OpenAPIServiceProvider",
             ]
         )
