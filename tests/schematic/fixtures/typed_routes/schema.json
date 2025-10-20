@@ -1,0 +1,226 @@
+{
+  "info": {
+    "description": "This is a test API.",
+    "title": "API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/users": {
+      "get": {
+        "operationId": "api.user.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "email": {
+                        "title": "Email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "title": "Id",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "title": "Name",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "email"
+                    ],
+                    "title": "UserResponse",
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "post": {
+        "operationId": "api.user.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "title": "Email",
+                    "type": "string"
+                  },
+                  "name": {
+                    "title": "Name",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "title": "UserRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "email": {
+                      "title": "Email",
+                      "type": "string"
+                    },
+                    "id": {
+                      "title": "Id",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "title": "Name",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "email"
+                  ],
+                  "title": "UserResponse",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/users/{user_id}": {
+      "delete": {
+        "operationId": "api.user.delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "api.user.update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "title": "Email",
+                    "type": "string"
+                  },
+                  "name": {
+                    "title": "Name",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "title": "UserRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "email": {
+                      "title": "Email",
+                      "type": "string"
+                    },
+                    "id": {
+                      "title": "Id",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "title": "Name",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "email"
+                  ],
+                  "title": "UserResponse",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    }
+  }
+}

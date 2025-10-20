@@ -39,7 +39,7 @@ class RequestBody:
         self.description = description
         return self
 
-    def set_content(self, content_type: str, media_type: "MediaType") -> Self:
+    def set_content(self, content_type: str, media_type: MediaType) -> Self:
         """
         Set the content of the request body.
 
@@ -53,7 +53,7 @@ class RequestBody:
         self.content[content_type] = media_type
         return self
 
-    def add_content(self, content_type: str, media_type: "MediaType") -> Self:
+    def add_content(self, content_type: str, media_type: MediaType) -> Self:
         """
         Add content for a specific media type.
 

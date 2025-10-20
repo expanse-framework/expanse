@@ -25,7 +25,7 @@ class ExternalDocumentation:
         self.url: str = url
         self.description: str | None = description
 
-    def set_description(self, description: str) -> "ExternalDocumentation":
+    def set_description(self, description: str) -> ExternalDocumentation:
         """
         Set a description of the target documentation.
 
@@ -68,7 +68,7 @@ class Tag:
         self.description: str | None = None
         self.external_docs: ExternalDocumentation | None = None
 
-    def set_description(self, description: str) -> "Tag":
+    def set_description(self, description: str) -> Tag:
         """
         Set a description for the tag.
 
@@ -82,7 +82,7 @@ class Tag:
         self.description = description
         return self
 
-    def set_external_docs(self, external_docs: ExternalDocumentation) -> "Tag":
+    def set_external_docs(self, external_docs: ExternalDocumentation) -> Tag:
         """
         Set additional external documentation for this tag.
 

@@ -30,7 +30,7 @@ class Response:
         self.content: dict[str, MediaType] = {}
         self.links: dict[str, Link | Reference] = {}
 
-    def add_header(self, name: str, header: "Header | Reference") -> "Response":
+    def add_header(self, name: str, header: Header | Reference) -> Response:
         """
         Add a header to the response.
 
@@ -44,7 +44,7 @@ class Response:
         self.headers[name] = header
         return self
 
-    def add_content(self, media_type: str, content: "MediaType") -> "Response":
+    def add_content(self, media_type: str, content: MediaType) -> Response:
         """
         Add content description for a specific media type.
 
@@ -58,7 +58,7 @@ class Response:
         self.content[media_type] = content
         return self
 
-    def add_link(self, name: str, link: "Link | Reference") -> "Response":
+    def add_link(self, name: str, link: Link | Reference) -> Response:
         """
         Add a link to the response.
 

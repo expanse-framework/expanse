@@ -1,0 +1,291 @@
+{
+  "info": {
+    "description": "This is a test API.",
+    "title": "API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/users": {
+      "get": {
+        "description": "Additional description.",
+        "operationId": "api.user.list",
+        "parameters": [
+          {
+            "description": "The name of the user",
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The email of the user",
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "email": {
+                        "description": "The email of the user",
+                        "example": "foo@bar.com",
+                        "title": "Email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "title": "Id",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "description": "The name of the user",
+                        "examples": [
+                          "John Doe",
+                          "Jane Doe"
+                        ],
+                        "title": "Name",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "email"
+                    ],
+                    "title": "UserResponse",
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "The user is not authorized to list users."
+          }
+        },
+        "summary": "List users with optional filtering."
+      },
+      "post": {
+        "description": "Additional description.",
+        "operationId": "api.user.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "description": "The email of the user",
+                    "example": "foo@bar.com",
+                    "title": "Email",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "The name of the user",
+                    "examples": [
+                      "John Doe",
+                      "Jane Doe"
+                    ],
+                    "title": "Name",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "title": "UserRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "email": {
+                      "description": "The email of the user",
+                      "example": "foo@bar.com",
+                      "title": "Email",
+                      "type": "string"
+                    },
+                    "id": {
+                      "title": "Id",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name of the user",
+                      "examples": [
+                        "John Doe",
+                        "Jane Doe"
+                      ],
+                      "title": "Name",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "email"
+                  ],
+                  "title": "UserResponse",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "The user is not authorized to create a user."
+          },
+          "422": {
+            "description": "The request data is invalid."
+          }
+        },
+        "summary": "Create a new user."
+      }
+    },
+    "/api/users/{user_id}": {
+      "delete": {
+        "description": "Additional description.",
+        "operationId": "api.user.delete",
+        "parameters": [
+          {
+            "description": "The ID of the user to delete.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "204 No Content response on successful deletion."
+          },
+          "403": {
+            "description": "The user is not authorized to delete a user."
+          },
+          "404": {
+            "description": "The user is not found."
+          }
+        },
+        "summary": "Delete an existing user."
+      },
+      "patch": {
+        "description": "Additional description.",
+        "operationId": "api.user.update",
+        "parameters": [
+          {
+            "description": "The ID of the user to update.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "description": "The email of the user",
+                    "example": "foo@bar.com",
+                    "title": "Email",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "The name of the user",
+                    "examples": [
+                      "John Doe",
+                      "Jane Doe"
+                    ],
+                    "title": "Name",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "title": "UserRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "email": {
+                      "description": "The email of the user",
+                      "example": "foo@bar.com",
+                      "title": "Email",
+                      "type": "string"
+                    },
+                    "id": {
+                      "title": "Id",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name of the user",
+                      "examples": [
+                        "John Doe",
+                        "Jane Doe"
+                      ],
+                      "title": "Name",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "email"
+                  ],
+                  "title": "UserResponse",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "The user is not authorized to update a user."
+          },
+          "404": {
+            "description": "The user is not found."
+          },
+          "422": {
+            "description": "The request data is invalid."
+          }
+        },
+        "summary": "Update an existing user."
+      }
+    }
+  }
+}

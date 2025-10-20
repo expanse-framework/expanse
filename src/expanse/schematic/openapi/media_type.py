@@ -30,7 +30,7 @@ class Encoding:
         self.explode: bool | None = None
         self.allow_reserved: bool = False
 
-    def set_style(self, style: str) -> "Encoding":
+    def set_style(self, style: str) -> Encoding:
         """
         Set how a specific property value will be serialized.
 
@@ -43,7 +43,7 @@ class Encoding:
         self.style = style
         return self
 
-    def set_explode(self, explode: bool) -> "Encoding":
+    def set_explode(self, explode: bool) -> Encoding:
         """
         Set whether property values of type array or object generate separate parameters.
 
@@ -56,7 +56,7 @@ class Encoding:
         self.explode = explode
         return self
 
-    def set_allow_reserved(self, allow_reserved: bool) -> "Encoding":
+    def set_allow_reserved(self, allow_reserved: bool) -> Encoding:
         """
         Set whether reserved characters should be allowed without percent-encoding.
 
@@ -69,7 +69,7 @@ class Encoding:
         self.allow_reserved = allow_reserved
         return self
 
-    def add_header(self, name: str, header: "Header | Reference") -> "Encoding":
+    def add_header(self, name: str, header: Header | Reference) -> Encoding:
         """
         Add a header to the encoding.
 
@@ -115,7 +115,7 @@ class MediaType:
     Each Media Type Object provides schema and examples for the media type identified by its key.
     """
 
-    def __init__(self, schema: "Schema | None" = None) -> None:
+    def __init__(self, schema: Schema | None = None) -> None:
         """
         Initialize a MediaType object.
 
@@ -127,7 +127,7 @@ class MediaType:
         self.examples: dict[str, Example | Reference] = {}
         self.encoding: dict[str, Encoding] = {}
 
-    def set_schema(self, schema: "Schema") -> "MediaType":
+    def set_schema(self, schema: Schema) -> MediaType:
         """
         Set the schema for this media type.
 
@@ -140,7 +140,7 @@ class MediaType:
         self.schema = schema
         return self
 
-    def set_example(self, example: Any) -> "MediaType":
+    def set_example(self, example: Any) -> MediaType:
         """
         Set an example of the media type.
 
@@ -154,7 +154,7 @@ class MediaType:
         self.example = example
         return self
 
-    def add_example(self, name: str, example: "Example | Reference") -> "MediaType":
+    def add_example(self, name: str, example: Example | Reference) -> MediaType:
         """
         Add a named example of the media type.
 
@@ -168,7 +168,7 @@ class MediaType:
         self.examples[name] = example
         return self
 
-    def add_encoding(self, property_name: str, encoding: Encoding) -> "MediaType":
+    def add_encoding(self, property_name: str, encoding: Encoding) -> MediaType:
         """
         Add encoding information for a property.
 

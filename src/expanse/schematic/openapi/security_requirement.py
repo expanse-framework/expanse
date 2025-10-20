@@ -23,7 +23,7 @@ class SecurityRequirement:
 
     def add_requirement(
         self, name: str, scopes: list[str] | None = None
-    ) -> "SecurityRequirement":
+    ) -> SecurityRequirement:
         """
         Add a security requirement.
 
@@ -43,7 +43,7 @@ class SecurityRequirement:
         self.requirements[name] = scopes or []
         return self
 
-    def remove_requirement(self, name: str) -> "SecurityRequirement":
+    def remove_requirement(self, name: str) -> SecurityRequirement:
         """
         Remove a security requirement.
 
@@ -80,7 +80,7 @@ class SecurityRequirement:
         """
         return name in self.requirements
 
-    def clear(self) -> "SecurityRequirement":
+    def clear(self) -> SecurityRequirement:
         """
         Clear all security requirements.
 

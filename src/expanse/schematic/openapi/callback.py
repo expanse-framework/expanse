@@ -23,8 +23,8 @@ class Callback:
         self.expressions: dict[str, PathItem | Reference] = {}
 
     def add_expression(
-        self, expression: str, path_item: "PathItem | Reference"
-    ) -> "Callback":
+        self, expression: str, path_item: PathItem | Reference
+    ) -> Callback:
         """
         Add a callback expression.
 

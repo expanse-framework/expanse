@@ -37,7 +37,7 @@ class OAuthFlow:
         self.refresh_url: str | None = refresh_url
         self.scopes: dict[str, str] = scopes or {}
 
-    def set_authorization_url(self, url: str) -> "OAuthFlow":
+    def set_authorization_url(self, url: str) -> OAuthFlow:
         """
         Set the authorization URL.
 
@@ -51,7 +51,7 @@ class OAuthFlow:
         self.authorization_url = url
         return self
 
-    def set_token_url(self, url: str) -> "OAuthFlow":
+    def set_token_url(self, url: str) -> OAuthFlow:
         """
         Set the token URL.
 
@@ -65,7 +65,7 @@ class OAuthFlow:
         self.token_url = url
         return self
 
-    def set_refresh_url(self, url: str) -> "OAuthFlow":
+    def set_refresh_url(self, url: str) -> OAuthFlow:
         """
         Set the refresh URL.
 
@@ -79,7 +79,7 @@ class OAuthFlow:
         self.refresh_url = url
         return self
 
-    def add_scope(self, name: str, description: str) -> "OAuthFlow":
+    def add_scope(self, name: str, description: str) -> OAuthFlow:
         """
         Add a scope to the OAuth2 security scheme.
 
@@ -93,7 +93,7 @@ class OAuthFlow:
         self.scopes[name] = description
         return self
 
-    def set_scopes(self, scopes: dict[str, str]) -> "OAuthFlow":
+    def set_scopes(self, scopes: dict[str, str]) -> OAuthFlow:
         """
         Set the available scopes for the OAuth2 security scheme.
 
@@ -140,7 +140,7 @@ class OAuthFlows:
         self.client_credentials: OAuthFlow | None = None
         self.authorization_code: OAuthFlow | None = None
 
-    def set_implicit(self, flow: OAuthFlow) -> "OAuthFlows":
+    def set_implicit(self, flow: OAuthFlow) -> OAuthFlows:
         """
         Set configuration for the OAuth Implicit flow.
 
@@ -153,7 +153,7 @@ class OAuthFlows:
         self.implicit = flow
         return self
 
-    def set_password(self, flow: OAuthFlow) -> "OAuthFlows":
+    def set_password(self, flow: OAuthFlow) -> OAuthFlows:
         """
         Set configuration for the OAuth Resource Owner Password flow.
 
@@ -166,7 +166,7 @@ class OAuthFlows:
         self.password = flow
         return self
 
-    def set_client_credentials(self, flow: OAuthFlow) -> "OAuthFlows":
+    def set_client_credentials(self, flow: OAuthFlow) -> OAuthFlows:
         """
         Set configuration for the OAuth Client Credentials flow.
 
@@ -180,7 +180,7 @@ class OAuthFlows:
         self.client_credentials = flow
         return self
 
-    def set_authorization_code(self, flow: OAuthFlow) -> "OAuthFlows":
+    def set_authorization_code(self, flow: OAuthFlow) -> OAuthFlows:
         """
         Set configuration for the OAuth Authorization Code flow.
 
@@ -281,7 +281,7 @@ class SecurityScheme:
         name: str,
         in_: Literal["query", "header", "cookie"],
         description: str | None = None,
-    ) -> "SecurityScheme":
+    ) -> SecurityScheme:
         """
         Create an API Key security scheme.
 
@@ -305,7 +305,7 @@ class SecurityScheme:
         scheme: str,
         bearer_format: str | None = None,
         description: str | None = None,
-    ) -> "SecurityScheme":
+    ) -> SecurityScheme:
         """
         Create an HTTP authentication security scheme.
 
@@ -324,7 +324,7 @@ class SecurityScheme:
         return security_scheme
 
     @classmethod
-    def mutual_tls(cls, description: str | None = None) -> "SecurityScheme":
+    def mutual_tls(cls, description: str | None = None) -> SecurityScheme:
         """
         Create a mutual TLS security scheme.
 
@@ -341,7 +341,7 @@ class SecurityScheme:
     @classmethod
     def oauth2(
         cls, flows: OAuthFlows, description: str | None = None
-    ) -> "SecurityScheme":
+    ) -> SecurityScheme:
         """
         Create an OAuth2 security scheme.
 
@@ -360,7 +360,7 @@ class SecurityScheme:
     @classmethod
     def open_id_connect(
         cls, open_id_connect_url: str, description: str | None = None
-    ) -> "SecurityScheme":
+    ) -> SecurityScheme:
         """
         Create an OpenID Connect security scheme.
 
@@ -377,7 +377,7 @@ class SecurityScheme:
         scheme.description = description
         return scheme
 
-    def set_description(self, description: str) -> "SecurityScheme":
+    def set_description(self, description: str) -> SecurityScheme:
         """
         Set a description for the security scheme.
 

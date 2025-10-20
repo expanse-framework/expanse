@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 from typing import Any
 
@@ -79,6 +77,171 @@ class Schema:
         self.read_only: bool = False
         self.write_only: bool = False
         self.nullable: bool = False
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], type: Type | None = None) -> Schema:
+        from expanse.schematic.openapi.types import ArrayType
+        from expanse.schematic.openapi.types import BooleanType
+        from expanse.schematic.openapi.types import IntegerType
+        from expanse.schematic.openapi.types import NumberType
+        from expanse.schematic.openapi.types import ObjectType
+        from expanse.schematic.openapi.types import StringType
+
+        # Handle type if not provided
+        if type is None and "type" in data:
+            type_value = data["type"]
+            # Handle nullable types (can be a list like ["string", "null"])
+            if isinstance(type_value, list):
+                # Take the first non-null type
+                type_value = next((t for t in type_value if t != "null"), type_value[0])
+
+            # Create Type object based on type string
+            type_map = {
+                "string": StringType,
+                "integer": IntegerType,
+                "number": NumberType,
+                "boolean": BooleanType,
+                "array": ArrayType,
+                "object": ObjectType,
+            }
+            if type_value in type_map:
+                type_obj = type_map[type_value]()
+
+                # Set format if present
+                if "format" in data:
+                    type_obj.set_format(data["format"])
+
+                type = type_obj
+
+        schema = cls(type)
+
+        # JSON Schema meta properties
+        if "$schema" in data:
+            schema.schema = data["$schema"]
+
+        # Core properties
+        if "title" in data:
+            schema.title = data["title"]
+
+        if "description" in data:
+            schema.description = data["description"]
+
+        if "default" in data:
+            schema.default = data["default"]
+
+        if "examples" in data:
+            schema.examples = data["examples"]
+
+        if "enum" in data:
+            schema.enum = data["enum"]
+
+        # Object properties
+        if "properties" in data:
+            for name, prop_data in data["properties"].items():
+                prop_schema = cls.from_dict(prop_data)
+                schema.properties[name] = prop_schema
+
+        if "required" in data:
+            schema.required = data["required"]
+
+        if "additionalProperties" in data:
+            add_props = data["additionalProperties"]
+            if isinstance(add_props, bool):
+                schema.additional_properties = add_props
+            else:
+                schema.additional_properties = cls.from_dict(add_props)
+
+        if "minProperties" in data:
+            schema.min_properties = data["minProperties"]
+
+        if "maxProperties" in data:
+            schema.max_properties = data["maxProperties"]
+
+        # Array properties
+        if "items" in data:
+            schema.items = cls.from_dict(data["items"])
+
+        if "minItems" in data:
+            schema.min_items = data["minItems"]
+
+        if "maxItems" in data:
+            schema.max_items = data["maxItems"]
+
+        if "uniqueItems" in data:
+            schema.unique_items = data["uniqueItems"]
+
+        # String properties
+        if "minLength" in data:
+            schema.min_length = data["minLength"]
+
+        if "maxLength" in data:
+            schema.max_length = data["maxLength"]
+
+        if "pattern" in data:
+            schema.pattern = data["pattern"]
+
+        # Number properties
+        if "minimum" in data:
+            schema.minimum = data["minimum"]
+
+        if "maximum" in data:
+            schema.maximum = data["maximum"]
+
+        if "exclusiveMinimum" in data:
+            schema.exclusive_minimum = data["exclusiveMinimum"]
+
+        if "exclusiveMaximum" in data:
+            schema.exclusive_maximum = data["exclusiveMaximum"]
+
+        if "multipleOf" in data:
+            schema.multiple_of = data["multipleOf"]
+
+        # Composition keywords
+        if "allOf" in data:
+            schema.all_of = [cls.from_dict(item) for item in data["allOf"]]
+
+        if "oneOf" in data:
+            schema.one_of = [cls.from_dict(item) for item in data["oneOf"]]
+
+        if "anyOf" in data:
+            schema.any_of = [cls.from_dict(item) for item in data["anyOf"]]
+
+        if "not" in data:
+            schema.not_ = cls.from_dict(data["not"])
+
+        # OpenAPI specific extensions
+        if "discriminator" in data:
+            from expanse.schematic.openapi.discriminator import Discriminator
+
+            schema.discriminator = Discriminator.from_dict(data["discriminator"])
+
+        if "xml" in data:
+            from expanse.schematic.openapi.xml import XML
+
+            schema.xml = XML.from_dict(data["xml"])
+
+        if "externalDocs" in data:
+            from expanse.schematic.openapi.tag import ExternalDocumentation
+
+            schema.external_docs = ExternalDocumentation.from_dict(data["externalDocs"])
+
+        if "example" in data:
+            schema.example = data["example"]
+
+        if "deprecated" in data:
+            schema.deprecated = data["deprecated"]
+
+        # JSON Schema meta properties
+        if "readOnly" in data:
+            schema.read_only = data["readOnly"]
+
+        if "writeOnly" in data:
+            schema.write_only = data["writeOnly"]
+
+        if "nullable" in data:
+            schema.nullable = data["nullable"]
+
+        return schema
 
     def set_title(self, title: str) -> Schema:
         """Set the title of the schema."""

@@ -41,7 +41,7 @@ class PathItem:
         self.servers: list[Server] = []
         self.parameters: list[Parameter | Reference] = []
 
-    def set_summary(self, summary: str) -> "PathItem":
+    def set_summary(self, summary: str) -> PathItem:
         """
         Set an optional string summary, intended to apply to all operations in this path.
 
@@ -54,7 +54,7 @@ class PathItem:
         self.summary = summary
         return self
 
-    def set_description(self, description: str) -> "PathItem":
+    def set_description(self, description: str) -> PathItem:
         """
         Set an optional string description, intended to apply to all operations in this path.
 
@@ -68,7 +68,7 @@ class PathItem:
         self.description = description
         return self
 
-    def set_get(self, operation: "Operation") -> "PathItem":
+    def set_get(self, operation: Operation) -> PathItem:
         """
         Set a definition of a GET operation on this path.
 
@@ -81,7 +81,7 @@ class PathItem:
         self.get = operation
         return self
 
-    def set_put(self, operation: "Operation") -> "PathItem":
+    def set_put(self, operation: Operation) -> PathItem:
         """
         Set a definition of a PUT operation on this path.
 
@@ -94,7 +94,7 @@ class PathItem:
         self.put = operation
         return self
 
-    def set_post(self, operation: "Operation") -> "PathItem":
+    def set_post(self, operation: Operation) -> PathItem:
         """
         Set a definition of a POST operation on this path.
 
@@ -107,7 +107,7 @@ class PathItem:
         self.post = operation
         return self
 
-    def set_delete(self, operation: "Operation") -> "PathItem":
+    def set_delete(self, operation: Operation) -> PathItem:
         """
         Set a definition of a DELETE operation on this path.
 
@@ -120,7 +120,7 @@ class PathItem:
         self.delete = operation
         return self
 
-    def set_options(self, operation: "Operation") -> "PathItem":
+    def set_options(self, operation: Operation) -> PathItem:
         """
         Set a definition of an OPTIONS operation on this path.
 
@@ -133,7 +133,7 @@ class PathItem:
         self.options = operation
         return self
 
-    def set_head(self, operation: "Operation") -> "PathItem":
+    def set_head(self, operation: Operation) -> PathItem:
         """
         Set a definition of a HEAD operation on this path.
 
@@ -146,7 +146,7 @@ class PathItem:
         self.head = operation
         return self
 
-    def set_patch(self, operation: "Operation") -> "PathItem":
+    def set_patch(self, operation: Operation) -> PathItem:
         """
         Set a definition of a PATCH operation on this path.
 
@@ -159,7 +159,7 @@ class PathItem:
         self.patch = operation
         return self
 
-    def set_trace(self, operation: "Operation") -> "PathItem":
+    def set_trace(self, operation: Operation) -> PathItem:
         """
         Set a definition of a TRACE operation on this path.
 
@@ -172,7 +172,7 @@ class PathItem:
         self.trace = operation
         return self
 
-    def add_server(self, server: "Server") -> "PathItem":
+    def add_server(self, server: Server) -> PathItem:
         """
         Add an alternative server to service all operations in this path.
 
@@ -185,7 +185,7 @@ class PathItem:
         self.servers.append(server)
         return self
 
-    def add_parameter(self, parameter: "Parameter | Reference") -> "PathItem":
+    def add_parameter(self, parameter: Parameter | Reference) -> PathItem:
         """
         Add a parameter that is applicable for all the operations described under this path.
 

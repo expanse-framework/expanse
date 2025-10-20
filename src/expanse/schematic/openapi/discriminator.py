@@ -24,7 +24,7 @@ class Discriminator:
         self.property_name: str = property_name
         self.mapping: dict[str, str] = {}
 
-    def add_mapping(self, value: str, schema_ref: str) -> "Discriminator":
+    def add_mapping(self, value: str, schema_ref: str) -> Discriminator:
         """
         Add a mapping between payload values and schema names or references.
 
@@ -38,7 +38,7 @@ class Discriminator:
         self.mapping[value] = schema_ref
         return self
 
-    def set_mapping(self, mapping: dict[str, str]) -> "Discriminator":
+    def set_mapping(self, mapping: dict[str, str]) -> Discriminator:
         """
         Set the mappings between payload values and schema names or references.
 
@@ -51,7 +51,7 @@ class Discriminator:
         self.mapping = mapping
         return self
 
-    def remove_mapping(self, value: str) -> "Discriminator":
+    def remove_mapping(self, value: str) -> Discriminator:
         """
         Remove a mapping.
 
@@ -76,7 +76,7 @@ class Discriminator:
         """
         return self.mapping.get(value)
 
-    def clear_mapping(self) -> "Discriminator":
+    def clear_mapping(self) -> Discriminator:
         """
         Clear all mappings.
 

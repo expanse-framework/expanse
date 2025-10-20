@@ -45,7 +45,7 @@ class Header:
         self.examples: dict[str, Example | Reference] = {}
         self.content: dict[str, MediaType] = {}
 
-    def set_description(self, description: str) -> "Header":
+    def set_description(self, description: str) -> Header:
         """
         Set a brief description of the header.
 
@@ -59,7 +59,7 @@ class Header:
         self.description = description
         return self
 
-    def set_required(self, required: bool) -> "Header":
+    def set_required(self, required: bool) -> Header:
         """
         Set whether this header is mandatory.
 
@@ -72,7 +72,7 @@ class Header:
         self.required = required
         return self
 
-    def set_deprecated(self, deprecated: bool) -> "Header":
+    def set_deprecated(self, deprecated: bool) -> Header:
         """
         Set whether this header is deprecated.
 
@@ -85,7 +85,7 @@ class Header:
         self.deprecated = deprecated
         return self
 
-    def set_allow_empty_value(self, allow_empty_value: bool) -> "Header":
+    def set_allow_empty_value(self, allow_empty_value: bool) -> Header:
         """
         Set the ability to pass empty-valued headers.
 
@@ -98,7 +98,7 @@ class Header:
         self.allow_empty_value = allow_empty_value
         return self
 
-    def set_schema(self, schema: "Schema") -> "Header":
+    def set_schema(self, schema: Schema) -> Header:
         """
         Set the schema defining the type used for the header.
 
@@ -122,7 +122,7 @@ class Header:
             "pipeDelimited",
             "deepObject",
         ],
-    ) -> "Header":
+    ) -> Header:
         """
         Set how the header value will be serialized.
 
@@ -136,7 +136,7 @@ class Header:
         self.style = style
         return self
 
-    def set_explode(self, explode: bool) -> "Header":
+    def set_explode(self, explode: bool) -> Header:
         """
         Set whether header values of type array or object generate separate headers.
 
@@ -150,7 +150,7 @@ class Header:
         self.explode = explode
         return self
 
-    def set_allow_reserved(self, allow_reserved: bool) -> "Header":
+    def set_allow_reserved(self, allow_reserved: bool) -> Header:
         """
         Set whether reserved characters should be allowed.
 
@@ -163,7 +163,7 @@ class Header:
         self.allow_reserved = allow_reserved
         return self
 
-    def set_example(self, example: Any) -> "Header":
+    def set_example(self, example: Any) -> Header:
         """
         Set an example of the header's potential value.
 
@@ -176,7 +176,7 @@ class Header:
         self.example = example
         return self
 
-    def add_example(self, name: str, example: "Example | Reference") -> "Header":
+    def add_example(self, name: str, example: Example | Reference) -> Header:
         """
         Add a named example of the header's potential value.
 
@@ -190,7 +190,7 @@ class Header:
         self.examples[name] = example
         return self
 
-    def add_content(self, media_type: str, content: "MediaType") -> "Header":
+    def add_content(self, media_type: str, content: MediaType) -> Header:
         """
         Add content description for the header.
 

@@ -22,12 +22,8 @@ class Operation:
     """
 
     def __init__(self, method: str):
-        """
-        Initialize an Operation object.
+        from expanse.schematic.openapi.responses import Responses
 
-        Args:
-            method: The HTTP method for this operation
-        """
         self.operation_id: str | None = None
         self.method: str = method
         self.path: str = ""
@@ -35,13 +31,13 @@ class Operation:
         self.summary: str = ""
         self.deprecated: bool = False
         self.tags: list[str] = []
-        self.parameters: list["Parameter | Reference"] = []
-        self.request_body: "RequestBody | Reference | None" = None
-        self.responses: "Responses | None" = None
-        self.callbacks: dict[str, "Callback | Reference"] = {}
-        self.security: list["SecurityRequirement"] = []
-        self.servers: list["Server"] = []
-        self.external_docs: "ExternalDocumentation | None" = None
+        self.parameters: list[Parameter | Reference] = []
+        self.request_body: RequestBody | Reference | None = None
+        self.responses: Responses = Responses()
+        self.callbacks: dict[str, Callback | Reference] = {}
+        self.security: list[SecurityRequirement] = []
+        self.servers: list[Server] = []
+        self.external_docs: ExternalDocumentation | None = None
 
     def set_operation_id(self, operation_id: str) -> Self:
         """
@@ -108,7 +104,7 @@ class Operation:
         self.tags.append(tag)
         return self
 
-    def add_parameter(self, parameter: "Parameter | Reference") -> Self:
+    def add_parameter(self, parameter: Parameter | Reference) -> Self:
         """
         Add a parameter that is applicable for this operation.
 
@@ -121,7 +117,7 @@ class Operation:
         self.parameters.append(parameter)
         return self
 
-    def set_request_body(self, request_body: "RequestBody | Reference") -> Self:
+    def set_request_body(self, request_body: RequestBody | Reference) -> Self:
         """
         Set the request body applicable for this operation.
 
@@ -134,7 +130,7 @@ class Operation:
         self.request_body = request_body
         return self
 
-    def set_responses(self, responses: "Responses") -> Self:
+    def set_responses(self, responses: Responses) -> Self:
         """
         Set the list of possible responses as they are returned from executing this operation.
 
@@ -147,7 +143,7 @@ class Operation:
         self.responses = responses
         return self
 
-    def add_callback(self, name: str, callback: "Callback | Reference") -> Self:
+    def add_callback(self, name: str, callback: Callback | Reference) -> Self:
         """
         Add a callback related to the parent operation.
 
@@ -161,7 +157,7 @@ class Operation:
         self.callbacks[name] = callback
         return self
 
-    def add_security_requirement(self, requirement: "SecurityRequirement") -> Self:
+    def add_security_requirement(self, requirement: SecurityRequirement) -> Self:
         """
         Add a security requirement for this operation.
 
@@ -174,7 +170,7 @@ class Operation:
         self.security.append(requirement)
         return self
 
-    def add_server(self, server: "Server") -> Self:
+    def add_server(self, server: Server) -> Self:
         """
         Add an alternative server to service this operation.
 
@@ -187,7 +183,7 @@ class Operation:
         self.servers.append(server)
         return self
 
-    def set_external_docs(self, external_docs: "ExternalDocumentation") -> Self:
+    def set_external_docs(self, external_docs: ExternalDocumentation) -> Self:
         """
         Set additional external documentation for this operation.
 
@@ -225,7 +221,7 @@ class Operation:
         if self.request_body is not None:
             result["requestBody"] = self.request_body.to_dict()
 
-        if self.responses is not None:
+        if not self.responses.is_empty():
             result["responses"] = self.responses.to_dict()
 
         if self.callbacks:

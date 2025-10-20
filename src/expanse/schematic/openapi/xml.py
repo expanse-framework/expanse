@@ -19,7 +19,7 @@ class XML:
         self.attribute: bool = False
         self.wrapped: bool = False
 
-    def set_name(self, name: str) -> "XML":
+    def set_name(self, name: str) -> XML:
         """
         Set the name that replaces the element/attribute used for the described schema property.
 
@@ -35,7 +35,7 @@ class XML:
         self.name = name
         return self
 
-    def set_namespace(self, namespace: str) -> "XML":
+    def set_namespace(self, namespace: str) -> XML:
         """
         Set the URI of the namespace definition.
 
@@ -48,7 +48,7 @@ class XML:
         self.namespace = namespace
         return self
 
-    def set_prefix(self, prefix: str) -> "XML":
+    def set_prefix(self, prefix: str) -> XML:
         """
         Set the prefix to be used for the name.
 
@@ -61,7 +61,7 @@ class XML:
         self.prefix = prefix
         return self
 
-    def set_attribute(self, attribute: bool) -> "XML":
+    def set_attribute(self, attribute: bool) -> XML:
         """
         Set whether the property definition translates to an attribute instead of an element.
 
@@ -75,7 +75,7 @@ class XML:
         self.attribute = attribute
         return self
 
-    def set_wrapped(self, wrapped: bool) -> "XML":
+    def set_wrapped(self, wrapped: bool) -> XML:
         """
         Set whether the array is wrapped.
 

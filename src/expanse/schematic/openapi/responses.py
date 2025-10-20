@@ -31,8 +31,8 @@ class Responses:
         self.default: Response | Reference | None = None
 
     def add_response(
-        self, status_code: str, response: "Response | Reference"
-    ) -> "Responses":
+        self, status_code: str, response: Response | Reference
+    ) -> Responses:
         """
         Add a response for a specific HTTP status code.
 
@@ -51,7 +51,7 @@ class Responses:
         self.responses[status_code] = response
         return self
 
-    def set_default(self, response: "Response | Reference") -> "Responses":
+    def set_default(self, response: Response | Reference) -> Responses:
         """
         Set the default response object for all HTTP codes that are not covered individually.
 
@@ -65,7 +65,7 @@ class Responses:
         self.default = response
         return self
 
-    def get_response(self, status_code: str) -> "Response | Reference | None":
+    def get_response(self, status_code: str) -> Response | Reference | None:
         """
         Get a response by status code.
 
@@ -77,7 +77,7 @@ class Responses:
         """
         return self.responses.get(status_code)
 
-    def get_default(self) -> "Response | Reference | None":
+    def get_default(self) -> Response | Reference | None:
         """
         Get the default response.
 
@@ -86,7 +86,7 @@ class Responses:
         """
         return self.default
 
-    def remove_response(self, status_code: str) -> "Responses":
+    def remove_response(self, status_code: str) -> Responses:
         """
         Remove a response by status code.
 
@@ -99,7 +99,7 @@ class Responses:
         self.responses.pop(status_code, None)
         return self
 
-    def clear_default(self) -> "Responses":
+    def clear_default(self) -> Responses:
         """
         Clear the default response.
 
@@ -109,7 +109,7 @@ class Responses:
         self.default = None
         return self
 
-    def get_all_responses(self) -> dict[str, "Response | Reference"]:
+    def get_all_responses(self) -> dict[str, Response | Reference]:
         """
         Get all responses.
 

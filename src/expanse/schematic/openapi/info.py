@@ -118,7 +118,7 @@ class Info:
         self.contact: Contact | None = None
         self.license: License | None = None
 
-    def set_summary(self, summary: str) -> "Info":
+    def set_summary(self, summary: str) -> Info:
         """
         Set a short summary of the API.
 
@@ -131,7 +131,7 @@ class Info:
         self.summary = summary
         return self
 
-    def set_description(self, description: str) -> "Info":
+    def set_description(self, description: str) -> Info:
         """
         Set a description of the API.
 
@@ -144,7 +144,7 @@ class Info:
         self.description = description
         return self
 
-    def set_terms_of_service(self, terms_of_service: str) -> "Info":
+    def set_terms_of_service(self, terms_of_service: str) -> Info:
         """
         Set a URL to the Terms of Service for the API.
 
@@ -157,7 +157,7 @@ class Info:
         self.terms_of_service = terms_of_service
         return self
 
-    def set_contact(self, contact: Contact) -> "Info":
+    def set_contact(self, contact: Contact) -> Info:
         """
         Set the contact information for the exposed API.
 
@@ -170,7 +170,7 @@ class Info:
         self.contact = contact
         return self
 
-    def set_license(self, license: License) -> "Info":
+    def set_license(self, license: License) -> Info:
         """
         Set the license information for the exposed API.
 

@@ -20,7 +20,7 @@ class Paths:
         """Initialize a Paths object."""
         self.paths: dict[str, PathItem | Reference] = {}
 
-    def add_path(self, path: str, path_item: "PathItem | Reference") -> "Paths":
+    def add_path(self, path: str, path_item: PathItem | Reference) -> Paths:
         """
         Add a path and its operations.
 
@@ -44,7 +44,7 @@ class Paths:
         self.paths[path] = path_item
         return self
 
-    def get_path(self, path: str) -> "PathItem | Reference | None":
+    def get_path(self, path: str) -> PathItem | Reference | None:
         """
         Get a path item by path.
 
@@ -56,7 +56,7 @@ class Paths:
         """
         return self.paths.get(path)
 
-    def remove_path(self, path: str) -> "Paths":
+    def remove_path(self, path: str) -> Paths:
         """
         Remove a path.
 
@@ -69,7 +69,7 @@ class Paths:
         self.paths.pop(path, None)
         return self
 
-    def get_all_paths(self) -> dict[str, "PathItem | Reference"]:
+    def get_all_paths(self) -> dict[str, PathItem | Reference]:
         """
         Get all paths.
 

@@ -56,32 +56,32 @@ class Parameter:
         if self.in_ == "path":
             self.required = True
 
-    def set_description(self, description: str) -> "Parameter":
+    def set_description(self, description: str) -> Parameter:
         """Set a brief description of the parameter."""
         self.description = description
         return self
 
-    def set_required(self, required: bool) -> "Parameter":
+    def set_required(self, required: bool) -> Parameter:
         """Set whether this parameter is mandatory."""
         self.required = required
         return self
 
-    def set_deprecated(self, deprecated: bool) -> "Parameter":
+    def set_deprecated(self, deprecated: bool) -> Parameter:
         """Set whether this parameter is deprecated."""
         self.deprecated = deprecated
         return self
 
-    def set_schema(self, schema: "Schema") -> "Parameter":
+    def set_schema(self, schema: Schema) -> Parameter:
         """Set the schema defining the type used for the parameter."""
         self.schema = schema
         return self
 
-    def add_example(self, name: str, example: "Example | Reference") -> "Parameter":
+    def add_example(self, name: str, example: Example | Reference) -> Parameter:
         """Add a named example of the parameter's potential value."""
         self.examples[name] = example
         return self
 
-    def add_content(self, media_type: str, content: "MediaType") -> "Parameter":
+    def add_content(self, media_type: str, content: MediaType) -> Parameter:
         """Add content description for the parameter."""
         self.content[media_type] = content
         return self

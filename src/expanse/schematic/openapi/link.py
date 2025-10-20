@@ -43,7 +43,7 @@ class Link:
         self.description: str | None = None
         self.server: Server | None = None
 
-    def set_description(self, description: str) -> "Link":
+    def set_description(self, description: str) -> Link:
         """
         Set a description of the link.
 
@@ -57,7 +57,7 @@ class Link:
         self.description = description
         return self
 
-    def add_parameter(self, name: str, value: Any) -> "Link":
+    def add_parameter(self, name: str, value: Any) -> Link:
         """
         Add a parameter to pass to the linked operation.
 
@@ -71,7 +71,7 @@ class Link:
         self.parameters[name] = value
         return self
 
-    def set_parameters(self, parameters: dict[str, Any]) -> "Link":
+    def set_parameters(self, parameters: dict[str, Any]) -> Link:
         """
         Set parameters to pass to the linked operation.
 
@@ -86,7 +86,7 @@ class Link:
         self.parameters = parameters
         return self
 
-    def set_request_body(self, request_body: Any) -> "Link":
+    def set_request_body(self, request_body: Any) -> Link:
         """
         Set a literal value or expression to use as a request body when calling the target operation.
 
@@ -99,7 +99,7 @@ class Link:
         self.request_body = request_body
         return self
 
-    def set_server(self, server: "Server") -> "Link":
+    def set_server(self, server: Server) -> Link:
         """
         Set a server object to be used by the target operation.
 

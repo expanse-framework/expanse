@@ -21,7 +21,7 @@ class ServerVariable:
         self.description: str | None = description
         self.enum: list[str] = []
 
-    def set_enum(self, values: list[str]) -> "ServerVariable":
+    def set_enum(self, values: list[str]) -> ServerVariable:
         """
         Set enumeration of string values to be used if the substitution options
         are from a limited set.
@@ -72,7 +72,7 @@ class Server:
         self.description: str | None = description
         self.variables: dict[str, ServerVariable] = {}
 
-    def add_variable(self, name: str, variable: ServerVariable) -> "Server":
+    def add_variable(self, name: str, variable: ServerVariable) -> Server:
         """
         Add a server variable.
 
