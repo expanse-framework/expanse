@@ -21,7 +21,6 @@ class RequestBodyExtension(OperationExtension):
             description or ""
         )
         signature_info = route_info.signature
-        # Check if there's a body parameter
         body_param = signature_info.body_parameter
         form_param = signature_info.form_parameter
 

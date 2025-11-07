@@ -16,7 +16,7 @@ def test_docstring_parser_parses_google_style():
             A dictionary containing user information
 
         Raises:
-            HTTPException (404): User not found
+            HTTPException: (404) User not found
             ValueError: Invalid user ID format
         """
         return {}
@@ -57,7 +57,7 @@ def test_docstring_parser_parses_sphinx_style():
         :returns: A dictionary containing user information
         :rtype: dict
 
-        :raises HTTPException: User not found with status 404
+        :raises HTTPException: (404) User not found
         """
         return {}
 

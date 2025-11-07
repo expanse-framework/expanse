@@ -8,9 +8,11 @@
   "paths": {
     "/api/users": {
       "get": {
+        "description": "Additional description.",
         "operationId": "api.user.list",
         "parameters": [
           {
+            "description": "The name of the user",
             "in": "query",
             "name": "name",
             "required": false,
@@ -20,6 +22,7 @@
             }
           },
           {
+            "description": "The email of the user",
             "in": "query",
             "name": "email",
             "required": false,
@@ -37,6 +40,8 @@
                   "items": {
                     "properties": {
                       "email": {
+                        "description": "The email of the user",
+                        "example": "foo@bar.com",
                         "title": "Email",
                         "type": "string"
                       },
@@ -45,6 +50,8 @@
                         "type": "integer"
                       },
                       "name": {
+                        "description": "The name of the user",
+                        "examples": ["John Doe", "Jane Doe"],
                         "title": "Name",
                         "type": "string"
                       }
@@ -58,10 +65,15 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "description": "You are not authorized to list users"
           }
-        }
+        },
+        "summary": "List users with optional filtering."
       },
       "post": {
+        "description": "Additional description.",
         "operationId": "api.user.create",
         "requestBody": {
           "content": {
@@ -69,10 +81,14 @@
               "schema": {
                 "properties": {
                   "email": {
+                    "description": "The email of the user",
+                    "example": "foo@bar.com",
                     "title": "Email",
                     "type": "string"
                   },
                   "name": {
+                    "description": "The name of the user",
+                    "examples": ["John Doe", "Jane Doe"],
                     "title": "Name",
                     "type": "string"
                   }
@@ -92,6 +108,8 @@
                 "schema": {
                   "properties": {
                     "email": {
+                      "description": "The email of the user",
+                      "example": "foo@bar.com",
                       "title": "Email",
                       "type": "string"
                     },
@@ -100,6 +118,8 @@
                       "type": "integer"
                     },
                     "name": {
+                      "description": "The name of the user",
+                      "examples": ["John Doe", "Jane Doe"],
                       "title": "Name",
                       "type": "string"
                     }
@@ -112,15 +132,23 @@
             },
             "description": ""
           },
-          "422": { "description": "Validation Error" }
-        }
+          "403": {
+            "description": "You are not authorized to create users"
+          },
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create a new user."
       }
     },
     "/api/users/{user_id}": {
       "delete": {
+        "description": "Additional description.",
         "operationId": "api.user.delete",
         "parameters": [
           {
+            "description": "The ID of the user to delete.",
             "in": "path",
             "name": "user_id",
             "required": true,
@@ -133,15 +161,21 @@
           "204": {
             "description": ""
           },
+          "403": {
+            "description": "You are not authorized to delete users"
+          },
           "404": {
             "description": "User not found"
           }
-        }
+        },
+        "summary": "Delete an existing user."
       },
       "patch": {
+        "description": "Additional description.",
         "operationId": "api.user.update",
         "parameters": [
           {
+            "description": "The ID of the user to update.",
             "in": "path",
             "name": "user_id",
             "required": true,
@@ -156,10 +190,14 @@
               "schema": {
                 "properties": {
                   "email": {
+                    "description": "The email of the user",
+                    "example": "foo@bar.com",
                     "title": "Email",
                     "type": "string"
                   },
                   "name": {
+                    "description": "The name of the user",
+                    "examples": ["John Doe", "Jane Doe"],
                     "title": "Name",
                     "type": "string"
                   }
@@ -179,6 +217,8 @@
                 "schema": {
                   "properties": {
                     "email": {
+                      "description": "The email of the user",
+                      "example": "foo@bar.com",
                       "title": "Email",
                       "type": "string"
                     },
@@ -187,6 +227,8 @@
                       "type": "integer"
                     },
                     "name": {
+                      "description": "The name of the user",
+                      "examples": ["John Doe", "Jane Doe"],
                       "title": "Name",
                       "type": "string"
                     }
@@ -199,11 +241,17 @@
             },
             "description": ""
           },
+          "403": {
+            "description": "You are not authorized to update users"
+          },
           "404": {
             "description": "User not found"
           },
-          "422": { "description": "Validation Error" }
-        }
+          "422": {
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update an existing user."
       }
     }
   }

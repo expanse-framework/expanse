@@ -30,19 +30,19 @@ def test_schema_generator_handles_basic_types():
 
     # String
     schema = generator.generate_from_type(str)
-    assert schema.type.type_name == "string"
+    assert schema.type.name == "string"
 
     # Integer
     schema = generator.generate_from_type(int)
-    assert schema.type.type_name == "integer"
+    assert schema.type.name == "integer"
 
     # Float
     schema = generator.generate_from_type(float)
-    assert schema.type.type_name == "number"
+    assert schema.type.name == "number"
 
     # Boolean
     schema = generator.generate_from_type(bool)
-    assert schema.type.type_name == "boolean"
+    assert schema.type.name == "boolean"
 
 
 def test_schema_generator_handles_special_types():
@@ -63,7 +63,7 @@ def test_schema_generator_handles_special_types():
 
     # Decimal
     schema = generator.generate_from_type(Decimal)
-    assert schema.type.type_name == "number"
+    assert schema.type.name == "number"
 
 
 def test_schema_generator_handles_optional_types():
@@ -71,7 +71,7 @@ def test_schema_generator_handles_optional_types():
     generator = SchemaGenerator()
 
     schema = generator.generate_from_type(Optional[str])
-    assert schema.nullable is True
+    assert schema.nullable
 
 
 def test_schema_generator_handles_list_types():
@@ -79,9 +79,9 @@ def test_schema_generator_handles_list_types():
     generator = SchemaGenerator()
 
     schema = generator.generate_from_type(list[str])
-    assert schema.type.type_name == "array"
+    assert schema.type.name == "array"
     assert schema.items is not None
-    assert schema.items.type.type_name == "string"
+    assert schema.items.type.name == "string"
 
 
 def test_schema_generator_handles_dict_types():
@@ -89,7 +89,7 @@ def test_schema_generator_handles_dict_types():
     generator = SchemaGenerator()
 
     schema = generator.generate_from_type(dict[str, int])
-    assert schema.type.type_name == "object"
+    assert schema.type.name == "object"
     assert schema.additional_properties is not None
 
 
@@ -107,7 +107,7 @@ def test_schema_generator_handles_pydantic_models():
 
     schema = generator.generate_from_pydantic(UserModel)
 
-    assert schema.type.type_name == "object"
+    assert schema.type.name == "object"
     assert schema.title == "UserModel"
     assert "name" in schema.properties
     assert "email" in schema.properties
@@ -149,7 +149,7 @@ def test_schema_generator_handles_nested_pydantic_models():
     schema = generator.generate_from_pydantic(UserWithAddress)
 
     assert "address" in schema.properties
-    assert schema.properties["address"].type.type_name == "object"
+    assert schema.properties["address"].type.name == "object"
 
 
 def test_schema_generator_creates_component_references():

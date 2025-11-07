@@ -17,15 +17,16 @@ class ErrorResponseExtension(OperationExtension):
     """
 
     def handle(self, operation: Operation, route_info: RouteInfo) -> None:
-        # Try to find explicit response codes first
-        doc_string = route_info.doc_string
-        print(doc_string)
+        signature_info = route_info.signature
+        body_param = signature_info.body_parameter
 
-        for error in route_info.doc_string.raises:
-            status_code = str(error.status_code)
-            description = error.description or "Error Response"
-            error_response = OpenAPIResponse(description)
-            operation.responses.add_response(status_code, error_response)
+        if body_param and body_param.pydantic_model:
+            # If the body parameter is a Pydantic model, any validation error will lead to a 422 response.
+            if not operation.responses.has_response("422"):
+                operation.responses.add_response(
+                    "422",
+                    OpenAPIResponse("Validation Error"),
+                )
 
         inference = self._inference.infer(route_info)
         for inferred_error in inference.errors:
@@ -34,3 +35,13 @@ class ErrorResponseExtension(OperationExtension):
                     str(inferred_error.status_code),
                     OpenAPIResponse(inferred_error.description),
                 )
+        for error in route_info.doc_string.raises:
+            status_code = str(error.status_code)
+            description = error.description or "Error Response"
+            if not operation.responses.has_response(status_code):
+                error_response = OpenAPIResponse(description)
+                operation.responses.add_response(status_code, error_response)
+                continue
+
+            reponse = operation.responses.get_response(status_code)
+            reponse.description = description
