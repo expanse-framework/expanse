@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import override
 
-from expanse.schematic.analyzers.schema_generator import SchemaGenerator
+from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.parameter import Parameter
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
 
@@ -25,7 +25,7 @@ class ParametersExtension(OperationExtension):
             parameter = Parameter(param_info.name, "path")
             parameter.set_required(True)
 
-            schema = SchemaGenerator().generate_from_type(param_info.annotation)
+            schema = SchemaRegistry().generate_from_type(param_info.annotation)
             parameter.set_schema(schema)
 
             # Add description from docstring
@@ -48,8 +48,7 @@ class ParametersExtension(OperationExtension):
                     parameter.set_required(field_info.is_required())
 
                     # Generate schema from field type
-                    print(field_name, field_info)
-                    schema = SchemaGenerator().generate_from_type(field_info.annotation)
+                    schema = SchemaRegistry().generate_from_type(field_info.annotation)
                     parameter.set_schema(schema)
 
                     # Add description from field
@@ -62,7 +61,7 @@ class ParametersExtension(OperationExtension):
                 parameter.set_required(param_info.is_required)
 
                 # Generate schema from type annotation
-                schema = SchemaGenerator().generate_from_type(param_info.annotation)
+                schema = SchemaRegistry().generate_from_type(param_info.annotation)
                 parameter.set_schema(schema)
 
                 # Add description from docstring

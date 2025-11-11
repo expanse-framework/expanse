@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from expanse.schematic.analyzers.schema_generator import SchemaGenerator
+from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.media_type import MediaType
 from expanse.schematic.openapi.request_body import RequestBody
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
@@ -42,7 +42,7 @@ class RequestBodyExtension(OperationExtension):
             # schema_ref = Reference(f"#/components/schemas/{component_name}")
 
             media_type = MediaType()
-            schema = SchemaGenerator().generate_from_pydantic(body_param.pydantic_model)
+            schema = SchemaRegistry().generate_from_pydantic(body_param.pydantic_model)
             media_type.set_schema(schema)
 
             request_body.add_content("application/json", media_type)
@@ -59,7 +59,7 @@ class RequestBodyExtension(OperationExtension):
                     request_body.set_description(param_doc.description)
 
             # Create media type for form data
-            schema = SchemaGenerator().generate_from_type(form_param.annotation)
+            schema = SchemaRegistry().generate_from_type(form_param.annotation)
             media_type = MediaType(schema)
 
             request_body.add_content("multipart/form-data", media_type)

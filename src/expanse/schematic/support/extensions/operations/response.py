@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import NoneType
 from typing import TYPE_CHECKING
 
-from expanse.schematic.analyzers.schema_generator import SchemaGenerator
+from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.media_type import MediaType
 from expanse.schematic.openapi.response import Response as OpenAPIResponse
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
@@ -35,7 +35,7 @@ class ResponseExtension(OperationExtension):
             from expanse.http.response import Response as HttpResponse
 
             if route_info.signature.return_annotation != HttpResponse:
-                schema = SchemaGenerator().generate_from_type(
+                schema = SchemaRegistry().generate_from_type(
                     route_info.signature.return_annotation
                 )
                 media_type = MediaType(schema)

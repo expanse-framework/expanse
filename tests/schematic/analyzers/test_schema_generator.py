@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from expanse.schematic.analyzers.schema_generator import SchemaGenerator
+from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 
 
 class Color(Enum):
@@ -26,7 +26,7 @@ class UserModel(BaseModel):
 
 def test_schema_generator_handles_basic_types():
     """Test that basic Python types are converted correctly."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     # String
     schema = generator.generate_from_type(str)
@@ -47,7 +47,7 @@ def test_schema_generator_handles_basic_types():
 
 def test_schema_generator_handles_special_types():
     """Test that special types have correct formats."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     # UUID
     schema = generator.generate_from_type(UUID)
@@ -68,7 +68,7 @@ def test_schema_generator_handles_special_types():
 
 def test_schema_generator_handles_optional_types():
     """Test that Optional types are marked as nullable."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     schema = generator.generate_from_type(Optional[str])
     assert schema.nullable
@@ -76,7 +76,7 @@ def test_schema_generator_handles_optional_types():
 
 def test_schema_generator_handles_list_types():
     """Test that list types generate array schemas."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     schema = generator.generate_from_type(list[str])
     assert schema.type.name == "array"
@@ -86,7 +86,7 @@ def test_schema_generator_handles_list_types():
 
 def test_schema_generator_handles_dict_types():
     """Test that dict types generate object schemas."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     schema = generator.generate_from_type(dict[str, int])
     assert schema.type.name == "object"
@@ -95,7 +95,7 @@ def test_schema_generator_handles_dict_types():
 
 def test_schema_generator_handles_enum_types():
     """Test that Enum types generate schemas with enum values."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     schema = generator.generate_from_type(Color)
     assert schema.enum == ["red", "green", "blue"]
@@ -103,7 +103,7 @@ def test_schema_generator_handles_enum_types():
 
 def test_schema_generator_handles_pydantic_models():
     """Test that Pydantic models are converted correctly."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
 
     schema = generator.generate_from_pydantic(UserModel)
 
@@ -128,7 +128,7 @@ def test_schema_generator_extracts_pydantic_field_descriptions():
         name: str
         """The user's name."""
 
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
     schema = generator.generate_from_pydantic(UserWithDocs)
 
     assert schema.description == "A documented user model."
@@ -145,7 +145,7 @@ def test_schema_generator_handles_nested_pydantic_models():
         name: str
         address: Address
 
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
     schema = generator.generate_from_pydantic(UserWithAddress)
 
     assert "address" in schema.properties
@@ -154,7 +154,7 @@ def test_schema_generator_handles_nested_pydantic_models():
 
 def test_schema_generator_creates_component_references():
     """Test that component schema references are created."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
     components_schemas = {}
 
     component_name = generator.get_or_create_component_schema(
@@ -168,7 +168,7 @@ def test_schema_generator_creates_component_references():
 
 def test_schema_generator_reuses_existing_components():
     """Test that existing component schemas are reused."""
-    generator = SchemaGenerator()
+    generator = SchemaRegistry()
     components_schemas = {}
 
     # Create component twice

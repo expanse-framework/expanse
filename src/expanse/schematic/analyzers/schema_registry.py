@@ -27,7 +27,7 @@ from expanse.schematic.openapi.types import ObjectType
 from expanse.schematic.openapi.types import StringType
 
 
-class SchemaGenerator:
+class SchemaRegistry:
     """
     Generates OpenAPI Schema objects from Python type hints and Pydantic models.
     """
@@ -36,24 +36,15 @@ class SchemaGenerator:
         self._schemas: dict[str, Schema] = {}
 
     def generate_from_type(self, type_hint: Any) -> Schema:
-        """
-        Generate a Schema from a Python type hint.
-
-        Args:
-            type_hint: The Python type to convert
-
-        Returns:
-            Schema object representing the type
-        """
-        # Handle None/NoneType
+        # None/NoneType
         if type_hint is None or type_hint is type(None):
             return Schema().set_nullable(True)
 
-        # Handle Pydantic models
+        # Pydantic models
         if self._is_pydantic_model(type_hint):
             return self.generate_from_pydantic(type_hint)
 
-        # Handle basic types
+        # Simple types
         if type_hint in (str, bytes):
             return Schema(StringType())
         elif type_hint is int:
@@ -73,15 +64,15 @@ class SchemaGenerator:
         elif type_hint is time:
             return Schema(StringType().set_format("time"))
 
-        # Handle Enum
+        # Enums
         if inspect.isclass(type_hint) and issubclass(type_hint, Enum):
             return self._generate_enum_schema(type_hint)
 
-        # Handle generic types
+        # Generic types
         origin = get_origin(type_hint)
         args = get_args(type_hint)
 
-        # Handle Optional[T] (Union[T, None])
+        # Optional[T], Union[T, None]
         if origin is UnionType:
             # Check if it's Optional (has None in union)
             non_none_types = [arg for arg in args if arg is not type(None)]
@@ -100,19 +91,19 @@ class SchemaGenerator:
                     schema.set_nullable(True)
                 return schema
 
-        # Handle List[T], list[T]
+        # List[T], list[T]
         if origin in (list, list, Sequence):
             items_type = args[0] if args else Any
             return Schema(ArrayType()).set_items(self.generate_from_type(items_type))
 
-        # Handle Dict[K, V], dict[K, V]
+        # Dict[K, V], dict[K, V]
         if origin in (dict, dict):
             value_type = args[1] if len(args) >= 2 else Any
             schema = Schema(ObjectType())
             schema.set_additional_properties(self.generate_from_type(value_type))
             return schema
 
-        # Handle Set[T], set[T]
+        # Set[T], set[T]
         if origin in (set, set):
             items_type = args[0] if args else Any
             return (
@@ -121,7 +112,7 @@ class SchemaGenerator:
                 .set_nullable(False)
             )
 
-        # Handle Tuple - treat as array
+        # Tuple - we can treat them as arrays
         if origin in (tuple, tuple):
             # For fixed-length tuples, we could use prefixItems in JSON Schema
             # For now, treat as array
@@ -137,45 +128,18 @@ class SchemaGenerator:
                 # Annotated SQLAlchemy model
                 return self.generate_from_pydantic(args[1])
 
-        # Fallback: treat as object
+        # If we could not determine a more specialized type, return a generic object schema
         return Schema(ObjectType())
 
     def generate_from_pydantic(self, model: type[BaseModel]) -> Schema:
-        """
-        Generate a Schema from a Pydantic model.
-
-        Args:
-            model: The Pydantic model class
-
-        Returns:
-            Schema object representing the model
-        """
         raw_schema = model.model_json_schema()
 
         return Schema.from_dict(raw_schema, ObjectType())
 
     def _generate_field_schema(self, field_info: FieldInfo) -> Schema:
-        """
-        Generate a Schema from a Pydantic field.
-
-        Args:
-            field_info: The Pydantic field info
-
-        Returns:
-            Schema object for the field
-        """
         return self.generate_from_type(field_info.annotation)
 
     def _generate_enum_schema(self, enum_class: type[Enum]) -> Schema:
-        """
-        Generate a Schema for an Enum type.
-
-        Args:
-            enum_class: The Enum class
-
-        Returns:
-            Schema object for the enum
-        """
         # Determine the base type of enum values
         enum_values = [e.value for e in enum_class]
 
@@ -195,7 +159,6 @@ class SchemaGenerator:
         return schema
 
     def _is_pydantic_model(self, type_hint: Any) -> bool:
-        """Check if a type is a Pydantic model."""
         try:
             return isinstance(type_hint, type) and issubclass(type_hint, BaseModel)
         except TypeError:
@@ -204,16 +167,6 @@ class SchemaGenerator:
     def get_or_create_component_schema(
         self, model: type[BaseModel], components_schemas: dict[str, Schema]
     ) -> str:
-        """
-        Get or create a component schema reference for a Pydantic model.
-
-        Args:
-            model: The Pydantic model
-            components_schemas: Dictionary of component schemas to add to
-
-        Returns:
-            The component reference name
-        """
         component_name = model.__name__
 
         if component_name not in components_schemas:
