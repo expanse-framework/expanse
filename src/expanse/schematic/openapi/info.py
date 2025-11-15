@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from typing import Any
-
-
-if TYPE_CHECKING:
-    from expanse.schematic.openapi.contact import Contact
-    from expanse.schematic.openapi.license import License
 
 
 class Contact:

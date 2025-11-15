@@ -24,6 +24,17 @@ class ExternalDocumentation:
 
         return result
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ExternalDocumentation:
+        url: str = data["url"]
+        description: str | None = data.get("description")
+
+        instance = cls(url=url)
+        if description is not None:
+            instance.set_description(description)
+
+        return instance
+
     def __repr__(self) -> str:
         return f"ExternalDocumentation(url='{self.url}')"
 

@@ -27,7 +27,7 @@ class Parameter:
         self.required: bool = False
         self.deprecated: bool = False
         self.allow_empty_value: bool = False
-        self.schema: Schema | None = None
+        self.schema: Schema | Reference | None = None
         self.description: str = ""
         self.style: (
             Literal[
@@ -62,7 +62,7 @@ class Parameter:
         self.deprecated = deprecated
         return self
 
-    def set_schema(self, schema: Schema) -> Parameter:
+    def set_schema(self, schema: Schema | Reference) -> Parameter:
         self.schema = schema
         return self
 

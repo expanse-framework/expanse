@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from typing import Annotated
 from typing import Any
-from typing import ClassVar
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -24,7 +23,7 @@ from expanse.routing.helpers import post
 class User(Model):
     __tablename__ = "users"
 
-    __table_args__: ClassVar[dict[str, Any]] = {"extend_existing": True}
+    __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
 
     id: Mapped[int] = column(primary_key=True)
     name: Mapped[str] = column(init=True)

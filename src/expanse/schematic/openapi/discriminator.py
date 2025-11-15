@@ -35,6 +35,14 @@ class Discriminator:
 
         return result
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Discriminator:
+        discriminator = cls(property_name=data["propertyName"])
+        mapping = data.get("mapping", {})
+        discriminator.set_mapping(mapping)
+
+        return discriminator
+
     def __contains__(self, value: str) -> bool:
         return value in self.mapping
 

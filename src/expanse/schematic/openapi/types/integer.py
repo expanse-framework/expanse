@@ -6,7 +6,7 @@ from expanse.schematic.openapi.types.type import Type
 
 
 class IntegerType(Type):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("integer")
         self.minimum: int | None = None
         self.maximum: int | None = None

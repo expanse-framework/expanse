@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
@@ -17,6 +19,6 @@ class Config(BaseSettings):
 
     info: APIInfo = APIInfo()
 
-    model_config: SettingsConfigDict = SettingsConfigDict(
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="SCHEMATIC_", env_nested_delimiter="__"
     )

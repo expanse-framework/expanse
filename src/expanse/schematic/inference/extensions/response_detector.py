@@ -69,7 +69,7 @@ class ResponseDetector:
                 content_type = keyword.value.value
 
         if content_type is None:
-            match call.func.id:
+            match call.func.id:  # type: ignore[attr-defined]
                 case "json":
                     content_type = "application/json"
 

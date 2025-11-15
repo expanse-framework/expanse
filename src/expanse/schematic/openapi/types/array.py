@@ -6,7 +6,7 @@ from expanse.schematic.openapi.types.type import Type
 
 
 class ArrayType(Type):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("array")
         self.items: Any = None
         self.min_items: int | None = None

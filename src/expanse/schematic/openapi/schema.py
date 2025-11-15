@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from expanse.schematic.openapi.reference import Reference
     from expanse.schematic.openapi.tag import ExternalDocumentation
     from expanse.schematic.openapi.types import Type
-    from expanse.schematic.openapi.xml import XML
 
 
 class Schema:
@@ -25,7 +24,7 @@ class Schema:
         # Object properties
         self.properties: dict[str, Schema | Reference] = {}
         self.required: list[str] = []
-        self.additional_properties: bool | Schema | None = None
+        self.additional_properties: bool | Schema | Reference | None = None
         self.min_properties: int | None = None
         self.max_properties: int | None = None
 
@@ -55,7 +54,6 @@ class Schema:
 
         # OpenAPI specific extensions
         self.discriminator: Discriminator | None = None
-        self.xml: XML | None = None
         self.external_docs: ExternalDocumentation | None = None
         self.example: Any = None  # Deprecated in favor of examples
         self.deprecated: bool = False
@@ -210,11 +208,6 @@ class Schema:
 
             schema.discriminator = Discriminator.from_dict(data["discriminator"])
 
-        if "xml" in data:
-            from expanse.schematic.openapi.xml import XML
-
-            schema.xml = XML.from_dict(data["xml"])
-
         if "externalDocs" in data:
             from expanse.schematic.openapi.tag import ExternalDocumentation
 
@@ -239,140 +232,110 @@ class Schema:
         return schema
 
     def set_title(self, title: str) -> Schema:
-        """Set the title of the schema."""
         self.title = title
         return self
 
     def set_description(self, description: str) -> Schema:
-        """Set the description of the schema."""
         self.description = description
         return self
 
     def set_default(self, default: Any) -> Schema:
-        """Set the default value for the schema."""
         self.default = default
         return self
 
     def add_example(self, example: Any) -> Schema:
-        """Add an example value."""
         self.examples.append(example)
         return self
 
     def set_enum(self, values: list[Any]) -> Schema:
-        """Set the enumeration values."""
         self.enum = values
         return self
 
     def add_property(self, name: str, schema: Schema, required: bool = False) -> Schema:
-        """Add a property to the schema."""
         self.properties[name] = schema
         if required:
             self.required.append(name)
         return self
 
     def set_required(self, required: list[str]) -> Schema:
-        """Set the required properties."""
         self.required = required
         return self
 
     def set_additional_properties(
         self, additional_properties: bool | Schema | Reference
     ) -> Schema:
-        """Set additional properties behavior."""
         self.additional_properties = additional_properties
         return self
 
     def set_items(self, items: Schema | Reference) -> Schema:
-        """Set the items schema for arrays."""
         self.items = items
         return self
 
     def set_min_length(self, min_length: int) -> Schema:
-        """Set the minimum length for strings."""
         self.min_length = min_length
         return self
 
     def set_max_length(self, max_length: int) -> Schema:
-        """Set the maximum length for strings."""
         self.max_length = max_length
         return self
 
     def set_pattern(self, pattern: str) -> Schema:
-        """Set the regex pattern for strings."""
         self.pattern = pattern
         return self
 
     def set_minimum(self, minimum: float, exclusive: bool = False) -> Schema:
-        """Set the minimum value for numbers."""
         self.minimum = minimum
         if exclusive:
             self.exclusive_minimum = True
         return self
 
     def set_maximum(self, maximum: float, exclusive: bool = False) -> Schema:
-        """Set the maximum value for numbers."""
         self.maximum = maximum
         if exclusive:
             self.exclusive_maximum = True
         return self
 
     def add_all_of(self, schema: Schema | Reference) -> Schema:
-        """Add a schema to the allOf composition."""
         self.all_of.append(schema)
         return self
 
     def add_one_of(self, schema: Schema | Reference) -> Schema:
-        """Add a schema to the oneOf composition."""
         self.one_of.append(schema)
         return self
 
     def add_any_of(self, schema: Schema | Reference) -> Schema:
-        """Add a schema to the anyOf composition."""
         self.any_of.append(schema)
         return self
 
     def set_not(self, schema: Schema | Reference) -> Schema:
-        """Set the not schema."""
         self.not_ = schema
         return self
 
     def set_discriminator(self, discriminator: Discriminator) -> Schema:
-        """Set the discriminator for polymorphism."""
         self.discriminator = discriminator
         return self
 
-    def set_xml(self, xml: XML) -> Schema:
-        """Set XML metadata."""
-        self.xml = xml
-        return self
-
     def set_external_docs(self, external_docs: ExternalDocumentation) -> Schema:
-        """Set external documentation."""
         self.external_docs = external_docs
         return self
 
     def set_deprecated(self, deprecated: bool) -> Schema:
-        """Set whether the schema is deprecated."""
         self.deprecated = deprecated
         return self
 
     def set_read_only(self, read_only: bool) -> Schema:
-        """Set whether the schema is read-only."""
         self.read_only = read_only
         return self
 
     def set_write_only(self, write_only: bool) -> Schema:
-        """Set whether the schema is write-only."""
         self.write_only = write_only
         return self
 
     def set_nullable(self, nullable: bool) -> Schema:
-        """Set whether the schema is nullable."""
         self.nullable = nullable
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the Schema object to a dictionary representation."""
         result: dict[str, Any] = {}
 
         # Add JSON Schema meta properties
@@ -474,9 +437,6 @@ class Schema:
         # OpenAPI specific extensions
         if self.discriminator is not None:
             result["discriminator"] = self.discriminator.to_dict()
-
-        if self.xml is not None:
-            result["xml"] = self.xml.to_dict()
 
         if self.external_docs is not None:
             result["externalDocs"] = self.external_docs.to_dict()

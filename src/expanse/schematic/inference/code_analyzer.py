@@ -170,7 +170,7 @@ class _FunctionVisitor(ast.NodeVisitor):
             current = node
             while isinstance(current, ast.Attribute):
                 parts.append(current.attr)
-                current = current.value
+                current = current.value  # type: ignore[assignment]
             if isinstance(current, ast.Name):
                 parts.append(current.id)
             return ".".join(reversed(parts))

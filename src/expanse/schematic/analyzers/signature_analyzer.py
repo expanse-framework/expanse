@@ -138,12 +138,11 @@ class SignatureAnalyzer:
                 is_query = data_type == Query
 
                 if is_body or is_query:
-                    kind = "body" if is_body else "query"
                     return ParameterInfo(
                         name=name,
                         annotation=annotation,
                         default=default,
-                        kind=kind,
+                        kind="body" if is_body else "query",
                         is_required=is_required,
                         pydantic_model=pydantic_model,
                         data_source=data_type,
@@ -187,22 +186,19 @@ class SignatureAnalyzer:
         return None
 
     def _is_pydantic_model(self, annotation: Any) -> bool:
-        """Check if an annotation is a Pydantic model."""
         try:
             return isinstance(annotation, type) and issubclass(annotation, BaseModel)
         except TypeError:
             return False
 
     def _is_form_parameter(self, annotation: Any) -> bool:
-        """Check if an annotation represents a Form parameter."""
         try:
             return isinstance(annotation, type) and issubclass(annotation, Form)
         except TypeError:
             return False
 
     def _is_query_parameter(self, annotation: Any) -> bool:
-        """Check if an annotation represents a Query parameter."""
         try:
-            return isinstance(annotation, type) and issubclass(annotation, Query)
+            return isinstance(annotation, type) and issubclass(annotation, Query)  # type: ignore[arg-type]
         except TypeError:
             return False

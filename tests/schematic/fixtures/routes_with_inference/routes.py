@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from typing import Annotated
 from typing import Any
-from typing import ClassVar
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -25,7 +24,7 @@ from expanse.routing.helpers import post
 class User(Model):
     __tablename__ = "users"
 
-    __table_args__: ClassVar[dict[str, Any]] = {"extend_existing": True}
+    __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
 
     id: Mapped[int] = column(primary_key=True)
     name: Mapped[str] = column(init=True)
@@ -36,7 +35,7 @@ class UserRequest(BaseModel):
     name: str = Field(
         description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
-    email: str = Field(description="The email of the user", example="foo@bar.com")
+    email: str = Field(description="The email of the user", examples=["foo@bar.com"])
 
 
 class UserResponse(BaseModel):
@@ -44,7 +43,7 @@ class UserResponse(BaseModel):
     name: str = Field(
         description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
-    email: str = Field(description="The email of the user", example="foo@bar.com")
+    email: str = Field(description="The email of the user", examples=["foo@bar.com"])
 
 
 class UserFilters(BaseModel):
@@ -52,7 +51,7 @@ class UserFilters(BaseModel):
         None, description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
     email: str | None = Field(
-        None, description="The email of the user", example="foo@bar.com"
+        None, description="The email of the user", examples=["foo@bar.com"]
     )
 
 

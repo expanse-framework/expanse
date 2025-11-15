@@ -6,7 +6,7 @@ from typing import Any
 class Type:
     def __init__(self, name: str) -> None:
         self.name: str = name
-        self.format: str = ""
+        self.format: str | None = None
         self.description: str = ""
         self.content_media_type: str = ""
         self.content_encoding: str = ""
@@ -16,8 +16,14 @@ class Type:
         self.enum: list[Any] = []
         self.nullable: bool = False
 
+    def set_format(self, format: str) -> Type:
+        self.format = format
+        return self
+
     def to_dict(self) -> dict[str, Any]:
-        result = {"type": self.name if not self.nullable else [self.name, "null"]}
+        result: dict[str, Any] = {
+            "type": self.name if not self.nullable else [self.name, "null"]
+        }
 
         if self.format:
             result["format"] = self.format

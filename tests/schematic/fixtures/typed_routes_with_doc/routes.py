@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from typing import Annotated
 from typing import Any
-from typing import ClassVar
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -25,7 +24,7 @@ from expanse.routing.helpers import post
 class User(Model):
     __tablename__ = "users"
 
-    __table_args__: ClassVar[dict[str, Any]] = {"extend_existing": True}
+    __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
 
     id: Mapped[int] = column(primary_key=True)
     name: Mapped[str] = column(init=True)
@@ -36,13 +35,13 @@ class UserRequest(BaseModel):
     name: str = Field(
         description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
-    email: str = Field(description="The email of the user", example="foo@bar.com")
+    email: str = Field(description="The email of the user", examples=["foo@bar.com"])
 
 
 class UserAddress(BaseModel):
-    street: str = Field(description="Street address", example="123 Main St")
-    city: str = Field(description="City", example="Anytown")
-    zip_code: str = Field(description="ZIP code", example="12345")
+    street: str = Field(description="Street address", examples=["123 Main St"])
+    city: str = Field(description="City", examples=["Anytown"])
+    zip_code: str = Field(description="ZIP code", examples=["12345"])
 
 
 class UserResponse(BaseModel):
@@ -50,7 +49,7 @@ class UserResponse(BaseModel):
     name: str = Field(
         description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
-    email: str = Field(description="The email of the user", example="foo@bar.com")
+    email: str = Field(description="The email of the user", examples=["foo@bar.com"])
     address: UserAddress = Field(description="The address of the user")
 
 
@@ -59,7 +58,7 @@ class UserFilters(BaseModel):
         None, description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
     email: str | None = Field(
-        None, description="The email of the user", example="foo@bar.com"
+        None, description="The email of the user", examples=["foo@bar.com"]
     )
 
 

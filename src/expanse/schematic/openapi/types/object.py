@@ -6,7 +6,7 @@ from expanse.schematic.openapi.types.type import Type
 
 
 class ObjectType(Type):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("object")
         self.properties: dict[str, Any] = {}
         self.required: list[str] = []

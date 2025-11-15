@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from expanse.schematic.openapi.reference import Reference
 from expanse.schematic.openapi.response import Response as OpenAPIResponse
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
 
@@ -47,4 +48,5 @@ class ErrorResponseExtension(OperationExtension):
                 continue
 
             reponse = operation.responses.get_response(status_code)
+            assert isinstance(reponse, OpenAPIResponse | Reference)
             reponse.description = description

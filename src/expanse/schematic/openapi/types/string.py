@@ -6,7 +6,7 @@ from expanse.schematic.openapi.types.type import Type
 
 
 class StringType(Type):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("string")
         self.min_length: int | None = None
         self.max_length: int | None = None

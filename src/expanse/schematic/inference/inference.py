@@ -40,7 +40,7 @@ class InferenceResult:
 
     errors: list[InferredError] = field(default_factory=list)
     responses: list[InferredResponse] = field(default_factory=list)
-    metadata: dict[str, any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class InferenceExtension(Protocol):
