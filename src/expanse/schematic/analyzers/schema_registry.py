@@ -147,7 +147,6 @@ class SchemaRegistry:
         raw_schema = model.model_json_schema(
             ref_template="#/components/schemas/{model}"
         )
-        print(raw_schema)
 
         schema = Schema.from_dict(raw_schema, ObjectType())
 
