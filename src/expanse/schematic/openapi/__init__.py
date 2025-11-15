@@ -1,10 +1,3 @@
-"""
-OpenAPI 3.1 Specification Classes
-
-This module provides Python classes that represent the OpenAPI 3.1 specification objects.
-All classes include proper typing and methods for serialization to dictionary format.
-"""
-
 from expanse.schematic.openapi.callback import Callback
 from expanse.schematic.openapi.components import Components
 from expanse.schematic.openapi.discriminator import Discriminator
@@ -34,39 +27,37 @@ from expanse.schematic.openapi.server import Server
 from expanse.schematic.openapi.server import ServerVariable
 from expanse.schematic.openapi.tag import ExternalDocumentation
 from expanse.schematic.openapi.tag import Tag
-from expanse.schematic.openapi.xml import XML
 
 
 __all__ = [
-    # Core OpenAPI Document
-    "OpenAPI",
-    "Info",
+    "XML",
+    "Callback",
+    "Components",
     "Contact",
+    "Discriminator",
+    "Encoding",
+    "Example",
+    "ExternalDocumentation",
+    "Header",
+    "Info",
     "License",
+    "Link",
+    "MediaType",
+    "OAuthFlow",
+    "OAuthFlows",
+    "OpenAPI",
+    "Operation",
+    "Parameter",
+    "PathItem",
+    "Paths",
+    "Reference",
+    "RequestBody",
+    "Response",
+    "Responses",
+    "Schema",
+    "SecurityRequirement",
+    "SecurityScheme",
     "Server",
     "ServerVariable",
-    "Paths",
-    "PathItem",
-    "Operation",
-    "ExternalDocumentation",
-    "Parameter",
-    "RequestBody",
-    "MediaType",
-    "Encoding",
-    "Responses",
-    "Response",
-    "Callback",
-    "Example",
-    "Link",
-    "Header",
     "Tag",
-    "Reference",
-    "Schema",
-    "Discriminator",
-    "XML",
-    "Components",
-    "SecurityScheme",
-    "OAuthFlows",
-    "OAuthFlow",
-    "SecurityRequirement",
 ]

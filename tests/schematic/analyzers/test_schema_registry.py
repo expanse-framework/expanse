@@ -2,12 +2,20 @@ from datetime import date
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Annotated
+from typing import Any
+from typing import ClassVar
 from uuid import UUID
 
 from pydantic import BaseModel
+from sqlalchemy.orm import Mapped
 
+from expanse.database.orm import column
+from expanse.database.orm.model import Model
 from expanse.schematic.analyzers.schema_registry import SchemaRegistry
+from expanse.schematic.openapi.components import Components
+from expanse.schematic.openapi.reference import Reference
+from expanse.schematic.openapi.schema import Schema
 
 
 class Color(Enum):
@@ -24,112 +32,127 @@ class UserModel(BaseModel):
     age: int | None = None
 
 
+class User(Model):
+    __tablename__ = "users"
+
+    __table_args__: ClassVar[dict[str, Any]] = {"extend_existing": True}
+
+    id: Mapped[int] = column(primary_key=True)
+    name: Mapped[str] = column(init=True)
+    email: Mapped[str] = column(init=True)
+
+
 def test_schema_generator_handles_basic_types():
-    """Test that basic Python types are converted correctly."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
     # String
     schema = generator.generate_from_type(str)
+
+    assert isinstance(schema, Schema)
     assert schema.type.name == "string"
 
     # Integer
     schema = generator.generate_from_type(int)
+    assert isinstance(schema, Schema)
     assert schema.type.name == "integer"
 
     # Float
     schema = generator.generate_from_type(float)
+    assert isinstance(schema, Schema)
     assert schema.type.name == "number"
 
     # Boolean
     schema = generator.generate_from_type(bool)
+    assert isinstance(schema, Schema)
     assert schema.type.name == "boolean"
 
 
 def test_schema_generator_handles_special_types():
-    """Test that special types have correct formats."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
     # UUID
     schema = generator.generate_from_type(UUID)
+    assert isinstance(schema, Schema)
     assert schema.type.format == "uuid"
 
     # DateTime
     schema = generator.generate_from_type(datetime)
+    assert isinstance(schema, Schema)
     assert schema.type.format == "date-time"
 
     # Date
     schema = generator.generate_from_type(date)
+    assert isinstance(schema, Schema)
     assert schema.type.format == "date"
 
     # Decimal
     schema = generator.generate_from_type(Decimal)
+    assert isinstance(schema, Schema)
     assert schema.type.name == "number"
 
 
 def test_schema_generator_handles_optional_types():
-    """Test that Optional types are marked as nullable."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
-    schema = generator.generate_from_type(Optional[str])
+    schema = generator.generate_from_type(str | None)
+    assert isinstance(schema, Schema)
     assert schema.nullable
 
 
 def test_schema_generator_handles_list_types():
-    """Test that list types generate array schemas."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
     schema = generator.generate_from_type(list[str])
+    assert isinstance(schema, Schema)
     assert schema.type.name == "array"
     assert schema.items is not None
+    assert isinstance(schema.items, Schema)
     assert schema.items.type.name == "string"
 
 
 def test_schema_generator_handles_dict_types():
-    """Test that dict types generate object schemas."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
     schema = generator.generate_from_type(dict[str, int])
+    assert isinstance(schema, Schema)
     assert schema.type.name == "object"
     assert schema.additional_properties is not None
 
 
 def test_schema_generator_handles_enum_types():
-    """Test that Enum types generate schemas with enum values."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
     schema = generator.generate_from_type(Color)
+    assert isinstance(schema, Schema)
     assert schema.enum == ["red", "green", "blue"]
 
 
 def test_schema_generator_handles_pydantic_models():
-    """Test that Pydantic models are converted correctly."""
-    generator = SchemaRegistry()
+    generator = SchemaRegistry(Components())
 
-    schema = generator.generate_from_pydantic(UserModel)
+    schema = generator.generate_from_type(UserModel)
 
+    assert isinstance(schema, Schema)
     assert schema.type.name == "object"
     assert schema.title == "UserModel"
     assert "name" in schema.properties
     assert "email" in schema.properties
     assert "age" in schema.properties
 
-    # Check required fields
     assert "name" in schema.required
     assert "email" in schema.required
-    assert "age" not in schema.required  # Optional field
+    assert "age" not in schema.required
 
 
 def test_schema_generator_extracts_pydantic_field_descriptions():
-    """Test that field descriptions are extracted from Pydantic models."""
-
     class UserWithDocs(BaseModel):
         """A documented user model."""
 
         name: str
         """The user's name."""
 
-    generator = SchemaRegistry()
-    schema = generator.generate_from_pydantic(UserWithDocs)
+    generator = SchemaRegistry(Components())
+    schema = generator.generate_from_type(UserWithDocs)
 
     assert schema.description == "A documented user model."
 
@@ -145,35 +168,21 @@ def test_schema_generator_handles_nested_pydantic_models():
         name: str
         address: Address
 
-    generator = SchemaRegistry()
-    schema = generator.generate_from_pydantic(UserWithAddress)
+    components = Components()
+    generator = SchemaRegistry(components)
+    schema = generator.generate_from_type(UserWithAddress)
 
+    assert isinstance(schema, Schema)
     assert "address" in schema.properties
-    assert schema.properties["address"].type.name == "object"
+    assert isinstance(schema.properties["address"], Reference)
+    assert "Address" in components.schemas
 
 
-def test_schema_generator_creates_component_references():
-    """Test that component schema references are created."""
-    generator = SchemaRegistry()
-    components_schemas = {}
+def test_schema_generator_creates_component_references_for_annotated_models():
+    components = Components()
+    generator = SchemaRegistry(components)
 
-    component_name = generator.get_or_create_component_schema(
-        UserModel, components_schemas
-    )
+    generator.generate_from_type(Annotated[User, UserModel])
 
-    assert component_name == "UserModel"
-    assert "UserModel" in components_schemas
-    assert components_schemas["UserModel"].title == "UserModel"
-
-
-def test_schema_generator_reuses_existing_components():
-    """Test that existing component schemas are reused."""
-    generator = SchemaRegistry()
-    components_schemas = {}
-
-    # Create component twice
-    name1 = generator.get_or_create_component_schema(UserModel, components_schemas)
-    name2 = generator.get_or_create_component_schema(UserModel, components_schemas)
-
-    assert name1 == name2
-    assert len(components_schemas) == 1
+    assert "UserModel" in components.schemas
+    assert components.schemas["UserModel"].title == "UserModel"

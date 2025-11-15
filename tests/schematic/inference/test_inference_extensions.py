@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+from expanse.core.http.exceptions import HTTPException
+from expanse.http.helpers import abort
 from expanse.routing.route import Route
 from expanse.schematic.inference.code_analyzer import CodeAnalyzer
 from expanse.schematic.inference.extensions.abort_detector import AbortDetector
@@ -8,12 +12,11 @@ from expanse.schematic.inference.extensions.http_exception_detector import (
 )
 from expanse.schematic.inference.inference import Inference
 from expanse.schematic.inference.inference import InferenceResult
+from expanse.schematic.support.route_info import RouteInfo
 
 
 def test_abort_detector_detects_abort_calls():
-    """Test that abort() calls are detected and converted to errors."""
-
-    def handler():
+    def handler(user: Any, authorized: bool):
         if not user:
             abort(404, "User not found")
         if not authorized:
@@ -40,9 +43,7 @@ def test_abort_detector_detects_abort_calls():
 
 
 def test_http_exception_detector_detects_raises():
-    """Test that HTTPException raises are detected."""
-
-    def handler():
+    def handler(user: Any, valid: bool):
         if not user:
             raise HTTPException(404, "User not found")
         if not valid:
@@ -66,21 +67,17 @@ def test_http_exception_detector_detects_raises():
 
 
 def test_inference_runs_multiple_extensions():
-    """Test that multiple inference extensions work together."""
-
     def handler():
         abort(403, "Forbidden")
         raise HTTPException(500, "Server error")
 
     route = Route.get("/users", handler)
-    code_analyzer = CodeAnalyzer()
-    code_analysis = code_analyzer.analyze(handler)
 
     inference = Inference()
     inference.add_extension(AbortDetector())
     inference.add_extension(HTTPExceptionDetector())
 
-    result = inference.infer(route, handler, code_analysis)
+    result = inference.infer(RouteInfo(route, inference))
 
     # Should detect both abort and raise
     assert len(result.errors) == 2

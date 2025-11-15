@@ -11,6 +11,7 @@ from expanse.schematic.inference.inference import InferredResponse
 if TYPE_CHECKING:
     from expanse.schematic.inference.code_analyzer import CodeAnalysisResult
     from expanse.schematic.inference.inference import InferenceResult
+    from expanse.schematic.support.route_info import RouteInfo
 
 
 class ResponseDetector:
@@ -20,7 +21,7 @@ class ResponseDetector:
 
     def infer(
         self,
-        route_info: Route,
+        route_info: RouteInfo,
         code_analysis: CodeAnalysisResult,
         result: InferenceResult,
     ) -> None:
@@ -34,7 +35,7 @@ class ResponseDetector:
 
         match call.func.id:
             case "Response" | "json":
-                status_code, content, content_type = self._extract_response_args(call)
+                status_code, _content, content_type = self._extract_response_args(call)
                 result.responses.append(
                     InferredResponse(status_code=status_code, content_type=content_type)
                 )
@@ -43,7 +44,6 @@ class ResponseDetector:
 
     def _extract_response_args(self, call: ast.Call) -> tuple[int, Any, str | None]:
         status_code: int = 200
-        content: dict[str, Any] | None = None
         content_type: str | None = None
 
         for idx, arg in enumerate(call.args):

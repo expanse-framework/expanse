@@ -4,9 +4,12 @@ import inspect
 
 from dataclasses import dataclass
 from dataclasses import field
+from types import NoneType
 from typing import TYPE_CHECKING
 from typing import Annotated
 from typing import Any
+from typing import Literal
+from typing import Union
 from typing import get_args
 from typing import get_origin
 from typing import get_type_hints
@@ -17,7 +20,6 @@ from expanse.http.form import Form
 from expanse.http.json import JSON
 from expanse.http.query import Query
 from expanse.http.request import Request
-from expanse.http.response import Response
 
 
 if TYPE_CHECKING:
@@ -26,37 +28,26 @@ if TYPE_CHECKING:
 
 @dataclass
 class ParameterInfo:
-    """Information about a single parameter in a route handler."""
-
     name: str
     annotation: Any
     default: Any
-    kind: str  # 'path', 'query', 'body', 'header', 'form', 'dependency'
+    kind: Literal["path", "query", "body", "header", "form", "dependency"]
     is_required: bool
     pydantic_model: type[BaseModel] | None = None
-    data_source: type[JSON] | type[Query] | type[Form] | None = None
+    data_source: type[JSON] | type[Query] | Form | None = None
 
 
 @dataclass
 class SignatureInfo:
-    """Complete signature information for a route handler."""
-
     parameters: list[ParameterInfo] = field(default_factory=list)
     return_annotation: Any = None
     path_parameters: list[ParameterInfo] = field(default_factory=list)
     query_parameters: list[ParameterInfo] = field(default_factory=list)
     body_parameter: ParameterInfo | None = None
-    form_parameter: ParameterInfo | None = None
     has_request: bool = False
-    has_response: bool = False
 
 
 class SignatureAnalyzer:
-    """
-    Analyzes function signatures to extract parameter and return type information.
-    Handles Pydantic models, path parameters, query parameters, and request bodies.
-    """
-
     def analyze(self, route: Route) -> SignatureInfo:
         signature = route.signature
         info = SignatureInfo()
@@ -96,12 +87,8 @@ class SignatureAnalyzer:
                 info.query_parameters.append(param_info)
             elif param_info.kind == "body":
                 info.body_parameter = param_info
-            elif param_info.kind == "form":
-                info.form_parameter = param_info
             elif param_info.annotation is Request:
                 info.has_request = True
-            elif param_info.annotation is Response:
-                info.has_response = True
 
         return info
 
@@ -112,18 +99,6 @@ class SignatureAnalyzer:
         route: Route,
         annotation: Any = None,
     ) -> ParameterInfo | None:
-        """
-        Analyze a single parameter to determine its type and purpose.
-
-        Args:
-            name: Parameter name
-            parameter: Parameter object from inspect
-            route: The route this parameter belongs to
-            annotation: Resolved annotation (optional, defaults to parameter.annotation)
-
-        Returns:
-            ParameterInfo with extracted information
-        """
         if annotation is None:
             annotation = parameter.annotation
         default = parameter.default
@@ -145,9 +120,10 @@ class SignatureAnalyzer:
                 name=name,
                 annotation=annotation,
                 default=default,
-                kind="form",
+                kind="body",
                 is_required=is_required,
                 data_source=Form,
+                pydantic_model=annotation._model,
             )
 
         # Check if it's an Annotated Pydantic model (JSON or Query)
@@ -158,33 +134,11 @@ class SignatureAnalyzer:
                 data_type = args[1]
 
                 # Check if data_type is JSON or Query class
-                is_json = False
-                is_query = False
+                is_body = data_type == JSON
+                is_query = data_type == Query
 
-                try:
-                    is_json = isinstance(data_type, type) and issubclass(
-                        data_type, JSON
-                    )
-                except TypeError:
-                    pass
-
-                try:
-                    is_query = isinstance(data_type, type) and issubclass(
-                        data_type, Query
-                    )
-                except TypeError:
-                    pass
-
-                # Also check if it's an instance
-                if not is_json and not is_query:
-                    is_json = isinstance(data_type, JSON)
-                    is_query = isinstance(data_type, Query)
-
-                if is_json or is_query:
-                    kind = "body" if is_json else "query"
-                    data_source = (
-                        data_type if isinstance(data_type, type) else type(data_type)
-                    )
+                if is_body or is_query:
+                    kind = "body" if is_body else "query"
                     return ParameterInfo(
                         name=name,
                         annotation=annotation,
@@ -192,7 +146,7 @@ class SignatureAnalyzer:
                         kind=kind,
                         is_required=is_required,
                         pydantic_model=pydantic_model,
-                        data_source=data_source,
+                        data_source=data_type,
                     )
 
         # Check if it's a standalone Pydantic model (assume body)
@@ -204,6 +158,30 @@ class SignatureAnalyzer:
                 kind="body",
                 is_required=is_required,
                 pydantic_model=annotation,
+            )
+
+        # TODO: Support full union types
+        origin = get_origin(annotation)
+        if origin is Union:
+            args = get_args(annotation)
+            if len(args) == 2 and NoneType in args:
+                param_info = self._analyze_parameter(
+                    name,
+                    parameter,
+                    route,
+                    args[0] if args[1] is NoneType else args[1],
+                )
+                if param_info:
+                    param_info.is_required = False
+                    return param_info
+
+        if annotation is Request:
+            return ParameterInfo(
+                name=name,
+                annotation=annotation,
+                default=default,
+                kind="dependency",
+                is_required=is_required,
             )
 
         return None

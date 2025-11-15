@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 from expanse.routing.route import Route
 from expanse.schematic.analyzers.signature_analyzer import SignatureAnalyzer
 from expanse.schematic.analyzers.signature_analyzer import SignatureInfo
 from expanse.schematic.inference.inference import Inference
 from expanse.schematic.support.doc_string.doc_string import DocString
-from expanse.schematic.support.doc_string.doc_string_info import DocStringInfo
+
+
+if TYPE_CHECKING:
+    from expanse.schematic.support.doc_string.doc_string_info import DocStringInfo
 
 
 class RouteInfo:

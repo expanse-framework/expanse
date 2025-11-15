@@ -37,7 +37,11 @@ async def test_generated_schema(unbootstrapped_app: Application, fixture: str) -
         await container.get(OperationBuilder), await container.get(Inference)
     )
 
-    json.dumps(json.loads(schema_file.read_text()), indent=2, sort_keys=True)
+    print(
+        json.dumps(
+            generator.generate(config, router).to_dict(), indent=2, sort_keys=True
+        )
+    )
     assert generator.generate(config, router).to_dict() == json.loads(
         schema_file.read_text()
     )

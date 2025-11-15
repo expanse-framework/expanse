@@ -1,4 +1,125 @@
 {
+  "components": {
+    "schemas": {
+      "UserRequest": {
+        "properties": {
+          "email": {
+            "description": "The email of the user",
+            "example": "foo@bar.com",
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the user",
+            "examples": [
+              "John Doe",
+              "Jane Doe"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "UserRequest",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/__UserAddress"
+          },
+          "email": {
+            "description": "The email of the user",
+            "example": "foo@bar.com",
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The name of the user",
+            "examples": [
+              "John Doe",
+              "Jane Doe"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "address"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "description": "Location of the validation error",
+            "items": {
+              "type": "string"
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "The complete error message of the validation error",
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "description": "The type of validation error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "__UserAddress": {
+        "properties": {
+          "city": {
+            "description": "City",
+            "example": "Anytown",
+            "title": "City",
+            "type": "string"
+          },
+          "street": {
+            "description": "Street address",
+            "example": "123 Main St",
+            "title": "Street",
+            "type": "string"
+          },
+          "zip_code": {
+            "description": "ZIP code",
+            "example": "12345",
+            "title": "Zip Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "street",
+          "city",
+          "zip_code"
+        ],
+        "title": "UserAddress",
+        "type": "object"
+      }
+    }
+  },
   "info": {
     "description": "This is a test API.",
     "title": "API",
@@ -38,34 +159,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "properties": {
-                      "email": {
-                        "description": "The email of the user",
-                        "example": "foo@bar.com",
-                        "title": "Email",
-                        "type": "string"
-                      },
-                      "id": {
-                        "title": "Id",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name of the user",
-                        "examples": [
-                          "John Doe",
-                          "Jane Doe"
-                        ],
-                        "title": "Name",
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "name",
-                      "email"
-                    ],
-                    "title": "UserResponse",
-                    "type": "object"
+                    "$ref": "#/components/schemas/UserResponse"
                   },
                   "type": "array"
                 }
@@ -86,29 +180,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "email": {
-                    "description": "The email of the user",
-                    "example": "foo@bar.com",
-                    "title": "Email",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "The name of the user",
-                    "examples": [
-                      "John Doe",
-                      "Jane Doe"
-                    ],
-                    "title": "Name",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name",
-                  "email"
-                ],
-                "title": "UserRequest",
-                "type": "object"
+                "$ref": "#/components/schemas/UserRequest"
               }
             }
           },
@@ -119,34 +191,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "email": {
-                      "description": "The email of the user",
-                      "example": "foo@bar.com",
-                      "title": "Email",
-                      "type": "string"
-                    },
-                    "id": {
-                      "title": "Id",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name of the user",
-                      "examples": [
-                        "John Doe",
-                        "Jane Doe"
-                      ],
-                      "title": "Name",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "email"
-                  ],
-                  "title": "UserResponse",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             },
@@ -156,6 +201,13 @@
             "description": "The user is not authorized to create a user."
           },
           "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
             "description": "The request data is invalid."
           }
         },
@@ -208,29 +260,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "email": {
-                    "description": "The email of the user",
-                    "example": "foo@bar.com",
-                    "title": "Email",
-                    "type": "string"
-                  },
-                  "name": {
-                    "description": "The name of the user",
-                    "examples": [
-                      "John Doe",
-                      "Jane Doe"
-                    ],
-                    "title": "Name",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name",
-                  "email"
-                ],
-                "title": "UserRequest",
-                "type": "object"
+                "$ref": "#/components/schemas/UserRequest"
               }
             }
           },
@@ -241,34 +271,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "email": {
-                      "description": "The email of the user",
-                      "example": "foo@bar.com",
-                      "title": "Email",
-                      "type": "string"
-                    },
-                    "id": {
-                      "title": "Id",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name of the user",
-                      "examples": [
-                        "John Doe",
-                        "Jane Doe"
-                      ],
-                      "title": "Name",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "email"
-                  ],
-                  "title": "UserResponse",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             },
@@ -281,6 +284,13 @@
             "description": "The user is not found."
           },
           "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
             "description": "The request data is invalid."
           }
         },

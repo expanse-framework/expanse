@@ -20,13 +20,16 @@ class ErrorResponseExtension(OperationExtension):
         signature_info = route_info.signature
         body_param = signature_info.body_parameter
 
-        if body_param and body_param.pydantic_model:
+        if (
+            body_param
+            and body_param.pydantic_model
+            and not operation.responses.has_response("422")
+        ):
             # If the body parameter is a Pydantic model, any validation error will lead to a 422 response.
-            if not operation.responses.has_response("422"):
-                operation.responses.add_response(
-                    "422",
-                    OpenAPIResponse("Validation Error"),
-                )
+            operation.responses.add_response(
+                "422",
+                OpenAPIResponse("Validation Error"),
+            )
 
         inference = self._inference.infer(route_info)
         for inferred_error in inference.errors:

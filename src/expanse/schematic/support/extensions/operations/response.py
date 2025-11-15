@@ -3,6 +3,9 @@ from __future__ import annotations
 from types import NoneType
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+from pydantic import Field
+
 from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.media_type import MediaType
 from expanse.schematic.openapi.response import Response as OpenAPIResponse
@@ -12,6 +15,14 @@ from expanse.schematic.support.extensions.operations.extension import OperationE
 if TYPE_CHECKING:
     from expanse.schematic.openapi.operation import Operation
     from expanse.schematic.support.route_info import RouteInfo
+
+
+class ValidationError(BaseModel):
+    loc: list[str] = Field(..., description="Location of the validation error")
+    msg: str = Field(
+        ..., description="The complete error message of the validation error"
+    )
+    type: str = Field(..., description="The type of validation error")
 
 
 class ResponseExtension(OperationExtension):
@@ -35,7 +46,7 @@ class ResponseExtension(OperationExtension):
             from expanse.http.response import Response as HttpResponse
 
             if route_info.signature.return_annotation != HttpResponse:
-                schema = SchemaRegistry().generate_from_type(
+                schema = SchemaRegistry(self._openapi.components).generate_from_type(
                     route_info.signature.return_annotation
                 )
                 media_type = MediaType(schema)
@@ -59,3 +70,13 @@ class ResponseExtension(OperationExtension):
 
         if operation.responses.is_empty():
             operation.responses.add_response("200", success_response)
+
+        # Add validation error response if needed
+        if not operation.responses.has_response("422") and operation.request_body:
+            validation_error_response = OpenAPIResponse("Validation Error")
+            reference, _ = SchemaRegistry(
+                self._openapi.components
+            ).get_or_create_component_schema(ValidationError)
+            media_type = MediaType(reference)
+            validation_error_response.add_content("application/json", media_type)
+            operation.responses.add_response("422", validation_error_response)

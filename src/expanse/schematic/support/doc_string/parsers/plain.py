@@ -1,6 +1,5 @@
 from expanse.schematic.support.doc_string.doc_string_info import DocStringInfo
-
-from .parser import DocStringParser
+from expanse.schematic.support.doc_string.parsers.parser import DocStringParser
 
 
 class PlainDocStringParser(DocStringParser):

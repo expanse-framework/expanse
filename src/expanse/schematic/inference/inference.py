@@ -69,7 +69,6 @@ class Inference:
         func = route_info.func
 
         code_analysis = self._analyzer.analyze(func)
-        print(code_analysis)
 
         # Run all extensions
         for extension in self._extensions:

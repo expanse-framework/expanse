@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Any
 
-from expanse.schematic.openapi.info import Info
+from expanse.schematic.openapi.components import Components
 
 
 if TYPE_CHECKING:
-    from expanse.schematic.openapi.components import Components
+    from expanse.schematic.openapi.info import Info
     from expanse.schematic.openapi.path_item import PathItem
     from expanse.schematic.openapi.paths import Paths
     from expanse.schematic.openapi.reference import Reference
@@ -29,7 +29,7 @@ class OpenAPI:
         self.servers: list[Server] = []
         self.paths: Paths | None = None
         self.webhooks: dict[str, PathItem | Reference] = {}
-        self.components: Components | None = None
+        self.components: Components = Components()
         self.security: list[SecurityRequirement] = []
         self.tags: list[Tag] = []
         self.external_docs: ExternalDocumentation | None = None
@@ -114,7 +114,7 @@ class OpenAPI:
                 name: webhook.to_dict() for name, webhook in self.webhooks.items()
             }
 
-        if self.components is not None:
+        if not self.components.is_empty():
             result["components"] = self.components.to_dict()
 
         if self.security:

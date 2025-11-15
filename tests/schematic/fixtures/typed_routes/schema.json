@@ -1,4 +1,78 @@
 {
+  "components": {
+    "schemas": {
+      "UserRequest": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "UserRequest",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "description": "Location of the validation error",
+            "items": {
+              "type": "string"
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "The complete error message of the validation error",
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "description": "The type of validation error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
   "info": {
     "description": "This is a test API.",
     "title": "API",
@@ -35,23 +109,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "properties": {
-                      "email": {
-                        "title": "Email",
-                        "type": "string"
-                      },
-                      "id": {
-                        "title": "Id",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "title": "Name",
-                        "type": "string"
-                      }
-                    },
-                    "required": ["id", "name", "email"],
-                    "title": "UserResponse",
-                    "type": "object"
+                    "$ref": "#/components/schemas/UserResponse"
                   },
                   "type": "array"
                 }
@@ -67,19 +125,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "email": {
-                    "title": "Email",
-                    "type": "string"
-                  },
-                  "name": {
-                    "title": "Name",
-                    "type": "string"
-                  }
-                },
-                "required": ["name", "email"],
-                "title": "UserRequest",
-                "type": "object"
+                "$ref": "#/components/schemas/UserRequest"
               }
             }
           },
@@ -90,29 +136,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "email": {
-                      "title": "Email",
-                      "type": "string"
-                    },
-                    "id": {
-                      "title": "Id",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "title": "Name",
-                      "type": "string"
-                    }
-                  },
-                  "required": ["id", "name", "email"],
-                  "title": "UserResponse",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             },
             "description": ""
           },
-          "422": { "description": "Validation Error" }
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
         }
       }
     },
@@ -154,19 +193,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "email": {
-                    "title": "Email",
-                    "type": "string"
-                  },
-                  "name": {
-                    "title": "Name",
-                    "type": "string"
-                  }
-                },
-                "required": ["name", "email"],
-                "title": "UserRequest",
-                "type": "object"
+                "$ref": "#/components/schemas/UserRequest"
               }
             }
           },
@@ -177,23 +204,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "email": {
-                      "title": "Email",
-                      "type": "string"
-                    },
-                    "id": {
-                      "title": "Id",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "title": "Name",
-                      "type": "string"
-                    }
-                  },
-                  "required": ["id", "name", "email"],
-                  "title": "UserResponse",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             },
@@ -202,7 +213,16 @@
           "404": {
             "description": "User not found"
           },
-          "422": { "description": "Validation Error" }
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
         }
       }
     }

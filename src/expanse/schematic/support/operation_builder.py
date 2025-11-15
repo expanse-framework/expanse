@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from expanse.schematic.generator_config import GeneratorConfig
-from expanse.schematic.inference.inference import Inference
-from expanse.schematic.openapi.openapi import OpenAPI
+from typing import TYPE_CHECKING
+
 from expanse.schematic.openapi.operation import Operation
-from expanse.schematic.support.extensions.operations.extension import OperationExtension
-from expanse.schematic.support.route_info import RouteInfo
+
+
+if TYPE_CHECKING:
+    from expanse.schematic.generator_config import GeneratorConfig
+    from expanse.schematic.inference.inference import Inference
+    from expanse.schematic.openapi.openapi import OpenAPI
+    from expanse.schematic.support.extensions.operations.extension import (
+        OperationExtension,
+    )
+    from expanse.schematic.support.route_info import RouteInfo
 
 
 class OperationBuilder:

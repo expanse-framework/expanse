@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
-from expanse.schematic.support.route_info import RouteInfo
 
 
 if TYPE_CHECKING:
     from expanse.schematic.openapi.operation import Operation
+    from expanse.schematic.support.route_info import RouteInfo
 
 
 class EssentialsExtension(OperationExtension):

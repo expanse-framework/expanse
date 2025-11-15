@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from types import EllipsisType
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Literal
 
 
 if TYPE_CHECKING:
+    from types import EllipsisType
+
     from expanse.schematic.openapi.example import Example
     from expanse.schematic.openapi.media_type import MediaType
     from expanse.schematic.openapi.reference import Reference
@@ -21,13 +22,6 @@ class Parameter:
     """
 
     def __init__(self, name: str, in_: Literal["query", "header", "path", "cookie"]):
-        """
-        Initialize a Parameter object.
-
-        Args:
-            name: The name of the parameter. Parameter names are case sensitive.
-            in_: The location of the parameter.
-        """
         self.name: str = name
         self.in_: Literal["query", "header", "path", "cookie"] = in_
         self.required: bool = False
@@ -57,37 +51,30 @@ class Parameter:
             self.required = True
 
     def set_description(self, description: str) -> Parameter:
-        """Set a brief description of the parameter."""
         self.description = description
         return self
 
     def set_required(self, required: bool) -> Parameter:
-        """Set whether this parameter is mandatory."""
         self.required = required
         return self
 
     def set_deprecated(self, deprecated: bool) -> Parameter:
-        """Set whether this parameter is deprecated."""
         self.deprecated = deprecated
         return self
 
     def set_schema(self, schema: Schema) -> Parameter:
-        """Set the schema defining the type used for the parameter."""
         self.schema = schema
         return self
 
     def add_example(self, name: str, example: Example | Reference) -> Parameter:
-        """Add a named example of the parameter's potential value."""
         self.examples[name] = example
         return self
 
     def add_content(self, media_type: str, content: MediaType) -> Parameter:
-        """Add content description for the parameter."""
         self.content[media_type] = content
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the Parameter object to a dictionary representation."""
         data: dict[str, Any] = {
             "name": self.name,
             "in": self.in_,
@@ -128,6 +115,3 @@ class Parameter:
             }
 
         return data
-
-    def __repr__(self) -> str:
-        return f"Parameter(name='{self.name}', in='{self.in_}')"

@@ -39,12 +39,19 @@ class UserRequest(BaseModel):
     email: str = Field(description="The email of the user", example="foo@bar.com")
 
 
+class UserAddress(BaseModel):
+    street: str = Field(description="Street address", example="123 Main St")
+    city: str = Field(description="City", example="Anytown")
+    zip_code: str = Field(description="ZIP code", example="12345")
+
+
 class UserResponse(BaseModel):
     id: int
     name: str = Field(
         description="The name of the user", examples=["John Doe", "Jane Doe"]
     )
     email: str = Field(description="The email of the user", example="foo@bar.com")
+    address: UserAddress = Field(description="The address of the user")
 
 
 class UserFilters(BaseModel):

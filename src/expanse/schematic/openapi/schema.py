@@ -3,29 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Any
 
-from expanse.schematic.openapi.types import Type
-
 
 if TYPE_CHECKING:
     from expanse.schematic.openapi.discriminator import Discriminator
+    from expanse.schematic.openapi.reference import Reference
     from expanse.schematic.openapi.tag import ExternalDocumentation
+    from expanse.schematic.openapi.types import Type
     from expanse.schematic.openapi.xml import XML
 
 
 class Schema:
-    """
-    The Schema Object allows the definition of input and output data types.
-    These types can be objects, but also primitives and arrays.
-    This object is a superset of the JSON Schema Specification Draft 2020-12.
-    """
-
     def __init__(self, type: Type | None = None) -> None:
-        """
-        Initialize a Schema object.
-
-        Args:
-            type: The type definition for this schema
-        """
         # Core JSON Schema properties
         self.type: Type | None = type
         self.title: str | None = None
@@ -35,14 +23,14 @@ class Schema:
         self.enum: list[Any] = []
 
         # Object properties
-        self.properties: dict[str, Schema] = {}
+        self.properties: dict[str, Schema | Reference] = {}
         self.required: list[str] = []
         self.additional_properties: bool | Schema | None = None
         self.min_properties: int | None = None
         self.max_properties: int | None = None
 
         # Array properties
-        self.items: Schema | None = None
+        self.items: Schema | Reference | None = None
         self.min_items: int | None = None
         self.max_items: int | None = None
         self.unique_items: bool | None = None
@@ -60,10 +48,10 @@ class Schema:
         self.multiple_of: float | None = None
 
         # Composition keywords
-        self.all_of: list[Schema] = []
-        self.one_of: list[Schema] = []
-        self.any_of: list[Schema] = []
-        self.not_: Schema | None = None
+        self.all_of: list[Schema | Reference] = []
+        self.one_of: list[Schema | Reference] = []
+        self.any_of: list[Schema | Reference] = []
+        self.not_: Schema | Reference | None = None
 
         # OpenAPI specific extensions
         self.discriminator: Discriminator | None = None
@@ -79,7 +67,9 @@ class Schema:
         self.nullable: bool = False
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], type: Type | None = None) -> Schema:
+    def from_dict(
+        cls, data: dict[str, Any], type: Type | None = None
+    ) -> Schema | Reference:
         from expanse.schematic.openapi.types import ArrayType
         from expanse.schematic.openapi.types import BooleanType
         from expanse.schematic.openapi.types import IntegerType
@@ -118,6 +108,11 @@ class Schema:
         # JSON Schema meta properties
         if "$schema" in data:
             schema.schema = data["$schema"]
+
+        if "$ref" in data:
+            from expanse.schematic.openapi.reference import Reference
+
+            return Reference(ref=data["$ref"])
 
         # Core properties
         if "title" in data:
@@ -280,12 +275,14 @@ class Schema:
         self.required = required
         return self
 
-    def set_additional_properties(self, additional_properties: bool | Schema) -> Schema:
+    def set_additional_properties(
+        self, additional_properties: bool | Schema | Reference
+    ) -> Schema:
         """Set additional properties behavior."""
         self.additional_properties = additional_properties
         return self
 
-    def set_items(self, items: Schema) -> Schema:
+    def set_items(self, items: Schema | Reference) -> Schema:
         """Set the items schema for arrays."""
         self.items = items
         return self
@@ -319,22 +316,22 @@ class Schema:
             self.exclusive_maximum = True
         return self
 
-    def add_all_of(self, schema: Schema) -> Schema:
+    def add_all_of(self, schema: Schema | Reference) -> Schema:
         """Add a schema to the allOf composition."""
         self.all_of.append(schema)
         return self
 
-    def add_one_of(self, schema: Schema) -> Schema:
+    def add_one_of(self, schema: Schema | Reference) -> Schema:
         """Add a schema to the oneOf composition."""
         self.one_of.append(schema)
         return self
 
-    def add_any_of(self, schema: Schema) -> Schema:
+    def add_any_of(self, schema: Schema | Reference) -> Schema:
         """Add a schema to the anyOf composition."""
         self.any_of.append(schema)
         return self
 
-    def set_not(self, schema: Schema) -> Schema:
+    def set_not(self, schema: Schema | Reference) -> Schema:
         """Set the not schema."""
         self.not_ = schema
         return self
@@ -501,11 +498,3 @@ class Schema:
             result["nullable"] = self.nullable
 
         return result
-
-    def __repr__(self) -> str:
-        if self.type:
-            return f"Schema(type={self.type})"
-        elif self.title:
-            return f"Schema(title='{self.title}')"
-        else:
-            return "Schema()"

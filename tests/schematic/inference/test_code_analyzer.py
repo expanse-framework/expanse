@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+from typing import Any
+
+from expanse.core.http.exceptions import HTTPException
+from expanse.http.helpers import abort
 from expanse.schematic.inference.code_analyzer import CodeAnalyzer
 
 
-def test_code_analyzer_detects_function_calls():
-    """Test that function calls are detected."""
+def some_function(a: int, b: int, key: str | None = None) -> None:
+    pass
 
+
+def func(a: int, b: str, c: bool, d: list[int], e: dict[str, Any]) -> None:
+    pass
+
+
+def test_code_analyzer_detects_function_calls():
     def handler():
         print("Hello")
         abort(404, "Not found")
@@ -24,8 +34,6 @@ def test_code_analyzer_detects_function_calls():
 
 
 def test_code_analyzer_detects_exception_raises():
-    """Test that raised exceptions are detected."""
-
     def handler():
         raise HTTPException(404, "Not found")
         raise ValueError("Invalid input")
@@ -45,8 +53,6 @@ def test_code_analyzer_detects_exception_raises():
 
 
 def test_code_analyzer_detects_return_statements():
-    """Test that return statements are detected."""
-
     def handler():
         if True:
             return {"success": True}
@@ -59,12 +65,10 @@ def test_code_analyzer_detects_return_statements():
 
 
 def test_code_analyzer_handles_method_calls():
-    """Test that method calls are properly parsed."""
-
     def handler():
-        obj.method()
-        module.function()
-        a.b.c.deep()
+        obj.method()  # noqa: F821
+        module.function()  # noqa: F821
+        a.b.c.deep()  # noqa: F821
 
     analyzer = CodeAnalyzer()
     result = analyzer.analyze(handler)
@@ -76,8 +80,6 @@ def test_code_analyzer_handles_method_calls():
 
 
 def test_code_analyzer_extracts_literal_values():
-    """Test that literal values are extracted from calls."""
-
     def handler():
         func(123, "string", True, [1, 2, 3], {"key": "value"})
 
@@ -92,8 +94,6 @@ def test_code_analyzer_extracts_literal_values():
 
 
 def test_code_analyzer_handles_functions_without_source():
-    """Test that built-in functions are handled gracefully."""
-
     # Built-in function
     analyzer = CodeAnalyzer()
     result = analyzer.analyze(print)

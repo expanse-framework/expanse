@@ -4,8 +4,6 @@ from dataclasses import field
 
 @dataclass
 class ParameterDoc:
-    """Documentation for a single parameter."""
-
     name: str
     description: str
     type_hint: str | None = None
@@ -13,8 +11,6 @@ class ParameterDoc:
 
 @dataclass
 class RaisesDoc:
-    """Documentation for an exception that can be raised."""
-
     exception: str
     description: str
     status_code: int
@@ -22,8 +18,6 @@ class RaisesDoc:
 
 @dataclass
 class DocStringInfo:
-    """Parsed information from a docstring."""
-
     summary: str = ""
     description: str = ""
     parameters: dict[str, ParameterDoc] = field(default_factory=dict)
