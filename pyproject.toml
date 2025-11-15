@@ -15,7 +15,6 @@ dependencies = [
     "anyio>=4.2.0",
     "baize>=0.22.0",
     "cleo>=2.1.0",
-    "crashtest>=0.4.1",
     "cryptography>=44.0.0",
     "filelock>=3.16.1",
     "httpx>=0.26.0",

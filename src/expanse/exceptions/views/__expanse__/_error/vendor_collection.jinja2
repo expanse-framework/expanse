@@ -1,0 +1,93 @@
+<div
+  class="group/vendor my-2 rounded-lg border border-dashed border-stone-300 bg-stone-100 opacity-90 transition-colors duration-300 dark:border-white/10 dark:bg-white/1"
+  data-controller="disclosure"
+>
+  <div
+    class="flex h-11 cursor-pointer items-center gap-3 rounded-lg pr-4 pl-4 transition-colors duration-300 group-hover/vendor:bg-stone-200/50 group-data-[open=true]/vendor:rounded-b-none dark:hover:bg-white/2"
+    data-action="click->disclosure#toggle"
+  >
+    <div
+      class="flex flex-1 items-center gap-2 text-xs leading-3 text-stone-900 dark:text-stone-300"
+    >
+      <div class="flex size-3 flex-shrink-0 items-center justify-center">
+        <div
+          class="rounded-full bg-stone-400 p-0.5 text-white shadow transition-colors duration-300 group-hover/vendor:bg-yellow-500 group-data-[open=true]/vendor:bg-yellow-500 hover:animate-ping dark:bg-stone-50 dark:text-stone-800 dark:group-hover/vendor:bg-sky-400 dark:group-data-[open=true]/vendor:bg-sky-400"
+        >
+          <div class="size-1 rounded-full bg-current"></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <p>
+          {% if collection.frames_count == 1 %}
+            <strong class="font-medium">{{ collection.frames_count }}</strong> vendor frame
+          {% else %}
+            <strong class="font-medium">{{ collection.frames_count }}</strong> vendor frames
+          {% endif %}
+        </p>
+        <div data-controller="tooltip" class="relative" data-tooltip-placement="right">
+          <button
+            type="button"
+            class="text-stone-500 transition-colors duration-300 hover:text-stone-700 dark:text-stone-400"
+            data-tooltip-target="reference"
+            data-action="mouseenter->tooltip#show mouseleave->tooltip#hide"
+          >
+            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+              <path
+                opacity=".4"
+                fill="currentColor"
+                d="M64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320zM242.8 277.2C242.8 234.6 277.4 200 320 200C362.6 200 397.2 234.6 397.2 277.2C397.2 322.7 362.7 341.9 343.5 349C341.2 359.8 331.6 368 320 368C306.7 368 296 357.3 296 344C296 323.8 310.6 309.4 325.5 304.5C331.5 302.5 337.8 299.4 342.3 295C346.2 291.2 349.2 286 349.2 277.3C349.2 261.2 336.1 248.1 320 248.1C303.9 248.1 290.8 261.2 290.8 277.3C290.8 290.6 280.1 301.3 266.8 301.3C253.5 301.3 242.8 290.6 242.8 277.3zM348 416C348 431.5 335.5 444 320 444C304.5 444 292 431.5 292 416C292 400.5 304.5 388 320 388C335.5 388 348 400.5 348 416z"
+              />
+              <path
+                fill="currentColor"
+                d="M290.8 277.2C290.8 261.1 303.9 248 320 248C336.1 248 349.2 261.1 349.2 277.2C349.2 285.9 346.1 291.1 342.3 294.9C337.8 299.3 331.6 302.4 325.5 304.4C310.6 309.4 296 323.7 296 343.9C296 357.2 306.7 367.9 320 367.9C331.5 367.9 341.2 359.8 343.5 348.9C362.7 341.8 397.2 322.6 397.2 277.1C397.2 234.5 362.6 199.9 320 199.9C277.4 199.9 242.8 234.5 242.8 277.1C242.8 290.4 253.5 301.1 266.8 301.1C280.1 301.1 290.8 290.4 290.8 277.1zM320 444C335.5 444 348 431.5 348 416C348 400.5 335.5 388 320 388C304.5 388 292 400.5 292 416C292 431.5 304.5 444 320 444z"
+              />
+            </svg>
+          </button>
+
+          <div
+            class="absolute top-0 left-0 w-64 rounded-lg bg-stone-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg md:w-max md:p-2 dark:border dark:border-stone-600 dark:bg-stone-700"
+            data-tooltip-target="content"
+          >
+            Vendor frames originate from third-party libraries and not from your application.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex-shrink-0">
+      <button
+        type="button"
+        class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-stone-500 transition-colors duration-300 group-hover/vendor:text-yellow-500 group-data-[open=true]/vendor:text-yellow-500 dark:text-stone-500 dark:group-data-[open=true]/vendor:text-yellow-400"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="size-3"
+          data-disclosure-target="icon"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m7 15 5 5 5-5" />
+          <path d="m7 9 5-5 5 5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div
+    data-disclosure-target="panel"
+    class="{% if open %}h-auto{% else %}h-0{% endif %} overflow-hidden"
+  >
+    <div>
+      {% for frame in collection.frames %}
+        {% with frame=frame %}
+          {% include "__expanse__/_error/frame.jinja2" %}
+        {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+</div>

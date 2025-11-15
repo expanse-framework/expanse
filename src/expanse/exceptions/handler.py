@@ -131,7 +131,9 @@ class ExceptionHandler(ExceptionHandlerContract):
         if not isinstance(e, HTTPException) and config.get("app.debug"):
             if self._container.has(ExceptionRenderer):
                 return Response(
-                    await (await self._container.get(ExceptionRenderer)).render(e),
+                    await (await self._container.get(ExceptionRenderer)).render(
+                        e, request
+                    ),
                     status_code=500,
                     content_type="text/html",
                 )
@@ -145,9 +147,11 @@ class ExceptionHandler(ExceptionHandlerContract):
         if not isinstance(e, HTTPException):
             e = HTTPException(500, str(e))
 
-        return await self._render_http_exception(e)
+        return await self._render_http_exception(e, request)
 
-    async def _render_http_exception(self, e: HTTPException) -> Response:
+    async def _render_http_exception(
+        self, e: HTTPException, request: Request
+    ) -> Response:
         await self._register_error_paths()
 
         if view_name := (await self._get_http_exception_view(e)):
@@ -156,6 +160,13 @@ class ExceptionHandler(ExceptionHandlerContract):
             return view(
                 view_name,
                 data={"exception": e},
+                status_code=e.status_code,
+                content_type="text/html",
+                headers=e.headers,
+            )
+        elif self._container.has(ExceptionRenderer):
+            return Response(
+                await (await self._container.get(ExceptionRenderer)).render(e, request),
                 status_code=e.status_code,
                 content_type="text/html",
                 headers=e.headers,
@@ -191,7 +202,7 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         http_exception = HTTPException(422, str(e))
 
-        return await self._render_http_exception(http_exception)
+        return await self._render_http_exception(http_exception, request)
 
     async def _get_http_exception_view(self, e: HTTPException) -> str | None:
         view = f"errors/{e.status_code}"

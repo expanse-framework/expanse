@@ -3,6 +3,7 @@ from expanse.contracts.debug.exception_renderer import (
 )
 from expanse.contracts.routing.router import Router
 from expanse.core.http.exceptions import HTTPException
+from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.testing.client import TestClient
 
@@ -11,7 +12,7 @@ class ExceptionRenderer(BaseExceptionRenderer):
     def __init__(self) -> None:
         self.rendered: bool = False
 
-    async def render(self, exception: Exception) -> str:
+    async def render(self, exception: Exception, request: Request) -> str:
         self.rendered = True
 
         return "Rendered"

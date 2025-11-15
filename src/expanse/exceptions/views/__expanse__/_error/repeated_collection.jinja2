@@ -1,0 +1,44 @@
+<div
+  class="group my-2 rounded-lg border border-dashed border-stone-200 border-stone-300 bg-stone-100 opacity-90 dark:border-white/10 dark:bg-white/1"
+>
+  <div class="flex h-11 items-center gap-3 rounded-lg pr-2.5 pl-2">
+    <div
+      class="flex flex-1 items-center gap-1 text-xs leading-3 text-stone-900 dark:text-stone-300"
+    >
+      <div
+        class="h-full rounded-lg bg-transparent p-1.5 font-medium text-stone-800 dark:border-stone-50/5 dark:bg-stone-100/10 dark:text-stone-50"
+      >
+        <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+          <path
+            opacity=".4"
+            fill="currentColor"
+            d="M105.4 457.4C92.9 469.9 92.9 490.2 105.4 502.7L169.4 566.7C178.6 575.9 192.3 578.6 204.3 573.6C216.3 568.6 224 556.9 224 544L224 512L384 512C490 512 576 426 576 320C576 302.3 561.7 288 544 288C526.3 288 512 302.3 512 320C512 390.7 454.7 448 384 448L224 448L224 416C224 403.1 216.2 391.4 204.2 386.4C192.2 381.4 178.5 384.2 169.3 393.3L105.3 457.3z"
+          />
+          <path
+            fill="currentColor"
+            d="M534.6 137.4C547.1 149.9 547.1 170.2 534.6 182.7L470.6 246.7C461.4 255.9 447.7 258.6 435.7 253.6C423.7 248.6 416 236.9 416 224L416 192L256 192C185.3 192 128 249.3 128 320C128 337.7 113.7 352 96 352C78.3 352 64 337.7 64 320C64 214 150 128 256 128L416 128L416 96C416 83.1 423.8 71.4 435.8 66.4C447.8 61.4 461.5 64.2 470.7 73.3L534.7 137.3z"
+          />
+        </svg>
+      </div>
+      <div>
+        {% if collection.frames_count == 1 %}
+          The <strong class="font-medium">next frame</strong> is repeated
+          <strong class="font-medium">{{ collection.repetitions }}</strong> times
+        {% else %}
+          The next <strong class="font-medium">{{ collection.frames_count }}</strong> frames are
+          repeated <strong class="font-medium">{{ collection.repetitions }}</strong> times
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  class="flex flex-col rounded-lg bg-white shadow-xs ring ring-stone-800/5 dark:bg-stone-800/80 dark:ring-stone-600/50 [&_>_div:last-child_hr]:hidden"
+>
+  {% for frame in collection.frames %}
+    {% with frame=frame, open=trace_loop.index == 1 and collection_loop.index == 1 and loop.index == 1 %}
+      {% include "__expanse__/_error/frame.jinja2" %}
+    {% endwith %}
+  {% endfor %}
+</div>
