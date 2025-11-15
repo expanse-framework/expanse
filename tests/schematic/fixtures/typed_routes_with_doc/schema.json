@@ -5,7 +5,9 @@
         "properties": {
           "email": {
             "description": "The email of the user",
-            "example": "foo@bar.com",
+            "examples": [
+              "foo@bar.com"
+            ],
             "title": "Email",
             "type": "string"
           },
@@ -33,7 +35,9 @@
           },
           "email": {
             "description": "The email of the user",
-            "example": "foo@bar.com",
+            "examples": [
+              "foo@bar.com"
+            ],
             "title": "Email",
             "type": "string"
           },
@@ -93,19 +97,25 @@
         "properties": {
           "city": {
             "description": "City",
-            "example": "Anytown",
+            "examples": [
+              "Anytown"
+            ],
             "title": "City",
             "type": "string"
           },
           "street": {
             "description": "Street address",
-            "example": "123 Main St",
+            "examples": [
+              "123 Main St"
+            ],
             "title": "Street",
             "type": "string"
           },
           "zip_code": {
             "description": "ZIP code",
-            "example": "12345",
+            "examples": [
+              "12345"
+            ],
             "title": "Zip Code",
             "type": "string"
           }

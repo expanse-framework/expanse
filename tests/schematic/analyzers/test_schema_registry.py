@@ -32,7 +32,7 @@ class UserModel(BaseModel):
 
 
 class User(Model):
-    __tablename__ = "users"
+    __tablename__ = "schematic_users"
 
     __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
 

@@ -5,7 +5,9 @@
         "properties": {
           "email": {
             "description": "The email of the user",
-            "example": "foo@bar.com",
+            "examples": [
+              "foo@bar.com"
+            ],
             "title": "Email",
             "type": "string"
           },
@@ -30,7 +32,9 @@
         "properties": {
           "email": {
             "description": "The email of the user",
-            "example": "foo@bar.com",
+            "examples": [
+              "foo@bar.com"
+            ],
             "title": "Email",
             "type": "string"
           },
