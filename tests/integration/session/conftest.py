@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from expanse.configuration.config import Config
 
 
-@pytest.mark.db
 @pytest.fixture()
 async def setup_databases(
     app: Application, tmp_path: Path, command_tester: CommandTester
