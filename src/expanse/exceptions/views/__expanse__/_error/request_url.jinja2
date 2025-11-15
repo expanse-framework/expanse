@@ -1,0 +1,6 @@
+<div class="highlight">
+  <pre><code class="!p-0"><span class="n">{{ request.url.scheme }}</span><span class="p">://</span><span
+    class="n">{{ request.url.netloc }}</span><span class="s">{{ request.url.path }}</span>{% if request.url.query %}
+    <span class="p">?</span><span>{{ request.url.query }}</span>
+  {% endif %}</code></pre>
+</div>

@@ -42,6 +42,8 @@ jobs:
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -60,12 +62,12 @@ jobs:
         python-version: ["3.12", "3.13", "3.14"]
         include:
           - os: Windows
-            image: windows-2022
+            image: windows-latest
           - os: macOS
             image: macos-latest
         exclude:
           - os: Windows
-            python-version: ["3.13", "3.14"]
+            python-version: "3.14"
     env:
       DATABASE_HOST: localhost
       DATABASE_NAME: expanse
@@ -80,6 +82,8 @@ jobs:
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6

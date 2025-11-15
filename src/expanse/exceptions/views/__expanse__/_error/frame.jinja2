@@ -1,0 +1,73 @@
+<div
+  class="group relative rounded-lg"
+  data-open="{% if open %}true{% else %}false{% endif %}"
+  data-controller="disclosure"
+>
+  <div
+    class="{% if frame.code %}
+      cursor-pointer hover:[&_svg]:stroke-orange-500
+    {% endif %} flex items-center gap-3 overflow-x-auto rounded-lg p-4 py-3"
+    data-action="click->disclosure#toggle"
+  >
+    <div class="flex size-3 flex-shrink-0 items-center justify-center">
+      <div
+        class="rounded-full bg-stone-600 p-0.5 text-white shadow transition-colors duration-300 group-data-[open=true]:bg-orange-500 hover:animate-ping dark:bg-stone-50 dark:text-stone-800 dark:group-data-[open=true]:bg-orange-500"
+      >
+        <div class="size-1 rounded-full bg-current"></div>
+      </div>
+    </div>
+
+    <div class="flex min-w-0 flex-1 items-center justify-between gap-6">
+      <div class="min-w-0 font-mono text-xs">{{ frame.filepath }}</div>
+      <div class="truncate font-mono text-xs text-stone-500 dark:text-stone-400">
+        <span class="min-w-0 truncate font-mono text-xs text-orange-600 dark:text-orange-400">
+          {{ frame.function }}<span class="text-orange-400 dark:text-orange-300">()</span>
+        </span>
+        <span>
+          {{ frame.filename }}<span class="text-stone-400 dark:text-stone-500"
+            >:{{ frame.lineno }}</span
+          >
+        </span>
+      </div>
+    </div>
+
+    <div class="flex-shrink-0">
+      <button
+        type="button"
+        class="flex h-6 w-6 cursor-pointer items-center justify-center text-stone-500 transition-colors duration-300 group-hover:text-orange-500 group-data-[open=true]:text-orange-500 dark:text-stone-500 group-data-[open=true]:dark:text-orange-500"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="size-3"
+          data-disclosure-target="icon"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m7 15 5 5 5-5" />
+          <path d="m7 9 5-5 5 5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  {% if frame.code %}
+    <div
+      data-disclosure-target="panel"
+      class="{% if open %}h-auto{% else %}h-0{% endif %} overflow-hidden"
+    >
+      <div>
+        {% with code=frame.code %}
+          {% include "__expanse__/_error/frame_code.jinja2" %}
+        {% endwith %}
+      </div>
+    </div>
+  {% endif %}
+
+  <hr class="absolute right-10 left-10 border-stone-100 dark:border-stone-700/50" />
+</div>

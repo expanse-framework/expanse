@@ -1,0 +1,80 @@
+<div class="flex flex-col gap-3">
+  <h2 class="text-lg font-semibold text-stone-900 dark:text-white">Routing information</h2>
+  <div class="flex flex-col">
+    <div
+      class="flex h-10 max-w-full items-baseline gap-2 font-mono text-sm"
+      data-controller="tooltip"
+      data-tooltip-placement="top"
+    >
+      <div class="shrink-0 text-stone-500 uppercase dark:text-stone-400">Name</div>
+      <div
+        class="h-3 min-w-6 grow border-b-2 border-dotted border-stone-300 dark:border-white/20"
+      ></div>
+      <div
+        class="group relative"
+        data-action="mouseover->tooltip#show mouseout->tooltip#hide"
+        data-tooltip-target="reference"
+      >
+        <div class="truncate text-stone-900 dark:text-white">
+          <span> {{ route.name or "N/A" }} </span>
+        </div>
+        <div
+          class="absolute top-0 left-0 hidden max-w-64 rounded-lg bg-stone-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg group-hover:block md:w-max md:max-w-none md:p-2 dark:border dark:border-stone-600 dark:bg-stone-700"
+          data-tooltip-target="content"
+        >
+          {{ route.name or "N/A" }}
+        </div>
+      </div>
+    </div>
+    <div
+      class="flex h-10 max-w-full items-baseline gap-2 font-mono text-sm"
+      data-controller="tooltip"
+      data-tooltip-placement="top"
+    >
+      <div class="shrink-0 text-stone-500 uppercase dark:text-stone-400">Handler</div>
+      <div
+        class="h-3 min-w-6 grow border-b-2 border-dotted border-stone-300 dark:border-white/20"
+      ></div>
+      <div
+        class="group relative"
+        data-action="mouseover->tooltip#show mouseout->tooltip#hide"
+        data-tooltip-target="reference"
+      >
+        <div class="truncate text-stone-900 dark:text-white">
+          <span> {{ route.formatted_endpoint }} </span>
+        </div>
+        <div
+          class="absolute top-0 left-0 hidden max-w-64 rounded-lg bg-stone-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg group-hover:block md:w-max md:max-w-none md:p-2 dark:border dark:border-stone-600 dark:bg-stone-700"
+          data-tooltip-target="content"
+        >
+          {{ route.formatted_endpoint }}
+        </div>
+      </div>
+    </div>
+    <div
+      class="flex h-10 max-w-full items-baseline gap-2 font-mono text-sm"
+      data-controller="tooltip"
+      data-tooltip-placement="top"
+    >
+      <div class="shrink-0 text-stone-500 uppercase dark:text-stone-400">Middleware</div>
+      <div
+        class="h-3 min-w-6 grow border-b-2 border-dotted border-stone-300 dark:border-white/20"
+      ></div>
+      <div
+        class="group relative"
+        data-action="mouseover->tooltip#show mouseout->tooltip#hide"
+        data-tooltip-target="reference"
+      >
+        <div class="truncate text-stone-900 dark:text-white">
+          <span> {{ route.get_middleware() or ["N/A"] | join(', ') }} </span>
+        </div>
+        <div
+          class="absolute top-0 left-0 hidden max-w-64 rounded-lg bg-stone-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg group-hover:block md:w-max md:max-w-none md:p-2 dark:border dark:border-stone-600 dark:bg-stone-700"
+          data-tooltip-target="content"
+        >
+          {{ route.get_middleware() or ["N/A"] | join(', ') }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

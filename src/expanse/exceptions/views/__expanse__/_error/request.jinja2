@@ -1,0 +1,72 @@
+{% from "__expanse__/_macros.jinja2" import badge %}
+
+<div
+  class="relative z-50 h-auto rounded-lg bg-white px-2 shadow-xs ring ring-stone-950/5 dark:bg-stone-800 dark:ring-white/10"
+  data-controller="disclosure"
+>
+  <div class="flex min-h-10 items-center justify-between">
+    <div class="relative flex w-full items-center gap-3">
+      {%
+        set badge_types = {
+            'GET': 'warning',
+            'HEAD': 'info',
+            'OPTIONS': 'info',
+            'POST': 'success',
+            'PUT': 'info',
+            'PATCH': 'info',
+            'DELETE': 'error'
+        }
+      %}
+      <div data-action="click->disclosure#toggle">
+        {% call badge(badge_types[error.request.method], hover=True) %}
+          {{ error.request.method | upper }}
+        {% endcall %}
+      </div>
+      <div class="flex-1 truncate font-mono text-sm text-stone-950 dark:text-stone-100">
+        {% with request=error.request %}
+          {% include "__expanse__/_error/request_url.jinja2" %}
+        {% endwith %}
+      </div>
+      {% if error.request.route.name %}
+        {% call badge(class="font-mono") %}
+          {{ error.request.route.name }}
+        {% endcall %}
+      {% endif %}
+      <div class="flex-shrink-0">
+        <button
+          type="button"
+          class="flex h-6 w-6 cursor-pointer items-center justify-center text-stone-500 transition-colors duration-300 group-hover:text-orange-500 group-data-[open=true]:text-orange-500 dark:text-stone-500 group-data-[open=true]:dark:text-orange-500"
+          data-action="click->disclosure#toggle"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="size-3"
+            data-disclosure-target="icon"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m7 15 5 5 5-5" />
+            <path d="m7 9 5-5 5 5" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    data-disclosure-target="panel"
+    class="{% if open %}h-auto{% else %}h-0{% endif %} overflow-hidden"
+  >
+    <div class="px-2 pt-8 pb-0 **:text-xs [&_h2]:text-base">
+      {% with headers=error.request.headers %}
+        {% include "__expanse__/_error/request_headers.jinja2" %}
+      {% endwith %}
+    </div>
+  </div>
+</div>

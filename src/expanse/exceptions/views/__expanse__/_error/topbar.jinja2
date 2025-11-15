@@ -1,0 +1,19 @@
+<div class="flex items-center justify-between">
+  <div class="flex h-[56px] items-center gap-2">
+    <div class="flex items-center justify-center text-orange-500">
+      <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+        <path
+          fill="currentColor"
+          opacity=".4"
+          d="M280 536C280 558.1 297.9 576 320 576C342.1 576 360 558.1 360 536C360 513.9 342.1 496 320 496C297.9 496 280 513.9 280 536z"
+        />
+        <path
+          fill="currentColor"
+          d="M320 64C346.5 64 368 85.5 368 112C368 112.6 368 113.1 368 113.7L352 417.7C351.1 434.7 337 448 320 448C303 448 289 434.7 288 417.7L272 113.7C272 113.1 272 112.6 272 112C272 85.5 293.5 64 320 64z"
+        />
+      </svg>
+    </div>
+    <div class="text-sm font-medium text-stone-900 dark:text-white">{{ error.title }}</div>
+  </div>
+  {% include "__expanse__/_partials/dark_mode_switcher.jinja2" %}
+</div>

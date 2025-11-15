@@ -90,6 +90,13 @@ class Route:
 
         return self._param_names
 
+    @property
+    def formatted_endpoint(self) -> str:
+        if isinstance(self.endpoint, tuple):
+            return f"{self.endpoint[0].__qualname__}.{self.endpoint[1]}"
+
+        return self.endpoint.__qualname__
+
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.path}", {self.endpoint})'
 

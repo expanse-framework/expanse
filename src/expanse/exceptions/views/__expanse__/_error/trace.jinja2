@@ -1,0 +1,82 @@
+<div
+  class="flex flex-col gap-2.5 rounded-xl p-2.5 shadow-xs ring ring-stone-200 dark:bg-white/1 dark:ring-stone-800"
+>
+  <div class="flex items-center gap-2.5 p-2">
+    <div class="flex h-6 w-6 items-center justify-center text-orange-500">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+        <path
+          fill="currentColor"
+          opacity=".4"
+          d="M280 536C280 558.1 297.9 576 320 576C342.1 576 360 558.1 360 536C360 513.9 342.1 496 320 496C297.9 496 280 513.9 280 536z"
+        />
+        <path
+          fill="currentColor"
+          d="M320 64C346.5 64 368 85.5 368 112C368 112.6 368 113.1 368 113.7L352 417.7C351.1 434.7 337 448 320 448C303 448 289 434.7 288 417.7L272 113.7C272 113.1 272 112.6 272 112C272 85.5 293.5 64 320 64z"
+        />
+      </svg>
+    </div>
+    <h3 class="text-base font-semibold text-stone-900 dark:text-white">Exception trace</h3>
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    {% for trace in error.traces %}
+      {% set trace_loop=loop %}
+      {% if trace_loop.index > 1 %}
+        <div
+          class="group my-2 rounded-lg border border-dashed border-orange-600/25 bg-orange-600/4 dark:border-orange-400/20 dark:bg-orange-400/10"
+        >
+          <div class="flex h-11 items-center gap-3 rounded-lg pr-2.5 pl-2">
+            <div
+              class="flex flex-1 items-center gap-1 text-xs leading-3 text-stone-900 dark:text-stone-400"
+            >
+              <div
+                class="h-full rounded-lg bg-transparent p-1.5 font-medium text-orange-600 dark:text-orange-400"
+              >
+                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                  <path
+                    opacity=".3"
+                    fill="currentColor"
+                    d="M64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320zM288 416C288 398.3 302.3 384 320 384C328.8 384 336.8 387.6 342.6 393.4C345.5 396.3 347.8 399.8 349.5 403.6C350.5 406 351.2 408.5 351.4 409.6C351.8 412.1 351.9 413.2 351.9 412.7C352 414.3 352 414.3 352.1 416.3C352 419 351.9 420 351.9 419.5C351.6 421.6 351.5 422.1 351.4 422.6C351 424.6 350.3 426.6 349.5 428.6C347.9 432.4 345.5 435.8 342.7 438.7C336.9 444.5 328.9 448.1 320.1 448.1C302.4 448.1 288.1 433.8 288.1 416.1zM288.7 220.5C288.9 218.9 288.9 218.9 289.1 217.4C289 217.8 289.2 216.7 289.9 214.3C290.4 212.9 290.4 212.8 290.4 212.8C291.9 208.8 294.1 205.1 297 202.1C302.7 195.9 310.9 192.1 320 192.1C338.2 192.1 352.7 207.6 351.4 225.8C348.9 260.6 346.4 295.2 344 329.8C344 330 344 330.1 344 330.4C343.9 330.9 343.9 331.4 343.8 332.1C343.8 332.2 343.7 332.4 343.7 332.6C343.6 333.2 343.4 333.8 343.3 334.5C342.9 335.9 342.4 337.3 341.7 338.7C340.4 341.4 338.6 343.8 336.5 345.7C332.2 349.7 326.4 352.1 320.1 352.1C307.5 352.1 297.1 342.4 296.2 329.8C293.7 295 291.2 260.4 288.8 225.8C288.8 225.7 288.8 225.6 288.7 224C288.7 222.4 288.7 222.3 288.8 220.7z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M320 448C302.3 448 288 433.7 288 416C288 398.3 302.3 384 320 384C337.7 384 352 398.3 352 416C352 433.7 337.7 448 320 448zM320 192C338.3 192 352.7 207.5 351.4 225.7L344 329.7C343 342.3 332.6 352 320 352C307.4 352 297 342.3 296.1 329.7L288.7 225.7C287.3 207.5 301.7 192 320 192z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <span
+                  class="rounded-lg border border-transparent py-1.5 text-xs font-medium text-orange-600 dark:text-orange-500"
+                  >{{ trace.error_name }}:</span
+                >
+                <span class="dark:text-stone-400">{{ trace.error_message }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+      {% for collection in trace.frames %}
+        {% set collection_loop=loop %}
+        {% if collection.is_repeated %}
+          {% with collection=collection %}
+            {% include "__expanse__/_error/repeated_collection.jinja2" %}
+          {% endwith %}
+        {% elif collection.is_vendor %}
+          {% with collection=collection %}
+            {% include "__expanse__/_error/vendor_collection.jinja2" %}
+          {% endwith %}
+        {% else %}
+          <div
+            class="flex flex-col rounded-lg bg-white shadow-xs ring ring-stone-800/5 dark:bg-stone-800/80 dark:ring-stone-600/50 [&_>_div:last-child_hr]:hidden"
+          >
+            {% for frame in collection.frames %}
+              {% with frame=frame, open=trace_loop.index == 1 and collection_loop.index == 1 and loop.index == 1 %}
+                {% include "__expanse__/_error/frame.jinja2" %}
+              {% endwith %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
