@@ -13,6 +13,7 @@ from expanse.database.migration.migrator import Migrator
 from expanse.database.session import AsyncSession
 from expanse.database.session import Session
 from expanse.exceptions.handler import ExceptionHandler
+from expanse.pagination.pagination_manager import PaginationManager
 from expanse.support.service_provider import ServiceProvider
 
 
@@ -76,9 +77,13 @@ class DatabaseServiceProvider(ServiceProvider):
         connection.close()
 
     def _create_session(
-        self, db: DatabaseManager, name: str | None = None
+        self,
+        db: DatabaseManager,
+        pagination_manager: PaginationManager,
+        name: str | None = None,
     ) -> Generator[Session]:
         session = db.session(name)
+        session.set_pagination_manager(pagination_manager)
 
         yield session
 

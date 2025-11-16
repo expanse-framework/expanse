@@ -3,6 +3,7 @@ from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import asdict
 from dataclasses import is_dataclass
+from functools import partial
 from typing import Annotated
 from typing import Any
 from typing import Self
@@ -12,6 +13,7 @@ from typing import get_origin
 
 from expanse.container.container import Container
 from expanse.http.response import Response
+from expanse.support.has_variant import HasVariant
 
 
 _Adapter = Callable[..., Awaitable[Response]] | Callable[..., Response]
@@ -34,7 +36,12 @@ class ResponseAdapter:
         adapter = self.adapter(response, declared_response_type=declared_response_type)
 
         if adapter is None:
-            raise ValueError(f"Cannot adapt type {type(response)} to a valid response")
+            adapter = self._adapt_via_variant(response, declared_response_type)
+
+            if not adapter:
+                raise ValueError(
+                    f"Cannot adapt type {type(response)} to a valid response"
+                )
 
         return await self._container.call(
             adapter, response, expected_type=declared_response_type
@@ -68,6 +75,28 @@ class ResponseAdapter:
             return json(await serializer(response))
 
         return _adapter
+
+    def _adapt_via_variant(self, obj: Any, type_: type | None = None) -> _Adapter:
+        if not type_:
+            type_ = obj.__class__
+
+        origin = get_origin(type_)
+        if origin is not Annotated:
+            if isinstance(obj, HasVariant):
+                variant = obj.get_variant()
+
+                return partial(variant.apply, type_)
+
+            return None
+
+        from expanse.support.variant import Variant
+
+        annotated, annotation = get_args(type_)
+
+        if not isinstance(annotation, Variant):
+            return None
+
+        return partial(annotation.apply, annotated)
 
     async def _adapt_string(
         self, response: str, container: Container, **kwargs
@@ -123,12 +152,12 @@ class ResponseAdapter:
             if origin is Annotated:
                 from pydantic import BaseModel
 
-                serialization_model = get_args(type_)[1]
+                _, annotation = get_args(type_)
 
-                if issubclass(serialization_model, BaseModel):
+                if issubclass(annotation, BaseModel):
 
                     async def _serializer(model: Any) -> dict[str, Any]:
-                        return serialization_model.model_validate(model).model_dump()
+                        return annotation.model_validate(model).model_dump()
 
                     serializer = _serializer
 

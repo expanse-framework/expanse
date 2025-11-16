@@ -13,25 +13,29 @@ from sqlalchemy import Table
 from sqlalchemy import UpdateBase
 from sqlalchemy import text
 from sqlalchemy import util
-from sqlalchemy.engine.interfaces import _CoreAnyExecuteParams
-from sqlalchemy.engine.interfaces import _CoreSingleExecuteParams
 from sqlalchemy.orm import Session as BaseSession
-from sqlalchemy.orm._typing import OrmExecuteOptionsParameter
-from sqlalchemy.orm.session import _BindArguments
-from sqlalchemy.sql.selectable import TypedReturnsRows
 
 from expanse.database.pagination import prepare_pagination
-from expanse.pagination.cursor import Cursor
 
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import _CoreAnyExecuteParams
+    from sqlalchemy.engine.interfaces import _CoreSingleExecuteParams
+    from sqlalchemy.orm._typing import OrmExecuteOptionsParameter
+    from sqlalchemy.orm.session import _BindArguments
+    from sqlalchemy.sql.selectable import TypedReturnsRows
+
     from expanse.database.synchronous.cursor_paginator import CursorPaginator
+    from expanse.pagination.cursor import Cursor
+    from expanse.pagination.pagination_manager import PaginationManager
 
 
 _T = TypeVar("_T", bound=Any)
 
 
 class Session(BaseSession):
+    _pagination_manager: PaginationManager | None = None
+
     @overload  # type: ignore[override]
     def execute(
         self,
@@ -202,8 +206,8 @@ class Session(BaseSession):
         statement: TypedReturnsRows[tuple[_T]],
         params: _CoreAnyExecuteParams | None = None,
         *,
-        cursor: Cursor | None = None,
-        per_page: int | None = None,
+        per_page: int,
+        cursor: Cursor | None | ... = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -215,8 +219,8 @@ class Session(BaseSession):
         statement: Executable,
         params: _CoreAnyExecuteParams | None = None,
         *,
-        cursor: Cursor | None = None,
-        per_page: int | None = None,
+        per_page: int,
+        cursor: Cursor | None | ... = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -227,8 +231,8 @@ class Session(BaseSession):
         statement: TypedReturnsRows[tuple[_T]] | Executable,
         params: _CoreAnyExecuteParams | None = None,
         *,
-        cursor: Cursor | None = None,
-        per_page: int | None = None,
+        per_page: int,
+        cursor: Cursor | None | ... = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
@@ -238,8 +242,16 @@ class Session(BaseSession):
         if isinstance(statement, str):
             statement = text(statement)
 
+        if cursor is ...:
+            # No cursor was explicitly provided, use the session's pagination manager if available.
+            cursor = (
+                self._pagination_manager.resolve_cursor()
+                if self._pagination_manager is not None
+                else None
+            )
+
         statement, parameters, cursor = prepare_pagination(
-            statement, per_page or 20, cursor=cursor
+            statement, per_page, cursor=cursor
         )
 
         # Determine if we need to return scalars or raw rows.
@@ -273,3 +285,8 @@ class Session(BaseSession):
             cursor=cursor,
             parameters=parameters,
         )
+
+    def set_pagination_manager(self, manager: PaginationManager) -> Session:
+        self._pagination_manager = manager
+
+        return self

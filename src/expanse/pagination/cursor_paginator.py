@@ -1,45 +1,40 @@
 from collections.abc import Iterator
 from collections.abc import Sequence
 from typing import Self
-from typing import TypeVar
-
-from pydantic import BaseModel
+from typing import override
 
 from expanse.pagination.cursor import Cursor
+from expanse.support.has_variant import HasVariant
+from expanse.support.variant import Variant
 
 
-_T = TypeVar("_T")
-
-
-class CursorPaginator[_T]:
+class CursorPaginator[T](HasVariant):
     DEFAULT_PER_PAGE: int = 20
 
-    _all_items: Sequence[_T]
+    _all_items: Sequence[T]
     _has_more: bool = False
-    _items: Sequence[_T]
+    _items: Sequence[T]
 
     def __init__(
         self,
-        items: Sequence[_T],
+        items: Sequence[T],
         *,
         per_page: int | None = None,
         cursor: Cursor | None = None,
-        cursor_schema: type[BaseModel] | None = None,
         parameters: Sequence[str] | None = None,
     ) -> None:
         self._per_page: int = per_page or self.DEFAULT_PER_PAGE
         self.set_items(items)
         self._cursor: Cursor | None = cursor
-        self._cursor_schema: type[BaseModel] | None = cursor_schema
         self._parameters: Sequence[str] = parameters or []
 
-    def set_items(self, items: Sequence[_T]) -> None:
+    def set_items(self, items: Sequence[T]) -> None:
         self._all_items = items
         self._items = items[: self._per_page]
         self._has_more = len(self._all_items) > len(self._items)
 
     @property
-    def items(self) -> Sequence[_T]:
+    def items(self) -> Sequence[T]:
         return self._items
 
     @property
@@ -61,6 +56,14 @@ class CursorPaginator[_T]:
         return self._get_cursor_for_item(self._items[-1], is_next=True)
 
     @property
+    def next_encoded_cursor(self) -> str | None:
+        next_cursor = self.next_cursor
+        if next_cursor is None:
+            return None
+
+        return next_cursor.encode()
+
+    @property
     def previous_cursor(self) -> Cursor | None:
         if self._cursor is None or (self._cursor.is_reversed() and not self._has_more):
             return None
@@ -70,14 +73,21 @@ class CursorPaginator[_T]:
 
         return self._get_cursor_for_item(self._items[0], is_next=False)
 
-    def _get_cursor_for_item(self, item: _T, is_next: bool) -> Cursor | None:
+    @property
+    def previous_encoded_cursor(self) -> str | None:
+        previous_cursor = self.previous_cursor
+        if previous_cursor is None:
+            return None
+
+        return previous_cursor.encode()
+
+    def _get_cursor_for_item(self, item: T, is_next: bool) -> Cursor | None:
         return Cursor(
             {
                 parameter_name: getattr(item, parameter_name)
                 for parameter_name in self._parameters
             },
             reversed=not is_next,
-            schema=self._cursor_schema,
         )
 
     def next(self) -> Self | None:
@@ -88,9 +98,14 @@ class CursorPaginator[_T]:
             self._all_items[self._per_page :],
             per_page=self._per_page,
             cursor=self.next_cursor,
-            cursor_schema=self._cursor_schema,
             parameters=self._parameters,
         )
+
+    @override
+    def get_variant(self) -> Variant:
+        from expanse.pagination.variants.envelope import Envelope
+
+        return Envelope()
 
     def __iter__(self) -> Iterator[Self]:
         next_: Self | None = self
