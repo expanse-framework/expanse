@@ -52,13 +52,12 @@ class PaginatorWithLinks(Paginator):
         next_url: str | None = None
         prev_url: str | None = None
 
+        query = QueryParameters(request.url.query)
         if paginator.next_encoded_cursor:
-            query = QueryParameters(request.url.query)
             query.set("cursor", paginator.next_encoded_cursor)
             next_url = request.url.replace(query=str(query)).full
 
         if paginator.previous_encoded_cursor:
-            query = QueryParameters(request.url.query)
             query.set("cursor", paginator.previous_encoded_cursor)
             prev_url = request.url.replace(query=str(query)).full
 

@@ -201,7 +201,7 @@ class Session(BaseSession):
         )
 
     @overload
-    def paginate(
+    def cursor_paginate(
         self,
         statement: TypedReturnsRows[tuple[_T]],
         params: _CoreAnyExecuteParams | None = None,
@@ -214,7 +214,7 @@ class Session(BaseSession):
     ) -> CursorPaginator[_T]: ...
 
     @overload
-    def paginate(
+    def cursor_paginate(
         self,
         statement: Executable,
         params: _CoreAnyExecuteParams | None = None,
@@ -226,7 +226,7 @@ class Session(BaseSession):
         **kw: Any,
     ) -> CursorPaginator[Any]: ...
 
-    def paginate(
+    def cursor_paginate(
         self,
         statement: TypedReturnsRows[tuple[_T]] | Executable,
         params: _CoreAnyExecuteParams | None = None,

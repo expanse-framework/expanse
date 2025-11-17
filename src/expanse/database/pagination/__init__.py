@@ -28,6 +28,7 @@ def prepare_pagination(
         if (
             hasattr(order_by_clause, "table")
             and hasattr(order_by_clause, "key")
+            and order_by_clause.table is not None
             and order_by_clause.key
         ):
             # Default ASC order by
@@ -39,8 +40,9 @@ def prepare_pagination(
             # This happens when the query is ordered by an aliased column,
             # for instance: `query.order_by(Model.id.label("foo").desc())`
             element: ColumnElement[Any] | Label[Any] = order_by_clause.element
-            if isinstance(order_by_clause.element, Label):
-                modifier = getattr(order_by_clause.element.element, "modifier", None)
+            if isinstance(element, Label):
+                # Unspecified direction
+                modifier = getattr(element.element, "modifier", None)
             else:
                 modifier = getattr(element, "modifier", None)
                 element = element.element
@@ -50,6 +52,15 @@ def prepare_pagination(
             order_by_columns.append((element, direction))
             continue
         else:
+            # This happens when the query is ordered by a direct column reference
+            # with a modifier, for instance: `query.order_by(Model.id.desc())` or `query.order_by(column("id"))`
+
+            # If it's a simple column there is no modifier so we assume ascending order
+            if not hasattr(order_by_clause, "element"):
+                direction = "asc"
+                order_by_columns.append((order_by_clause, direction))
+                continue
+
             direction = (
                 "desc" if order_by_clause.modifier.__name__ == "desc_op" else "asc"
             )
