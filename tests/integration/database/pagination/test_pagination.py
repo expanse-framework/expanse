@@ -13,6 +13,7 @@ from expanse.database.orm import column
 from expanse.database.orm.model import Model
 from expanse.database.session import Session
 from expanse.pagination.cursor_paginator import CursorPaginator
+from expanse.pagination.variants.envelope import Envelope
 from expanse.testing.client import TestClient
 
 
@@ -38,6 +39,16 @@ class UserSchema(BaseModel):
 def paginated(
     session: Session,
 ) -> CursorPaginator[Annotated[User, UserSchema]]:
+    paginator = session.paginate(select(User).order_by(User.id), per_page=2)
+
+    return paginator
+
+
+def paginated_no_links(
+    session: Session,
+) -> Annotated[
+    CursorPaginator[Annotated[User, UserSchema]], Envelope(with_links=False)
+]:
     paginator = session.paginate(select(User).order_by(User.id), per_page=2)
 
     return paginator
@@ -87,7 +98,7 @@ async def test_session_cursor_pagination_is_properly_serialized(
         data["links"]["next"]
         == f"http://testserver/paginated?cursor={data['next_cursor']}"
     )
-    assert data["links"]["previous"] is None
+    assert data["links"]["prev"] is None
 
 
 async def test_session_cursor_pagination_uses_given_cursor(
@@ -121,8 +132,18 @@ async def test_session_cursor_pagination_uses_given_cursor(
             "email": "foo3@bar.com",
         },
     ]
-    assert data["next_cursor"] is not None
-    assert data["previous_cursor"] is not None
+    next_cursor = data["next_cursor"]
+    assert next_cursor is not None
+    prev_cursor = data["previous_cursor"]
+    assert prev_cursor is not None
+    assert (
+        data["links"]["next"]
+        == f"http://testserver/paginated?cursor={data['next_cursor']}"
+    )
+    assert (
+        data["links"]["prev"]
+        == f"http://testserver/paginated?cursor={data['previous_cursor']}"
+    )
 
     cursor = data["previous_cursor"]
 
@@ -151,3 +172,30 @@ async def test_session_cursor_pagination_uses_given_cursor(
             },
         ]
     )
+
+
+async def test_session_cursor_pagination_with_no_links(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_no_links)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    data = response.json()
+    assert response.json()["data"] == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
+        },
+    ]
+    assert data["next_cursor"] is not None
+    assert data["previous_cursor"] is None
+    assert "links" not in data

@@ -9,7 +9,7 @@ type CursorResolver = Callable[[Request], Cursor | None]
 
 class PaginationManager:
     def __init__(self, request: Request) -> None:
-        self._request = request
+        self._request: Request = request
         self._cursor_resolver: CursorResolver | None = None
 
     def resolve_cursor(self) -> Cursor | None:

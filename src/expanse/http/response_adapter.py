@@ -76,7 +76,9 @@ class ResponseAdapter:
 
         return _adapter
 
-    def _adapt_via_variant(self, obj: Any, type_: type | None = None) -> _Adapter:
+    def _adapt_via_variant(
+        self, obj: Any, type_: type | None = None
+    ) -> _Adapter | None:
         if not type_:
             type_ = obj.__class__
 
@@ -89,11 +91,10 @@ class ResponseAdapter:
 
             return None
 
-        from expanse.support.variant import Variant
 
         annotated, annotation = get_args(type_)
 
-        if not isinstance(annotation, Variant):
+        if not hasattr(annotation, "apply"):
             return None
 
         return partial(annotation.apply, annotated)

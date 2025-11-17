@@ -11,6 +11,7 @@ from pydantic import Field
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.http.url import QueryParameters
 from expanse.pagination.cursor_paginator import CursorPaginator
 
 
@@ -48,10 +49,20 @@ class PaginatorWithLinks(Paginator):
     def create(
         cls, paginator: CursorPaginator, request: Request
     ) -> "PaginatorWithLinks":
-        links = Links(
-            next=request.url.full if paginator.next_encoded_cursor else None,
-            prev=request.url.full if paginator.previous_encoded_cursor else None,
-        )
+        next_url: str | None = None
+        prev_url: str | None = None
+
+        if paginator.next_encoded_cursor:
+            query = QueryParameters(request.url.query)
+            query.set("cursor", paginator.next_encoded_cursor)
+            next_url = request.url.replace(query=str(query)).full
+
+        if paginator.previous_encoded_cursor:
+            query = QueryParameters(request.url.query)
+            query.set("cursor", paginator.previous_encoded_cursor)
+            prev_url = request.url.replace(query=str(query)).full
+
+        links = Links(next=next_url, prev=prev_url)
         return PaginatorWithLinks(
             items=paginator.items,
             next_encoded_cursor=paginator.next_encoded_cursor,

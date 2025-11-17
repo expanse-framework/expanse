@@ -5,7 +5,7 @@ from typing import override
 
 from expanse.pagination.cursor import Cursor
 from expanse.support.has_variant import HasVariant
-from expanse.support.variant import Variant
+from expanse.support.variant import AsyncVariant
 
 
 class CursorPaginator[T](HasVariant):
@@ -43,14 +43,14 @@ class CursorPaginator[T](HasVariant):
 
     @property
     def next_cursor(self) -> Cursor | None:
+        if not self._items:
+            return None
+
         if (self._cursor is None and not self._has_more) or (
             self._cursor is not None
             and not self._cursor.is_reversed()
             and not self._has_more
         ):
-            return None
-
-        if not self._items:
             return None
 
         return self._get_cursor_for_item(self._items[-1], is_next=True)
@@ -65,10 +65,10 @@ class CursorPaginator[T](HasVariant):
 
     @property
     def previous_cursor(self) -> Cursor | None:
-        if self._cursor is None or (self._cursor.is_reversed() and not self._has_more):
+        if not self._items:
             return None
 
-        if not self._items:
+        if self._cursor is None or (self._cursor.is_reversed() and not self._has_more):
             return None
 
         return self._get_cursor_for_item(self._items[0], is_next=False)
@@ -102,7 +102,7 @@ class CursorPaginator[T](HasVariant):
         )
 
     @override
-    def get_variant(self) -> Variant:
+    def get_variant(self) -> AsyncVariant[Self]:
         from expanse.pagination.variants.envelope import Envelope
 
         return Envelope()

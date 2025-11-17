@@ -39,23 +39,21 @@ class Cursor:
     def load(cls, value: str) -> Cursor | None:
         try:
             data = json.loads(value)
-            parameters = data.get("parameters") or {}
-            is_reversed = data.get("reversed") or False
-
-            return cls(parameters, is_reversed)
-        except (ValueError, json.JSONDecodeError):
+        except json.JSONDecodeError:
             return None
+
+        parameters = data.get("parameters") or {}
+        is_reversed = data.get("reversed") or False
+
+        return cls(parameters, is_reversed)
 
     @classmethod
     def decode(cls, value: str) -> Cursor | None:
         try:
             decoded = base64.urlsafe_b64decode(value.encode()).decode()
             return cls.load(decoded)
-        except (ValueError, json.JSONDecodeError):
+        except ValueError:
             return None
-
-    def __repr__(self) -> str:
-        return f"<Cursor parameters={self._parameters} reversed={self._reversed}>"
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, Cursor):
