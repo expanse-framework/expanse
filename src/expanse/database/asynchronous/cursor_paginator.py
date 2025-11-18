@@ -5,8 +5,10 @@ from sqlalchemy import Executable
 from sqlalchemy.sql.selectable import TypedReturnsRows
 
 from expanse.database.asynchronous.session import AsyncSession
-from expanse.pagination.cursor import Cursor
-from expanse.pagination.cursor_paginator import CursorPaginator as BaseCursorPaginator
+from expanse.pagination.cursor.cursor import Cursor
+from expanse.pagination.cursor.cursor_paginator import (
+    CursorPaginator as BaseCursorPaginator,
+)
 
 
 T = TypeVar("T")

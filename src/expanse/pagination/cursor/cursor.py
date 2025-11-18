@@ -5,7 +5,7 @@ import json
 
 from typing import Any
 
-from expanse.pagination.exceptions import InvalidCursorParameter
+from expanse.pagination.cursor.exceptions import InvalidCursorParameter
 
 
 class Cursor:

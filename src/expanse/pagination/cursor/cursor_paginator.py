@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from typing import Self
 from typing import override
 
-from expanse.pagination.cursor import Cursor
+from expanse.pagination.cursor.cursor import Cursor
 from expanse.support.has_variant import HasVariant
 from expanse.support.variant import AsyncVariant
 
@@ -103,7 +103,7 @@ class CursorPaginator[T](HasVariant):
 
     @override
     def get_variant(self) -> AsyncVariant[Self]:
-        from expanse.pagination.variants.envelope import Envelope
+        from expanse.pagination.cursor.variants.envelope import Envelope
 
         return Envelope()
 

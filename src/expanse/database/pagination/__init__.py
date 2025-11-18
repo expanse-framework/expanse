@@ -12,7 +12,7 @@ from sqlalchemy.sql.elements import Label
 from sqlalchemy.sql.elements import _label_reference
 
 from expanse.database.pagination.exceptions import DatabasePaginationError
-from expanse.pagination.cursor import Cursor
+from expanse.pagination.cursor.cursor import Cursor
 
 
 logger = logging.getLogger(__name__)

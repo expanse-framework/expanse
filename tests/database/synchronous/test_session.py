@@ -10,11 +10,12 @@ from expanse.core.application import Application
 from expanse.database.pagination.exceptions import DatabasePaginationError
 from expanse.database.synchronous.database_manager import DatabaseManager
 from expanse.database.synchronous.session import Session
-from expanse.pagination.cursor import Cursor
+from expanse.pagination.cursor.cursor import Cursor
 
 
 if TYPE_CHECKING:
-    from expanse.pagination.cursor_paginator import CursorPaginator
+    from expanse.pagination.cursor.cursor_paginator import CursorPaginator
+    from expanse.pagination.offset.paginator import Paginator
 
 
 class UserRow(NamedTuple):
@@ -177,3 +178,59 @@ def test_cursor_paginate_without_order_by_raise_an_error(session: Session) -> No
             sa.select("*").select_from(sa.table("users")),
             per_page=2,
         )
+
+
+def test_paginate_with_empty_result_set(session: Session) -> None:
+    paginator: Paginator[UserRow] = session.paginate(
+        sa.select("*")
+        .select_from(sa.table("users"))
+        .where(sa.column("id") > 100)
+        .order_by(sa.column("id")),
+        per_page=2,
+    )
+
+    assert paginator.items == []
+    assert not paginator.has_more
+    assert paginator.first_page == 1
+    assert paginator.current_page == 1
+    assert paginator.last_page == 0
+    assert paginator.next_page is None
+    assert paginator.previous_page is None
+    assert paginator.total == 0
+
+
+def test_paginate_first_page(session: Session) -> None:
+    paginator: Paginator[UserRow] = session.paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id")),
+        per_page=2,
+    )
+
+    assert paginator.items == [
+        (1, "John", "Doe", "john@doe.com"),
+        (2, "Jane", "Smith", "jane@smith.com"),
+    ]
+    assert paginator.first_page == 1
+    assert paginator.current_page == 1
+    assert paginator.last_page == 2
+    assert paginator.next_page == 2
+    assert paginator.previous_page is None
+    assert paginator.total == 4
+
+
+def test_paginate_second_page(session: Session) -> None:
+    paginator: Paginator[UserRow] = session.paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id")),
+        per_page=2,
+        page=2,
+    )
+
+    assert paginator.items == [
+        (3, "Alice", "Johnson", "alice@johnson.com"),
+        (4, "Jane", "Doe", "jane@doe.com"),
+    ]
+    assert paginator.first_page == 1
+    assert paginator.current_page == 2
+    assert paginator.last_page == 2
+    assert paginator.next_page is None
+    assert paginator.previous_page == 1
+    assert paginator.total == 4

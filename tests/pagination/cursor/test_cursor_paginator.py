@@ -1,4 +1,4 @@
-from expanse.pagination.cursor_paginator import CursorPaginator
+from expanse.pagination.cursor.cursor_paginator import CursorPaginator
 
 
 def test_cursor_paginator_construction() -> None:

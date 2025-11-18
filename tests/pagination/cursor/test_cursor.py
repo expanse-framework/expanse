@@ -1,7 +1,7 @@
 import pytest
 
-from expanse.pagination.cursor import Cursor
-from expanse.pagination.exceptions import InvalidCursorParameter
+from expanse.pagination.cursor.cursor import Cursor
+from expanse.pagination.cursor.exceptions import InvalidCursorParameter
 
 
 def test_cursor_can_be_encoded() -> None:

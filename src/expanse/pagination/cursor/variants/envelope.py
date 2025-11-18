@@ -12,7 +12,7 @@ from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.url import QueryParameters
-from expanse.pagination.cursor_paginator import CursorPaginator
+from expanse.pagination.cursor.cursor_paginator import CursorPaginator
 
 
 class LinksModel(BaseModel):
@@ -21,13 +21,13 @@ class LinksModel(BaseModel):
 
 
 @dataclass
-class Paginator:
-    items: Sequence[Any]
+class Paginator[T]:
+    items: Sequence[T]
     next_encoded_cursor: str | None
     previous_encoded_cursor: str | None
 
     @classmethod
-    def create(cls, paginator: CursorPaginator, request: Request) -> "Paginator":
+    def create(cls, paginator: CursorPaginator[T], request: Request) -> "Paginator[T]":
         return Paginator(
             items=paginator.items,
             next_encoded_cursor=paginator.next_encoded_cursor,
@@ -42,13 +42,13 @@ class Links:
 
 
 @dataclass
-class PaginatorWithLinks(Paginator):
+class PaginatorWithLinks[T](Paginator[T]):
     links: Links
 
     @classmethod
     def create(
-        cls, paginator: CursorPaginator, request: Request
-    ) -> "PaginatorWithLinks":
+        cls, paginator: CursorPaginator[T], request: Request
+    ) -> "PaginatorWithLinks[T]":
         next_url: str | None = None
         prev_url: str | None = None
 

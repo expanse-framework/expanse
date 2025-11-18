@@ -1,4 +1,6 @@
-from types import EllipsisType
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
 from typing import TypeVar
@@ -10,18 +12,26 @@ from sqlalchemy import Result
 from sqlalchemy import ScalarResult
 from sqlalchemy import Table
 from sqlalchemy import UpdateBase
+from sqlalchemy import func
 from sqlalchemy import text
 from sqlalchemy import util
-from sqlalchemy.engine.interfaces import _CoreAnyExecuteParams
 from sqlalchemy.ext.asyncio import AsyncSession as BaseAsyncSession
-from sqlalchemy.orm._typing import OrmExecuteOptionsParameter
-from sqlalchemy.orm.session import _BindArguments
-from sqlalchemy.sql.selectable import TypedReturnsRows
 
 from expanse.database.pagination import prepare_pagination
-from expanse.pagination.cursor import Cursor
-from expanse.pagination.cursor_paginator import CursorPaginator
-from expanse.pagination.pagination_manager import PaginationManager
+
+
+if TYPE_CHECKING:
+    from types import EllipsisType
+
+    from sqlalchemy.engine.interfaces import _CoreAnyExecuteParams
+    from sqlalchemy.orm._typing import OrmExecuteOptionsParameter
+    from sqlalchemy.orm.session import _BindArguments
+    from sqlalchemy.sql.selectable import TypedReturnsRows
+
+    from expanse.pagination.cursor.cursor import Cursor
+    from expanse.pagination.cursor.cursor_paginator import CursorPaginator
+    from expanse.pagination.offset.paginator import Paginator
+    from expanse.pagination.pagination_manager import PaginationManager
 
 
 _T = TypeVar("_T", bound=Any)
@@ -192,6 +202,100 @@ class AsyncSession(BaseAsyncSession):
             execution_options=execution_options,
             bind_arguments=bind_arguments,
             **kw,
+        )
+
+    @overload
+    async def paginate(
+        self,
+        statement: TypedReturnsRows[tuple[_T]],
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        per_page: int,
+        page: int | None | EllipsisType = ...,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: _BindArguments | None = None,
+        **kw: Any,
+    ) -> Paginator[_T]: ...
+
+    @overload
+    async def paginate(
+        self,
+        statement: Executable,
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        per_page: int,
+        page: int | None | EllipsisType = ...,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: _BindArguments | None = None,
+        **kw: Any,
+    ) -> Paginator[Any]: ...
+
+    async def paginate(
+        self,
+        statement: TypedReturnsRows[tuple[_T]] | Executable,
+        params: _CoreAnyExecuteParams | None = None,
+        *,
+        per_page: int,
+        page: int | None | EllipsisType = ...,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: dict[str, Any] | None = None,
+        **kw: Any,
+    ) -> Paginator[Any]:
+        from expanse.pagination.offset.paginator import Paginator
+
+        if page is ...:
+            # No currant page was explicitly provided,
+            # use the session's pagination manager if available.
+            page = (
+                self._pagination_manager.resolve_page()
+                if self._pagination_manager is not None
+                else 1
+            )
+
+        total: int = (
+            await self.execute(
+                statement.with_only_columns(func.count()).order_by(None),
+                params,
+                execution_options=execution_options,
+                bind_arguments=bind_arguments,
+                **kw,
+            )
+        ).scalar_one()
+
+        statement = statement.limit(per_page + 1).offset((page - 1) * per_page)
+
+        # Determine if we need to return scalars or raw rows.
+        # by checking if all the columns are tables, i.e. complete models in an ORM context.
+        # Only in that case do we return scalars.
+        raw_results = not all(
+            isinstance(column, Table) for column in statement._raw_columns
+        )
+        if raw_results:
+            results = (
+                await self.execute(
+                    statement,
+                    params,
+                    execution_options=execution_options,
+                    bind_arguments=bind_arguments,
+                    **kw,
+                )
+            ).all()
+        else:
+            results = (
+                await self.scalars(
+                    statement,
+                    params,
+                    execution_options=execution_options,
+                    bind_arguments=bind_arguments,
+                    **kw,
+                )
+            ).all()
+
+        return Paginator(
+            items=results,
+            per_page=per_page,
+            current_page=page,
+            total=total,
         )
 
     @overload
