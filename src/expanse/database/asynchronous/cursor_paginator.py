@@ -4,7 +4,7 @@ from typing import TypeVar
 from sqlalchemy import Executable
 from sqlalchemy.sql.selectable import TypedReturnsRows
 
-from expanse.database.synchronous.session import Session
+from expanse.database.asynchronous.session import AsyncSession
 from expanse.pagination.cursor import Cursor
 from expanse.pagination.cursor_paginator import CursorPaginator as BaseCursorPaginator
 
@@ -18,7 +18,7 @@ class CursorPaginator(BaseCursorPaginator[T]):
         items: Sequence[T],
         query: TypedReturnsRows[tuple[T]] | Executable,
         *,
-        session: Session,
+        session: AsyncSession,
         per_page: int | None = None,
         cursor: Cursor | None,
         parameters: Sequence[str] | None = None,
@@ -31,4 +31,4 @@ class CursorPaginator(BaseCursorPaginator[T]):
         )
 
         self._query: TypedReturnsRows[tuple[T]] | Executable = query
-        self._session: Session = session
+        self._session: AsyncSession = session

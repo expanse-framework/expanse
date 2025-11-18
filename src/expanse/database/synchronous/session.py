@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from types import EllipsisType
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import Self
 from typing import TypeVar
 from typing import overload
 
@@ -207,7 +209,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        cursor: Cursor | None | ... = ...,
+        cursor: Cursor | None | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -220,7 +222,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        cursor: Cursor | None | ... = ...,
+        cursor: Cursor | None | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -232,7 +234,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        cursor: Cursor | None | ... = ...,
+        cursor: Cursor | None | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
@@ -286,7 +288,7 @@ class Session(BaseSession):
             parameters=parameters,
         )
 
-    def set_pagination_manager(self, manager: PaginationManager) -> Session:
+    def set_pagination_manager(self, manager: PaginationManager) -> Self:
         self._pagination_manager = manager
 
         return self

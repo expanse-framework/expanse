@@ -59,9 +59,12 @@ class DatabaseServiceProvider(ServiceProvider):
         await connection.close()
 
     async def _create_async_session(
-        self, db: AsyncDatabaseManager, name: str | None = None
+        self,
+        db: AsyncDatabaseManager,
+        pagination_manager: PaginationManager,
+        name: str | None = None,
     ) -> AsyncGenerator[AsyncSession]:
-        session = db.session(name)
+        session = db.session(name).set_pagination_manager(pagination_manager)
 
         yield session
 
@@ -82,8 +85,7 @@ class DatabaseServiceProvider(ServiceProvider):
         pagination_manager: PaginationManager,
         name: str | None = None,
     ) -> Generator[Session]:
-        session = db.session(name)
-        session.set_pagination_manager(pagination_manager)
+        session = db.session(name).set_pagination_manager(pagination_manager)
 
         yield session
 
