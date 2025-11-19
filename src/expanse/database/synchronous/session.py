@@ -12,6 +12,7 @@ from sqlalchemy import Result
 from sqlalchemy import ScalarResult
 from sqlalchemy import Table
 from sqlalchemy import UpdateBase
+from sqlalchemy import select
 from sqlalchemy import text
 from sqlalchemy import util
 from sqlalchemy.orm import Session as BaseSession
@@ -212,7 +213,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        page: int | None | EllipsisType = ...,
+        page: int | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -225,7 +226,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        page: int | None | EllipsisType = ...,
+        page: int | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: _BindArguments | None = None,
         **kw: Any,
@@ -237,7 +238,7 @@ class Session(BaseSession):
         params: _CoreAnyExecuteParams | None = None,
         *,
         per_page: int,
-        page: int | None | EllipsisType = ...,
+        page: int | EllipsisType = ...,
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
@@ -245,7 +246,7 @@ class Session(BaseSession):
         from expanse.pagination.offset.paginator import Paginator
 
         if page is ...:
-            # No currant page was explicitly provided,
+            # No current page was explicitly provided,
             # use the session's pagination manager if available.
             page = (
                 self._pagination_manager.resolve_page()
@@ -254,11 +255,9 @@ class Session(BaseSession):
             )
 
         total = self.execute(
-            statement.with_only_columns(func.count()).order_by(None),
-            params,
-            execution_options=execution_options,
-            bind_arguments=bind_arguments,
-            **kw,
+            select(func.count()).select_from(
+                statement.order_by(None).limit(None).offset(None)
+            )
         ).scalar_one()
 
         statement = statement.limit(per_page + 1).offset((page - 1) * per_page)

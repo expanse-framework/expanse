@@ -5,7 +5,7 @@ from expanse.pagination.cursor.cursor import Cursor
 
 
 type CursorResolver = Callable[[Request], Cursor | None]
-type PageResolver = Callable[[Request], int | None]
+type PageResolver = Callable[[Request], int]
 
 
 class PaginationManager:
@@ -20,9 +20,9 @@ class PaginationManager:
 
         return self._cursor_resolver(self._request)
 
-    def resolve_page(self) -> int | None:
+    def resolve_page(self) -> int:
         if self._page_resolver is None:
-            return None
+            return self.default_page_resolver(self._request)
 
         return self._page_resolver(self._request)
 
@@ -44,14 +44,14 @@ class PaginationManager:
 
         return None
 
-    def default_page_resolver(self, request: Request) -> int | None:
+    def default_page_resolver(self, request: Request) -> int:
         if page := request.query_params.get("page"):
             try:
                 return int(page)
             except ValueError:
-                return None
+                return 1
 
-        return None
+        return 1
 
 
 __all__ = ["PaginationManager"]

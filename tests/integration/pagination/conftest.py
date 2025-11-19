@@ -9,7 +9,6 @@ from expanse.database.database_manager import AsyncDatabaseManager
 
 @pytest.fixture(autouse=True)
 async def setup_database(app: Application, tmp_path: Path) -> AsyncGenerator[None]:
-    print(app.config["database"])
     app.config["database"] = {
         "default": "sqlite",
         "connections": {

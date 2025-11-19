@@ -20,6 +20,7 @@ class LinksModel(BaseModel):
     prev: str | None
     first: str
     last: str
+    self: str
 
 
 @dataclass
@@ -27,6 +28,7 @@ class PaginatorModel:
     items: Sequence[Any]
     next_page: int | None
     previous_page: int | None
+    current_page: int
     first_page: int
     last_page: int
     total: int
@@ -37,6 +39,7 @@ class PaginatorModel:
             items=paginator.items,
             next_page=paginator.next_page,
             previous_page=paginator.previous_page,
+            current_page=paginator.current_page,
             first_page=paginator.first_page,
             last_page=paginator.last_page,
             total=paginator.total,
@@ -49,6 +52,7 @@ class Links:
     prev: str | None
     first: str
     last: str
+    self: str
 
 
 @dataclass
@@ -77,11 +81,17 @@ class PaginatorWithLinks(PaginatorModel):
         query.set("page", str(paginator.last_page))
         last_url = request.url.replace(query=str(query)).full
 
-        links = Links(next=next_url, prev=prev_url, first=first_url, last=last_url)
+        query.set("page", str(paginator.current_page))
+        self_url = request.url.replace(query=str(query)).full
+
+        links = Links(
+            next=next_url, prev=prev_url, first=first_url, last=last_url, self=self_url
+        )
         return PaginatorWithLinks(
             items=paginator.items,
             next_page=paginator.next_page,
             previous_page=paginator.previous_page,
+            current_page=paginator.current_page,
             first_page=paginator.first_page,
             last_page=paginator.last_page,
             total=paginator.total,
@@ -114,7 +124,7 @@ class Envelope:
         else:
             model = self.get_model(item_type)
 
-        paginator_class = PaginatorWithLinks if self._with_links else Paginator
+        paginator_class = PaginatorWithLinks if self._with_links else PaginatorModel
         paginator = paginator_class.create(data, request)
 
         return json(model.model_validate(paginator, from_attributes=True).model_dump())
@@ -134,6 +144,7 @@ class Envelope:
         __annotations__["data"] = list[model]
         __annotations__["next_page"] = int | None
         __annotations__["previous_page"] = int | None
+        __annotations__["current_page"] = int
         __annotations__["first_page"] = int
         __annotations__["last_page"] = int
         __annotations__["total"] = int
