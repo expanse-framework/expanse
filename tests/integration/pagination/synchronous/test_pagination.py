@@ -14,6 +14,7 @@ from expanse.database.orm import column
 from expanse.database.orm.model import Model
 from expanse.database.session import Session
 from expanse.pagination.offset.adapters.envelope import Envelope
+from expanse.pagination.offset.adapters.headers import Headers
 from expanse.pagination.offset.paginator import Paginator
 from expanse.testing.client import TestClient
 
@@ -61,6 +62,14 @@ def paginated(
 def paginated_no_links(
     session: Session,
 ) -> Annotated[Paginator[Annotated[User, UserSchema]], Envelope(with_links=False)]:
+    paginator = session.paginate(select(User).order_by(User.id), per_page=2)
+
+    return paginator
+
+
+def paginated_headers(
+    session: Session,
+) -> Annotated[Paginator[Annotated[User, UserSchema]], Headers()]:
     paginator = session.paginate(select(User).order_by(User.id), per_page=2)
 
     return paginator
@@ -247,3 +256,149 @@ async def test_session_pagination_keeps_query_parameters(
             "self": "http://testserver/paginated?foo=bar&baz=qux&page=1",
         },
     }
+
+
+def test_session_pagination_headers(router: Router, client: TestClient) -> None:
+    router.get("/paginated", paginated_headers)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "51"
+    links = response.headers["Link"]
+    assert links == ", ".join(
+        [
+            '<http://testserver/paginated?page=2>; rel="next"',
+            '<http://testserver/paginated?page=1>; rel="first"',
+            '<http://testserver/paginated?page=26>; rel="last"',
+            '<http://testserver/paginated?page=1>; rel="self"',
+        ]
+    )
+
+    assert response.json() == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
+        },
+    ]
+
+
+def test_session_pagination_headers_with_page(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_headers)
+
+    response = client.get(
+        "/paginated", headers={"Accept": "application/json"}, params={"page": 2}
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "51"
+    links = response.headers["Link"]
+    assert links == ", ".join(
+        [
+            '<http://testserver/paginated?page=3>; rel="next"',
+            '<http://testserver/paginated?page=1>; rel="prev"',
+            '<http://testserver/paginated?page=1>; rel="first"',
+            '<http://testserver/paginated?page=26>; rel="last"',
+            '<http://testserver/paginated?page=2>; rel="self"',
+        ]
+    )
+
+    assert response.json() == [
+        {
+            "id": 3,
+            "first_name": "First2",
+            "last_name": "Last2",
+            "email": "foo2@bar.com",
+        },
+        {
+            "id": 4,
+            "first_name": "First3",
+            "last_name": "Last3",
+            "email": "foo3@bar.com",
+        },
+    ]
+
+
+def test_session_pagination_headers_for_last_page(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_headers)
+
+    response = client.get(
+        "/paginated", headers={"Accept": "application/json"}, params={"page": 26}
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "51"
+    links = response.headers["Link"]
+    assert links == ", ".join(
+        [
+            '<http://testserver/paginated?page=25>; rel="prev"',
+            '<http://testserver/paginated?page=1>; rel="first"',
+            '<http://testserver/paginated?page=26>; rel="last"',
+            '<http://testserver/paginated?page=26>; rel="self"',
+        ]
+    )
+
+    assert response.json() == [
+        {
+            "id": 51,
+            "first_name": "First50",
+            "last_name": "Last50",
+            "email": "foo50@bar.com",
+        },
+    ]
+
+
+def test_session_pagination_headers_keeps_query_parameters(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_headers)
+
+    response = client.get(
+        "/paginated",
+        headers={"Accept": "application/json"},
+        params={
+            "foo": "bar bar",
+            "baz": "qux",
+            "page": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "51"
+    links = response.headers["Link"]
+    assert links == ", ".join(
+        [
+            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=3>; rel="next"',
+            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="prev"',
+            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="first"',
+            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=26>; rel="last"',
+            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=2>; rel="self"',
+        ]
+    )
+
+    assert response.json() == [
+        {
+            "id": 3,
+            "first_name": "First2",
+            "last_name": "Last2",
+            "email": "foo2@bar.com",
+        },
+        {
+            "id": 4,
+            "first_name": "First3",
+            "last_name": "Last3",
+            "email": "foo3@bar.com",
+        },
+    ]

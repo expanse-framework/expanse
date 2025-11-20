@@ -3,6 +3,7 @@ import typing
 from typing import Self
 from urllib.parse import SplitResult
 from urllib.parse import parse_qs
+from urllib.parse import urlencode
 from urllib.parse import urlsplit
 
 from expanse.http.url_path import URLPath
@@ -40,12 +41,7 @@ class QueryParameters:
         return self
 
     def __str__(self) -> str:
-        parts: list[str] = []
-        for key, values in self._params.items():
-            for value in values:
-                parts.append(f"{key}={value}")
-
-        return "&".join(parts)
+        return urlencode(self._params, doseq=True)
 
     def __bool__(self) -> bool:
         return bool(self._params)

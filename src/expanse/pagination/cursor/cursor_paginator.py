@@ -42,6 +42,10 @@ class CursorPaginator[T](HasAdapter):
         return self._has_more
 
     @property
+    def cursor(self) -> Cursor | None:
+        return self._cursor
+
+    @property
     def next_cursor(self) -> Cursor | None:
         if not self._items:
             return None
