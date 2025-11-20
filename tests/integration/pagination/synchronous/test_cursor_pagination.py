@@ -12,8 +12,8 @@ from expanse.database.database_manager import AsyncDatabaseManager
 from expanse.database.orm import column
 from expanse.database.orm.model import Model
 from expanse.database.session import Session
+from expanse.pagination.cursor.adapters.envelope import Envelope
 from expanse.pagination.cursor.cursor_paginator import CursorPaginator
-from expanse.pagination.cursor.variants.envelope import Envelope
 from expanse.testing.client import TestClient
 
 

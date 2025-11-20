@@ -4,12 +4,12 @@ from typing import Protocol
 from expanse.http.responses.response import Response
 
 
-class Variant[T](Protocol):
+class Adapter[T](Protocol):
     """
-    A variant is used to annotate a response and control its serialization.
+    An adapter is used to annotate a response and control its serialization.
     """
 
-    def apply(
+    def adapt(
         self, annotated: type[T], value: T, *args: Any, **kwargs: Any
     ) -> Response:
         """
@@ -18,12 +18,12 @@ class Variant[T](Protocol):
         ...
 
 
-class AsyncVariant[T](Protocol):
+class AsyncAdapter[T](Protocol):
     """
-    A variant is used to annotate a response and control its serialization.
+    An adapter is used to annotate a response and control its serialization.
     """
 
-    async def apply(
+    async def adapt(
         self, annotated: type[T], value: T, *args: Any, **kwargs: Any
     ) -> Response:
         """

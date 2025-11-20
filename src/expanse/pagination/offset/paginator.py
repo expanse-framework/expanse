@@ -3,11 +3,11 @@ from collections.abc import Sequence
 from typing import Self
 from typing import override
 
-from expanse.support.has_variant import HasVariant
-from expanse.support.variant import AsyncVariant
+from expanse.support.adapter import AsyncAdapter
+from expanse.support.has_adapter import HasAdapter
 
 
-class Paginator[T](HasVariant):
+class Paginator[T](HasAdapter):
     DEFAULT_PER_PAGE: int = 20
 
     _all_items: Sequence[T]
@@ -85,8 +85,8 @@ class Paginator[T](HasVariant):
         )
 
     @override
-    def get_variant(self) -> AsyncVariant[Self]:
-        from expanse.pagination.offset.variants.envelope import Envelope
+    def get_adapter(self) -> AsyncAdapter[Self]:
+        from expanse.pagination.offset.adapters.envelope import Envelope
 
         return Envelope()
 

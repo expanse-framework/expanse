@@ -107,7 +107,7 @@ class Envelope:
     def __init__(self, with_links: bool = True) -> None:
         self._with_links: bool = with_links
 
-    async def apply(
+    async def adapt(
         self, annotated: type[Paginator], data: Paginator, request: Request
     ) -> Response:
         paginator_args = get_args(annotated)

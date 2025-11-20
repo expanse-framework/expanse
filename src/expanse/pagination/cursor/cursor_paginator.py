@@ -4,11 +4,11 @@ from typing import Self
 from typing import override
 
 from expanse.pagination.cursor.cursor import Cursor
-from expanse.support.has_variant import HasVariant
-from expanse.support.variant import AsyncVariant
+from expanse.support.adapter import AsyncAdapter
+from expanse.support.has_adapter import HasAdapter
 
 
-class CursorPaginator[T](HasVariant):
+class CursorPaginator[T](HasAdapter):
     DEFAULT_PER_PAGE: int = 20
 
     _all_items: Sequence[T]
@@ -102,8 +102,8 @@ class CursorPaginator[T](HasVariant):
         )
 
     @override
-    def get_variant(self) -> AsyncVariant[Self]:
-        from expanse.pagination.cursor.variants.envelope import Envelope
+    def get_adapter(self) -> AsyncAdapter[Self]:
+        from expanse.pagination.cursor.adapters.envelope import Envelope
 
         return Envelope()
 

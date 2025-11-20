@@ -13,7 +13,7 @@ from typing import get_origin
 
 from expanse.container.container import Container
 from expanse.http.response import Response
-from expanse.support.has_variant import HasVariant
+from expanse.support.has_adapter import HasAdapter
 
 
 _Adapter = Callable[..., Awaitable[Response]] | Callable[..., Response]
@@ -36,7 +36,7 @@ class ResponseAdapter:
         adapter = self.adapter(response, declared_response_type=declared_response_type)
 
         if adapter is None:
-            adapter = self._adapt_via_variant(response, declared_response_type)
+            adapter = self._adapt_via_adapter(response, declared_response_type)
 
             if not adapter:
                 raise ValueError(
@@ -76,7 +76,7 @@ class ResponseAdapter:
 
         return _adapter
 
-    def _adapt_via_variant(
+    def _adapt_via_adapter(
         self, obj: Any, type_: type | None = None
     ) -> _Adapter | None:
         if not type_:
@@ -84,20 +84,19 @@ class ResponseAdapter:
 
         origin = get_origin(type_)
         if origin is not Annotated:
-            if isinstance(obj, HasVariant):
-                variant = obj.get_variant()
+            if isinstance(obj, HasAdapter):
+                adapter = obj.get_adapter()
 
-                return partial(variant.apply, type_)
+                return partial(adapter.adapt, type_)
 
             return None
-
 
         annotated, annotation = get_args(type_)
 
-        if not hasattr(annotation, "apply"):
+        if not hasattr(annotation, "adapt"):
             return None
 
-        return partial(annotation.apply, annotated)
+        return partial(annotation.adapt, annotated)
 
     async def _adapt_string(
         self, response: str, container: Container, **kwargs
