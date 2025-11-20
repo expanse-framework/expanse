@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 from typing import Annotated
-from typing import Any
+from typing import ClassVar
 
 from pydantic import BaseModel
 from pydantic import Field
+from sqlalchemy import MetaData
 from sqlalchemy import select
 from sqlalchemy.orm import Mapped
 
@@ -24,11 +25,11 @@ from expanse.routing.helpers import post
 class User(Model):
     __tablename__ = "schematic_users"
 
-    __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
-
     id: Mapped[int] = column(primary_key=True)
     name: Mapped[str] = column(init=True)
     email: Mapped[str] = column(init=True)
+
+    metadata: ClassVar[MetaData] = MetaData()
 
 
 class UserRequest(BaseModel):

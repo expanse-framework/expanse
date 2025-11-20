@@ -3,10 +3,11 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Annotated
-from typing import Any
+from typing import ClassVar
 from uuid import UUID
 
 from pydantic import BaseModel
+from sqlalchemy import MetaData
 from sqlalchemy.orm import Mapped
 
 from expanse.database.orm import column
@@ -34,11 +35,11 @@ class UserModel(BaseModel):
 class User(Model):
     __tablename__ = "schematic_users"
 
-    __table_args__: dict[str, Any] = {"extend_existing": True}  # noqa: RUF012
-
     id: Mapped[int] = column(primary_key=True)
     name: Mapped[str] = column(init=True)
     email: Mapped[str] = column(init=True)
+
+    metadata: ClassVar[MetaData] = MetaData()
 
 
 def test_schema_generator_handles_basic_types() -> None:
