@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 import typing
 
 from collections.abc import Sequence
@@ -14,9 +15,15 @@ from typing import Any
 from typing import Union
 from typing import get_args
 from typing import get_origin
+from typing import override
 from uuid import UUID
 
 from pydantic import BaseModel
+from pydantic.json_schema import _MODE_TITLE_MAPPING
+from pydantic.json_schema import CoreModeRef
+from pydantic.json_schema import CoreRef
+from pydantic.json_schema import DefsRef
+from pydantic.json_schema import GenerateJsonSchema as BaseGenerateJsonSchema
 
 from expanse.schematic.openapi.reference import Reference
 from expanse.schematic.openapi.schema import Schema
@@ -29,9 +36,79 @@ from expanse.schematic.openapi.types import StringType
 
 
 if typing.TYPE_CHECKING:
+    from pathlib import Path
+
     from pydantic.fields import FieldInfo
 
     from expanse.schematic.openapi.components import Components
+
+
+class GenerateJsonSchema(BaseGenerateJsonSchema):
+    _base_path: Path | None = None
+
+    @override
+    def get_defs_ref(self, core_mode_ref: CoreModeRef) -> DefsRef:
+        core_ref, mode = core_mode_ref
+
+        if self._base_path is not None:
+            # Convert path to module-like string if we know the base path
+            # This helps with reference consistency between operating systems
+            base_path_str = str(self._base_path).replace("/", ".").replace("\\", ".")
+            core_ref = CoreRef(core_mode_ref[0].removeprefix(base_path_str + "."))
+
+        # Split the core ref into "components"; generic origins and arguments are each separate components
+        components = re.split(r"([\][,])", core_ref)
+        # Remove IDs from each component
+        components = [x.rsplit(":", 1)[0] for x in components]
+        core_ref_no_id = "".join(components)
+        # Remove everything before the last period from each "component"
+        components = [
+            re.sub(r"(?:[^.[\]]+\.)+((?:[^.[\]]+))", r"\1", x) for x in components
+        ]
+        short_ref = "".join(components)
+
+        mode_title = _MODE_TITLE_MAPPING[mode]
+
+        # It is important that the generated defs_ref values be such that at least one choice will not
+        # be generated for any other core_ref. Currently, this should be the case because we include
+        # the id of the source type in the core_ref
+        name = DefsRef(self.normalize_name(short_ref))
+        name_mode = DefsRef(self.normalize_name(short_ref) + f"-{mode_title}")
+        module_qualname = DefsRef(self.normalize_name(core_ref_no_id))
+        module_qualname_mode = DefsRef(f"{module_qualname}-{mode_title}")
+        module_qualname_id = DefsRef(self.normalize_name(core_ref))
+        occurrence_index = self._collision_index.get(module_qualname_id)
+        if occurrence_index is None:
+            self._collision_counter[module_qualname] += 1
+            occurrence_index = self._collision_index[module_qualname_id] = (
+                self._collision_counter[module_qualname]
+            )
+
+        module_qualname_occurrence = DefsRef(f"{module_qualname}__{occurrence_index}")
+        module_qualname_occurrence_mode = DefsRef(
+            f"{module_qualname_mode}__{occurrence_index}"
+        )
+
+        self._prioritized_defsref_choices[module_qualname_occurrence_mode] = [
+            name,
+            name_mode,
+            module_qualname,
+            module_qualname_mode,
+            module_qualname_occurrence,
+            module_qualname_occurrence_mode,
+        ]
+
+        return module_qualname_occurrence_mode
+
+    @classmethod
+    def with_base_path(cls, base_path: Path | None) -> type[GenerateJsonSchema]:
+        return type(
+            "GenerateJsonSchemaWithBasePath",
+            (cls,),
+            {
+                "_base_path": base_path,
+            },
+        )
 
 
 class SchemaRegistry:
@@ -39,8 +116,11 @@ class SchemaRegistry:
     Generates OpenAPI Schema objects from Python type hints and Pydantic models.
     """
 
-    def __init__(self, components: Components) -> None:
+    def __init__(self, components: Components, base_path: Path | None = None) -> None:
         self._components: Components = components
+        self._generate_json_schema_class: type[GenerateJsonSchema] = (
+            GenerateJsonSchema.with_base_path(base_path)
+        )
 
     def generate_from_type(self, type_hint: Any) -> Schema | Reference:
         # None/NoneType
@@ -145,7 +225,8 @@ class SchemaRegistry:
 
     def generate_from_pydantic(self, model: type[BaseModel]) -> Schema:
         raw_schema = model.model_json_schema(
-            ref_template="#/components/schemas/{model}"
+            ref_template="#/components/schemas/{model}",
+            schema_generator=self._generate_json_schema_class,
         )
 
         schema = Schema.from_dict(raw_schema, ObjectType())

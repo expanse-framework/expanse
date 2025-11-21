@@ -6,6 +6,7 @@ from expanse.schematic.openapi.operation import Operation
 
 
 if TYPE_CHECKING:
+    from expanse.schematic.analyzers.schema_registry import SchemaRegistry
     from expanse.schematic.generator_config import GeneratorConfig
     from expanse.schematic.inference.inference import Inference
     from expanse.schematic.openapi.openapi import OpenAPI
@@ -34,12 +35,15 @@ class OperationBuilder:
         openapi: OpenAPI,
         route_info: RouteInfo,
         config: GeneratorConfig,
+        schema_registry: SchemaRegistry,
         inference: Inference,
     ) -> Operation:
         operation = Operation("get")
 
         for extension_class in self._extensions:
-            extension: OperationExtension = extension_class(openapi, inference, config)
+            extension: OperationExtension = extension_class(
+                openapi, inference, config, schema_registry
+            )
             extension.handle(operation, route_info)
 
         return operation

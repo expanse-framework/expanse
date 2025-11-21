@@ -50,9 +50,9 @@ class ParametersExtension(OperationExtension):
                     parameter.set_required(field_info.is_required())
 
                     # Generate schema from field type
-                    schema = SchemaRegistry(
-                        self._openapi.components
-                    ).generate_from_type(field_info.annotation)
+                    schema = self._schema_registry.generate_from_type(
+                        field_info.annotation
+                    )
                     parameter.set_schema(schema)
 
                     # Add description from field
@@ -65,9 +65,7 @@ class ParametersExtension(OperationExtension):
                 parameter.set_required(param_info.is_required)
 
                 # Generate schema from type annotation
-                schema = SchemaRegistry(self._openapi.components).generate_from_type(
-                    param_info.annotation
-                )
+                schema = self._schema_registry.generate_from_type(param_info.annotation)
                 parameter.set_schema(schema)
 
                 # Add description from docstring

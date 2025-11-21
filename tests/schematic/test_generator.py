@@ -34,7 +34,9 @@ async def test_generated_schema(unbootstrapped_app: Application, fixture: str) -
     await SchematicServiceProvider(container).register()
 
     generator = Generator(
-        await container.get(OperationBuilder), await container.get(Inference)
+        unbootstrapped_app,
+        await container.get(OperationBuilder),
+        await container.get(Inference),
     )
 
     assert generator.generate(config, router).to_dict() == json.loads(

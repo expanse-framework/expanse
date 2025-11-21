@@ -1,6 +1,41 @@
 {
   "components": {
     "schemas": {
+      "UserAddress": {
+        "properties": {
+          "city": {
+            "description": "City",
+            "examples": [
+              "Anytown"
+            ],
+            "title": "City",
+            "type": "string"
+          },
+          "street": {
+            "description": "Street address",
+            "examples": [
+              "123 Main St"
+            ],
+            "title": "Street",
+            "type": "string"
+          },
+          "zip_code": {
+            "description": "ZIP code",
+            "examples": [
+              "12345"
+            ],
+            "title": "Zip Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "street",
+          "city",
+          "zip_code"
+        ],
+        "title": "UserAddress",
+        "type": "object"
+      },
       "UserRequest": {
         "properties": {
           "email": {
@@ -31,7 +66,7 @@
       "UserResponse": {
         "properties": {
           "address": {
-            "$ref": "#/components/schemas/__UserAddress"
+            "$ref": "#/components/schemas/UserAddress"
           },
           "email": {
             "description": "The email of the user",
@@ -91,41 +126,6 @@
           "type"
         ],
         "title": "ValidationError",
-        "type": "object"
-      },
-      "__UserAddress": {
-        "properties": {
-          "city": {
-            "description": "City",
-            "examples": [
-              "Anytown"
-            ],
-            "title": "City",
-            "type": "string"
-          },
-          "street": {
-            "description": "Street address",
-            "examples": [
-              "123 Main St"
-            ],
-            "title": "Street",
-            "type": "string"
-          },
-          "zip_code": {
-            "description": "ZIP code",
-            "examples": [
-              "12345"
-            ],
-            "title": "Zip Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "street",
-          "city",
-          "zip_code"
-        ],
-        "title": "UserAddress",
         "type": "object"
       }
     }

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from expanse.http.form import Form
-from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.media_type import MediaType
 from expanse.schematic.openapi.request_body import RequestBody
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
@@ -35,9 +34,9 @@ class RequestBodyExtension(OperationExtension):
                 if param_doc.description:
                     request_body.set_description(param_doc.description)
 
-            reference, _ = SchemaRegistry(
-                self._openapi.components
-            ).get_or_create_component_schema(body_param.pydantic_model)
+            reference, _ = self._schema_registry.get_or_create_component_schema(
+                body_param.pydantic_model
+            )
             media_type = MediaType(reference)
             content_type = "application/json"
             if body_param.data_source == Form:
@@ -51,9 +50,7 @@ class RequestBodyExtension(OperationExtension):
             request_body = RequestBody()
             request_body.set_required(body_param.is_required)
 
-            schema = SchemaRegistry(self._openapi.components).generate_from_type(
-                body_param.annotation
-            )
+            schema = self._schema_registry.generate_from_type(body_param.annotation)
 
             media_type = MediaType(schema)
             content_type = "application/json"

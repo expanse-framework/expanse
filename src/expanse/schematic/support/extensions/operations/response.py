@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 from pydantic import Field
 
-from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.media_type import MediaType
 from expanse.schematic.openapi.response import Response as OpenAPIResponse
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
@@ -46,7 +45,7 @@ class ResponseExtension(OperationExtension):
             from expanse.http.response import Response as HttpResponse
 
             if route_info.signature.return_annotation != HttpResponse:
-                schema = SchemaRegistry(self._openapi.components).generate_from_type(
+                schema = self._schema_registry.generate_from_type(
                     route_info.signature.return_annotation
                 )
                 media_type = MediaType(schema)
@@ -74,9 +73,9 @@ class ResponseExtension(OperationExtension):
         # Add validation error response if needed
         if not operation.responses.has_response("422") and operation.request_body:
             validation_error_response = OpenAPIResponse("Validation Error")
-            reference, _ = SchemaRegistry(
-                self._openapi.components
-            ).get_or_create_component_schema(ValidationError)
+            reference, _ = self._schema_registry.get_or_create_component_schema(
+                ValidationError
+            )
             media_type = MediaType(reference)
             validation_error_response.add_content("application/json", media_type)
             operation.responses.add_response("422", validation_error_response)
