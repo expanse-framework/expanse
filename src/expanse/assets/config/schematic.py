@@ -19,6 +19,9 @@ class Config(BaseSettings):
 
     info: APIInfo = APIInfo()
 
+    # The default export path for the OpenAPI schema file.
+    export_path: str = "api.json"
+
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="SCHEMATIC_", env_nested_delimiter="__"
     )
