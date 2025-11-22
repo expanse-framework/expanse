@@ -1,0 +1,272 @@
+{
+  "components": {
+    "schemas": {
+      "UserRequest": {
+        "properties": {
+          "email": {
+            "description": "The email of the user",
+            "examples": [
+              "foo@bar.com"
+            ],
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the user",
+            "examples": [
+              "John Doe",
+              "Jane Doe"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "UserRequest",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "email": {
+            "description": "The email of the user",
+            "examples": [
+              "foo@bar.com"
+            ],
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The name of the user",
+            "examples": [
+              "John Doe",
+              "Jane Doe"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "description": "Location of the validation error",
+            "items": {
+              "type": "string"
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "The complete error message of the validation error",
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "description": "The type of validation error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "This is a test API.",
+    "title": "API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/users": {
+      "get": {
+        "description": "Additional description.",
+        "operationId": "api.user.list",
+        "parameters": [
+          {
+            "description": "The name of the user",
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The email of the user",
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "You are not authorized to list users"
+          }
+        },
+        "summary": "List users with optional filtering."
+      },
+      "post": {
+        "description": "Additional description.",
+        "operationId": "api.user.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "You are not authorized to create users"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create a new user."
+      }
+    },
+    "/api/users/{user_id}": {
+      "delete": {
+        "description": "Additional description.",
+        "operationId": "api.user.delete",
+        "parameters": [
+          {
+            "description": "The ID of the user to delete.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "403": {
+            "description": "You are not authorized to delete users"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Delete an existing user."
+      },
+      "patch": {
+        "description": "Additional description.",
+        "operationId": "api.user.update",
+        "parameters": [
+          {
+            "description": "The ID of the user to update.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "description": "You are not authorized to update users"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update an existing user."
+      }
+    }
+  }
+}
