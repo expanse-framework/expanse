@@ -38,7 +38,7 @@ class Headers:
         if not paginator_args:
             raise TypeError("CursorPaginator must have a type argument")
 
-        items: list[Any] = data.items
+        items: list[Any] = list(data.items)
         item_type = paginator_args[0]
         origin = get_origin(item_type)
 

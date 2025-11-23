@@ -1,4 +1,5 @@
 from typing import Annotated
+from typing import ClassVar
 
 import pytest
 
@@ -34,14 +35,14 @@ async def create_users(app: Application) -> None:
 
 
 class User(Model):
-    metadata: MetaData = MetaData()
-
     __tablename__ = "users"
 
     id: Mapped[int] = column(primary_key=True)
     first_name: Mapped[str] = column(nullable=False)
     last_name: Mapped[str] = column(nullable=False)
     email: Mapped[str] = column(nullable=False)
+
+    metadata: ClassVar[MetaData] = MetaData()
 
 
 class UserSchema(BaseModel):

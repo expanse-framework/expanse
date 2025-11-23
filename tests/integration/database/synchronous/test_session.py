@@ -2,12 +2,7 @@ from typing import Annotated
 
 import pytest
 
-from pydantic import BaseModel
-from sqlalchemy.orm import Mapped
-
 from expanse.contracts.routing.router import Router
-from expanse.database.orm import column
-from expanse.database.orm.model import Model
 from expanse.database.session import Session
 from expanse.http.helpers import json
 from expanse.http.response import Response
@@ -15,22 +10,6 @@ from expanse.testing.client import TestClient
 
 
 pytestmark = pytest.mark.db
-
-
-class User(Model):
-    __tablename__ = "users"
-
-    id: Mapped[int] = column(primary_key=True)
-    first_name: Mapped[str] = column(nullable=False)
-    last_name: Mapped[str] = column(nullable=False)
-    email: Mapped[str] = column(nullable=False)
-
-
-class UserSchema(BaseModel):
-    id: int
-    first_name: str
-    last_name: str
-    email: str
 
 
 def default_session(session: Session) -> Response:

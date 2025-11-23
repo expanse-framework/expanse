@@ -212,7 +212,11 @@ class Schema:
             if null is not None:
                 any_of.remove(null)
                 if len(any_of) == 1:
-                    schema = any_of[0]
+                    single_schema = any_of[0]
+                    if isinstance(single_schema, Schema):
+                        schema = single_schema
+                    else:
+                        schema.any_of = any_of
                 else:
                     schema.any_of = any_of
 

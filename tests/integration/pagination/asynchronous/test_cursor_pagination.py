@@ -1,4 +1,5 @@
 from typing import Annotated
+from typing import ClassVar
 from urllib.parse import urlencode
 
 import pytest
@@ -47,14 +48,14 @@ def parse_link_header(link_header: str) -> dict[str, str]:
 
 
 class User(Model):
-    metadata: MetaData = MetaData()
-
     __tablename__ = "users"
 
     id: Mapped[int] = column(primary_key=True)
     first_name: Mapped[str] = column(nullable=False)
     last_name: Mapped[str] = column(nullable=False)
     email: Mapped[str] = column(nullable=False)
+
+    metadata: ClassVar[MetaData] = MetaData()
 
 
 class UserSchema(BaseModel):

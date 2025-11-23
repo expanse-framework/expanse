@@ -49,7 +49,7 @@ def paginated_envelope_default(
     """
     stmt = select(User)
 
-    return session.paginate(stmt)
+    return session.paginate(stmt, per_page=10)
 
 
 @get("/paginated/envelope/unannotated-model")
@@ -61,7 +61,7 @@ def paginated_envelope_default_unannotated_model(
     """
     stmt = select(User)
 
-    return session.paginate(stmt)
+    return session.paginate(stmt, per_page=10)
 
 
 @get("/paginated/envelope/no-links")
@@ -73,7 +73,7 @@ def paginated_envelope_no_links(
     """
     stmt = select(User)
 
-    return session.paginate(stmt)
+    return session.paginate(stmt, per_page=10)
 
 
 @get("/paginated/headers/default")
@@ -85,7 +85,7 @@ def paginated_headers(
     """
     stmt = select(User)
 
-    return session.paginate(stmt)
+    return session.paginate(stmt, per_page=10)
 
 
 @get("/cursor-paginated/envelope/default")
@@ -97,7 +97,7 @@ def cursor_paginated_envelope_default(
     """
     stmt = select(User)
 
-    return session.cursor_paginate(stmt)
+    return session.cursor_paginate(stmt, per_page=10)
 
 
 @get("/cursor-paginated/envelope/unannotated-model")
@@ -109,7 +109,7 @@ def cursor_paginated_envelope_default_unannotated_model(
     """
     stmt = select(User)
 
-    return session.cursor_paginate(stmt)
+    return session.cursor_paginate(stmt, per_page=10)
 
 
 @get("/cursor-paginated/envelope/no-links")
@@ -123,7 +123,7 @@ def cursor_paginated_envelope_no_links(
     """
     stmt = select(User)
 
-    return session.cursor_paginate(stmt)
+    return session.cursor_paginate(stmt, per_page=10)
 
 
 @get("/paginated/headers/default")
@@ -135,7 +135,7 @@ def cursor_paginated_headers(
     """
     stmt = select(User)
 
-    return session.cursor_paginate(stmt)
+    return session.cursor_paginate(stmt, per_page=10)
 
 
 def routes(router: Registrar) -> None:

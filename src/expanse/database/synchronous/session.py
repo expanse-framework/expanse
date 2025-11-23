@@ -4,12 +4,14 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Self
 from typing import TypeVar
+from typing import cast
 from typing import overload
 
 from sqlalchemy import CursorResult
 from sqlalchemy import Executable
 from sqlalchemy import Result
 from sqlalchemy import ScalarResult
+from sqlalchemy import Select
 from sqlalchemy import Table
 from sqlalchemy import UpdateBase
 from sqlalchemy import select
@@ -254,23 +256,28 @@ class Session(BaseSession):
                 else 1
             )
 
+        # Cast to Select for type safety - paginate only works with Select statements
+        select_statement = cast("Select[Any]", statement)
+
         total = self.execute(
             select(func.count()).select_from(
-                statement.order_by(None).limit(None).offset(None)
+                select_statement.order_by(None).limit(None).offset(None).subquery()
             )
         ).scalar_one()
 
-        statement = statement.limit(per_page + 1).offset((page - 1) * per_page)
+        select_statement = select_statement.limit(per_page + 1).offset(
+            (page - 1) * per_page
+        )
 
         # Determine if we need to return scalars or raw rows.
         # by checking if all the columns are tables, i.e. complete models in an ORM context.
         # Only in that case do we return scalars.
         raw_results = not all(
-            isinstance(column, Table) for column in statement._raw_columns
+            isinstance(column, Table) for column in select_statement._raw_columns
         )
         if raw_results:
             results = self.execute(
-                statement,
+                select_statement,
                 params,
                 execution_options=execution_options,
                 bind_arguments=bind_arguments,
@@ -278,7 +285,7 @@ class Session(BaseSession):
             ).all()
         else:
             results = self.scalars(
-                statement,
+                select_statement,
                 params,
                 execution_options=execution_options,
                 bind_arguments=bind_arguments,
@@ -342,19 +349,21 @@ class Session(BaseSession):
                 else None
             )
 
-        statement, parameters, cursor = prepare_pagination(
-            statement, per_page, cursor=cursor
+        # Cast to Select for type safety - prepare_pagination expects Select
+        select_statement = cast("Select[Any]", statement)
+        select_statement, parameters, cursor = prepare_pagination(
+            select_statement, per_page, cursor=cursor
         )
 
         # Determine if we need to return scalars or raw rows.
         # by checking if all the columns are tables, i.e. complete models in an ORM context.
         # Only in that case do we return scalars.
         raw_results = not all(
-            isinstance(column, Table) for column in statement._raw_columns
+            isinstance(column, Table) for column in select_statement._raw_columns
         )
         if raw_results:
             results = self.execute(
-                statement,
+                select_statement,
                 params,
                 execution_options=execution_options,
                 bind_arguments=bind_arguments,
@@ -362,7 +371,7 @@ class Session(BaseSession):
             ).all()
         else:
             results = self.scalars(
-                statement,
+                select_statement,
                 params,
                 execution_options=execution_options,
                 bind_arguments=bind_arguments,
@@ -371,7 +380,7 @@ class Session(BaseSession):
 
         return CursorPaginator(
             items=results,
-            query=statement,
+            query=select_statement,
             session=self,
             per_page=per_page,
             cursor=cursor,

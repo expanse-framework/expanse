@@ -47,7 +47,9 @@ def prepare_pagination(
                 modifier = getattr(element, "modifier", None)
                 element = element.element
 
-            direction = "desc" if modifier and modifier.__name__ == "desc_op" else "asc"
+            direction: Literal["asc", "desc"] = (
+                "desc" if modifier and modifier.__name__ == "desc_op" else "asc"
+            )
 
             order_by_columns.append((element, direction))
             continue

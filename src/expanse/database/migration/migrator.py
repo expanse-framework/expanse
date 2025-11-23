@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextlib import suppress
 from pathlib import Path
+from typing import TYPE_CHECKING
 from typing import Literal
 
 from alembic import util
@@ -20,6 +21,10 @@ from cleo.ui.progress_indicator import ProgressIndicator
 from expanse.core.application import Application
 from expanse.database.migration.config import Config as AlembicConfig
 from expanse.database.migration.utils import configure_alembic_loggers
+
+
+if TYPE_CHECKING:
+    from sqlalchemy import MetaData
 
 
 class Buffer:
@@ -155,7 +160,11 @@ class Migrator:
             case "table":
                 from expanse.database.orm.model import Model
 
-                return name in Model.metadata.tables
+                metadata: MetaData = self._config.attributes.get(
+                    "target_metadata", Model.metadata
+                )
+
+                return name in metadata.tables
             case _:
                 return True
 

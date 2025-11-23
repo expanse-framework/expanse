@@ -1,13 +1,12 @@
 from alembic import context
 
 from expanse.database.database_manager import DatabaseManager
-from expanse.database.orm.model import Model
 
 
 config = context.config
 db: DatabaseManager = context.config.attributes["db"]
 
-target_metadata = Model.metadata
+target_metadata = context.config.attributes["target_metadata"]
 
 
 def run_migrations_offline() -> None:
