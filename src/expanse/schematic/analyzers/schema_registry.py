@@ -12,6 +12,7 @@ from decimal import Decimal
 from enum import Enum
 from types import UnionType
 from typing import Any
+from typing import Literal
 from typing import Union
 from typing import get_args
 from typing import get_origin
@@ -223,10 +224,13 @@ class SchemaRegistry:
         # If we could not determine a more specialized type, return a generic object schema
         return Schema(ObjectType())
 
-    def generate_from_pydantic(self, model: type[BaseModel]) -> Schema:
+    def generate_from_pydantic(
+        self, model: type[BaseModel], type: Literal["request", "response"] = "request"
+    ) -> Schema:
         raw_schema = model.model_json_schema(
             ref_template="#/components/schemas/{model}",
             schema_generator=self._generate_json_schema_class,
+            mode="validation" if type == "request" else "serialization",
         )
 
         schema = Schema.from_dict(raw_schema, ObjectType())
@@ -272,12 +276,12 @@ class SchemaRegistry:
             return False
 
     def get_or_create_component_schema(
-        self, model: type[BaseModel]
+        self, model: type[BaseModel], type: Literal["request", "response"] = "request"
     ) -> tuple[Reference, Schema]:
         component_name = model.__name__
 
         if component_name not in self._components.schemas:
-            schema = self.generate_from_pydantic(model)
+            schema = self.generate_from_pydantic(model, type=type)
             self._components.schemas[component_name] = schema
         else:
             schema = self._components.schemas[component_name]

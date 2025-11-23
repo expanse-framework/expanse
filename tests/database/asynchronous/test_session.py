@@ -1,0 +1,240 @@
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
+from typing import NamedTuple
+
+import pytest
+import sqlalchemy as sa
+
+from expanse.configuration.config import Config
+from expanse.core.application import Application
+from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+from expanse.database.asynchronous.session import AsyncSession
+from expanse.database.pagination.exceptions import DatabasePaginationError
+from expanse.pagination.cursor.cursor import Cursor
+
+
+if TYPE_CHECKING:
+    from expanse.pagination.cursor.cursor_paginator import CursorPaginator
+    from expanse.pagination.offset.paginator import Paginator
+
+
+class UserRow(NamedTuple):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+
+class AliasedUserRow(NamedTuple):
+    foo: int
+    first_name: str
+
+
+@pytest.fixture()
+async def session() -> AsyncGenerator[AsyncSession]:
+    app = Application()
+    app.set_config(
+        Config(
+            {
+                "database": {
+                    "default": "sqlite",
+                    "connections": {
+                        "sqlite": {"driver": "sqlite", "database": ":memory:"},
+                    },
+                }
+            }
+        )
+    )
+
+    db = AsyncDatabaseManager(app)
+
+    async with db.session() as session:
+        await session.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            first_name VARCHAR NOT NULL,
+            last_name VARCHAR,
+            email VARCHAR NOT NULL
+        )
+        """)
+
+        await session.execute("""
+        INSERT INTO users (first_name, last_name, email) VALUES
+            ('John', 'Doe', 'john@doe.com'),
+            ('Jane', 'Smith', 'jane@smith.com'),
+            ('Alice', 'Johnson', 'alice@johnson.com'),
+            ('Jane', 'Doe', 'jane@doe.com')
+        """)
+
+        yield session
+
+
+async def test_cursor_paginate(session: AsyncSession) -> None:
+    paginator: CursorPaginator[UserRow] = await session.cursor_paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id")),
+        per_page=2,
+    )
+
+    assert paginator.items == [
+        (1, "John", "Doe", "john@doe.com"),
+        (2, "Jane", "Smith", "jane@smith.com"),
+    ]
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.previous_cursor is None
+    assert paginator.next_cursor.parameter("id") == 2
+
+
+async def test_cursor_paginate_descending_order(session: AsyncSession) -> None:
+    paginator: CursorPaginator[UserRow] = await session.cursor_paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id").desc()),
+        per_page=2,
+    )
+
+    assert paginator.items == [
+        (4, "Jane", "Doe", "jane@doe.com"),
+        (3, "Alice", "Johnson", "alice@johnson.com"),
+    ]
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.previous_cursor is None
+    assert paginator.next_cursor.parameter("id") == 3
+
+
+async def test_cursor_paginate_aliased_column(session: AsyncSession) -> None:
+    paginator: CursorPaginator[AliasedUserRow] = await session.cursor_paginate(
+        sa.select(sa.column("id").label("foo"), sa.column("first_name"))
+        .select_from(sa.table("users"))
+        .order_by(sa.column("id").label("foo")),
+        per_page=2,
+    )
+
+    assert paginator.items == [
+        AliasedUserRow(foo=1, first_name="John"),
+        AliasedUserRow(foo=2, first_name="Jane"),
+    ]
+    assert paginator.items[0].foo == 1
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.previous_cursor is None
+    assert paginator.next_cursor.parameter("foo") == 2
+
+
+async def test_cursor_paginate_aliased_column_descending_order(
+    session: AsyncSession,
+) -> None:
+    paginator: CursorPaginator[AliasedUserRow] = await session.cursor_paginate(
+        sa.select(sa.column("id").label("foo"), sa.column("first_name"))
+        .select_from(sa.table("users"))
+        .order_by(sa.column("id").label("foo").desc()),
+        per_page=2,
+    )
+
+    assert paginator.items == [(4, "Jane"), (3, "Alice")]
+    assert paginator.items[0].foo == 4
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.next_cursor.parameter("foo") == 3
+
+
+async def test_cursor_paginate_order_by_multiple_columns(session: AsyncSession) -> None:
+    paginator: CursorPaginator[UserRow] = await session.cursor_paginate(
+        sa.select("*")
+        .select_from(sa.table("users"))
+        .order_by(sa.column("first_name").desc(), sa.column("id").desc()),
+        per_page=3,
+    )
+
+    assert paginator.items == [
+        (1, "John", "Doe", "john@doe.com"),
+        (4, "Jane", "Doe", "jane@doe.com"),
+        (2, "Jane", "Smith", "jane@smith.com"),
+    ]
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.previous_cursor is None
+    assert paginator.next_cursor.parameter("id") == 2
+    assert paginator.next_cursor.parameter("first_name") == "Jane"
+
+
+async def test_cursor_paginate_with_a_cursor(session: AsyncSession) -> None:
+    paginator: CursorPaginator[UserRow] = await session.cursor_paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id").desc()),
+        per_page=2,
+        cursor=Cursor({"id": 3}),
+    )
+
+    assert paginator.items == [
+        (2, "Jane", "Smith", "jane@smith.com"),
+        (1, "John", "Doe", "john@doe.com"),
+    ]
+    assert not paginator.has_more
+    assert paginator.next_cursor is None
+    assert paginator.previous_cursor is not None
+    assert paginator.previous_cursor.parameter("id") == 2
+
+
+async def test_cursor_paginate_without_order_by_raise_an_error(
+    session: AsyncSession,
+) -> None:
+    with pytest.raises(DatabasePaginationError):
+        await session.cursor_paginate(
+            sa.select("*").select_from(sa.table("users")),
+            per_page=2,
+        )
+
+
+async def test_paginate_with_empty_result_set(session: AsyncSession) -> None:
+    paginator: Paginator[UserRow] = await session.paginate(
+        sa.select("*")
+        .select_from(sa.table("users"))
+        .where(sa.column("id") > 100)
+        .order_by(sa.column("id")),
+        per_page=2,
+    )
+
+    assert paginator.items == []
+    assert not paginator.has_more
+    assert paginator.first_page == 1
+    assert paginator.current_page == 1
+    assert paginator.last_page == 0
+    assert paginator.next_page is None
+    assert paginator.previous_page is None
+    assert paginator.total == 0
+
+
+async def test_paginate_first_page(session: AsyncSession) -> None:
+    paginator: Paginator[UserRow] = await session.paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id")),
+        per_page=2,
+    )
+
+    assert paginator.items == [
+        (1, "John", "Doe", "john@doe.com"),
+        (2, "Jane", "Smith", "jane@smith.com"),
+    ]
+    assert paginator.first_page == 1
+    assert paginator.current_page == 1
+    assert paginator.last_page == 2
+    assert paginator.next_page == 2
+    assert paginator.previous_page is None
+    assert paginator.total == 4
+
+
+async def test_paginate_second_page(session: AsyncSession) -> None:
+    paginator: Paginator[UserRow] = await session.paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id")),
+        per_page=2,
+        page=2,
+    )
+
+    assert paginator.items == [
+        (3, "Alice", "Johnson", "alice@johnson.com"),
+        (4, "Jane", "Doe", "jane@doe.com"),
+    ]
+    assert paginator.first_page == 1
+    assert paginator.current_page == 2
+    assert paginator.last_page == 2
+    assert paginator.next_page is None
+    assert paginator.previous_page == 1
+    assert paginator.total == 4

@@ -15,7 +15,13 @@ from expanse.schematic.support.operation_builder import OperationBuilder
 
 @pytest.mark.parametrize(
     "fixture",
-    ["basic_routes", "typed_routes", "typed_routes_with_doc", "routes_with_inference"],
+    [
+        "basic_routes",
+        "typed_routes",
+        "typed_routes_with_doc",
+        "routes_with_inference",
+        "pagination",
+    ],
 )
 async def test_generated_schema(unbootstrapped_app: Application, fixture: str) -> None:
     container = unbootstrapped_app.container

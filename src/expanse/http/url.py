@@ -1,11 +1,50 @@
 import typing
 
+from typing import Self
 from urllib.parse import SplitResult
+from urllib.parse import parse_qs
+from urllib.parse import urlencode
 from urllib.parse import urlsplit
 
 from expanse.http.url_path import URLPath
 from expanse.support._utils import string_matches
 from expanse.types import Scope
+
+
+class QueryParameters:
+    def __init__(self, query_string: str) -> None:
+        self._params: dict[str, list[str]] = parse_qs(query_string)
+
+    def set(self, key: str, value: str | list[str]) -> Self:
+        if isinstance(value, str):
+            value = [value]
+
+        self._params[key] = value
+
+        return self
+
+    def append(self, key: str, value: str | list[str]) -> Self:
+        if isinstance(value, str):
+            value = [value]
+
+        if key not in self._params:
+            self._params[key] = []
+
+        self._params[key].extend(value)
+
+        return self
+
+    def remove(self, key: str) -> Self:
+        if key in self._params:
+            del self._params[key]
+
+        return self
+
+    def __str__(self) -> str:
+        return urlencode(self._params, doseq=True)
+
+    def __bool__(self) -> bool:
+        return bool(self._params)
 
 
 class URL:
