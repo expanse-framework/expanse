@@ -1,3 +1,5 @@
+import contextlib
+
 from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Sequence
@@ -153,8 +155,12 @@ class ResponseAdapter:
                 from pydantic import BaseModel
 
                 _, annotation = get_args(type_)
+                is_pydantic_model = False
 
-                if issubclass(annotation, BaseModel):
+                with contextlib.suppress(TypeError):
+                    is_pydantic_model = issubclass(annotation, BaseModel)
+
+                if is_pydantic_model:
 
                     async def _serializer(model: Any) -> dict[str, Any]:
                         return annotation.model_validate(model).model_dump()
