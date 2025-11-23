@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Any
 
+from expanse.schematic.openapi.types import NullType
+
 
 if TYPE_CHECKING:
     from expanse.schematic.openapi.discriminator import Discriminator
@@ -91,6 +93,7 @@ class Schema:
                 "boolean": BooleanType,
                 "array": ArrayType,
                 "object": ObjectType,
+                "null": NullType,
             }
             if type_value in type_map:
                 type_obj = type_map[type_value]()
@@ -197,7 +200,26 @@ class Schema:
             schema.one_of = [cls.from_dict(item) for item in data["oneOf"]]
 
         if "anyOf" in data:
-            schema.any_of = [cls.from_dict(item) for item in data["anyOf"]]
+            any_of = [cls.from_dict(item) for item in data["anyOf"]]
+            null = next(
+                (
+                    item
+                    for item in any_of
+                    if isinstance(item, Schema) and isinstance(item.type, NullType)
+                ),
+                None,
+            )
+            if null is not None:
+                any_of.remove(null)
+                if len(any_of) == 1:
+                    schema = any_of[0]
+                else:
+                    schema.any_of = any_of
+
+                assert isinstance(schema, Schema)
+                schema.set_nullable(True)
+            else:
+                schema.any_of = any_of
 
         if "not" in data:
             schema.not_ = cls.from_dict(data["not"])

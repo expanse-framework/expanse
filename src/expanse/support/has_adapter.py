@@ -7,5 +7,6 @@ from expanse.support.adapter import AsyncAdapter
 
 
 class HasAdapter(ABC):
+    @classmethod
     @abstractmethod
-    def get_adapter(self) -> Adapter[Self] | AsyncAdapter[Self]: ...
+    def get_adapter(cls) -> Adapter[Self] | AsyncAdapter[Self]: ...

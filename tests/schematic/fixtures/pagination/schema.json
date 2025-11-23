@@ -1,0 +1,443 @@
+{
+  "components": {
+    "schemas": {
+      "CursorPaginationLinks": {
+        "properties": {
+          "next": {
+            "nullable": true,
+            "type": "string"
+          },
+          "prev": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "title": "CursorPaginationLinks",
+        "type": "object"
+      },
+      "OffsetPaginationLinks": {
+        "properties": {
+          "first": {
+            "title": "First",
+            "type": "string"
+          },
+          "last": {
+            "title": "Last",
+            "type": "string"
+          },
+          "next": {
+            "nullable": true,
+            "type": "string"
+          },
+          "prev": {
+            "nullable": true,
+            "type": "string"
+          },
+          "self": {
+            "title": "Self",
+            "type": "string"
+          }
+        },
+        "required": [
+          "next",
+          "prev",
+          "first",
+          "last",
+          "self"
+        ],
+        "title": "OffsetPaginationLinks",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "This is a test API.",
+    "title": "API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/cursor-paginated/envelope/default": {
+      "get": {
+        "operationId": "cursor_paginated_envelope_default",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "title": "Data",
+                      "type": "array"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/CursorPaginationLinks"
+                    },
+                    "next_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor",
+                    "previous_cursor",
+                    "links"
+                  ],
+                  "title": "EnvelopeModel",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default cursor paginated envelope example."
+      }
+    },
+    "/api/cursor-paginated/envelope/no-links": {
+      "get": {
+        "operationId": "cursor_paginated_envelope_no_links",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "title": "Data",
+                      "type": "array"
+                    },
+                    "next_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor",
+                    "previous_cursor"
+                  ],
+                  "title": "EnvelopeModel",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Cursor paginated example without links in the envelope."
+      }
+    },
+    "/api/cursor-paginated/envelope/unannotated-model": {
+      "get": {
+        "operationId": "cursor_paginated_envelope_default_unannotated_model",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {},
+                      "title": "Data",
+                      "type": "array"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/CursorPaginationLinks"
+                    },
+                    "next_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor",
+                    "previous_cursor",
+                    "links"
+                  ],
+                  "title": "EnvelopeModel",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default cursor paginated envelope example with unannotated models."
+      }
+    },
+    "/api/paginated/envelope/default": {
+      "get": {
+        "operationId": "paginated_envelope_default",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current_page": {
+                      "minimum": 1,
+                      "title": "Current Page",
+                      "type": "integer"
+                    },
+                    "first_page": {
+                      "minimum": 1,
+                      "title": "First Page",
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "last_page": {
+                      "minimum": 1,
+                      "title": "Last Page",
+                      "type": "integer"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/OffsetPaginationLinks"
+                    },
+                    "next_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "previous_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "title": "Total",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "previous_page",
+                    "current_page",
+                    "first_page",
+                    "last_page",
+                    "total",
+                    "links"
+                  ],
+                  "title": "OffsetEnvelope",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default paginated envelope example."
+      }
+    },
+    "/api/paginated/envelope/no-links": {
+      "get": {
+        "operationId": "paginated_envelope_no_links",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current_page": {
+                      "minimum": 1,
+                      "title": "Current Page",
+                      "type": "integer"
+                    },
+                    "first_page": {
+                      "minimum": 1,
+                      "title": "First Page",
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "last_page": {
+                      "minimum": 1,
+                      "title": "Last Page",
+                      "type": "integer"
+                    },
+                    "next_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "previous_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "title": "Total",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "previous_page",
+                    "current_page",
+                    "first_page",
+                    "last_page",
+                    "total"
+                  ],
+                  "title": "OffsetEnvelopeWithoutLinks",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Paginated example without links in the envelope."
+      }
+    },
+    "/api/paginated/envelope/unannotated-model": {
+      "get": {
+        "operationId": "paginated_envelope_default_unannotated_model",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current_page": {
+                      "minimum": 1,
+                      "title": "Current Page",
+                      "type": "integer"
+                    },
+                    "first_page": {
+                      "minimum": 1,
+                      "title": "First Page",
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {},
+                      "title": "Items",
+                      "type": "array"
+                    },
+                    "last_page": {
+                      "minimum": 1,
+                      "title": "Last Page",
+                      "type": "integer"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/OffsetPaginationLinks"
+                    },
+                    "next_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "previous_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "title": "Total",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "previous_page",
+                    "current_page",
+                    "first_page",
+                    "last_page",
+                    "total",
+                    "links"
+                  ],
+                  "title": "OffsetEnvelope",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default paginated envelope example with unannotated models."
+      }
+    },
+    "/api/paginated/headers/default": {
+      "get": {
+        "operationId": "cursor_paginated_headers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Link": {
+                "description": "Links to specific pages, in the format defined by\n[RFC 5988](https://tools.ietf.org/html/rfc5988#section-5).\nThis will include a link with relation type `next` to the\nnext page, if there is a next page.                ",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cursor paginated example with links in headers."
+      }
+    }
+  }
+}

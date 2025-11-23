@@ -15,7 +15,7 @@ from expanse.http.url import QueryParameters
 from expanse.pagination.cursor.cursor_paginator import CursorPaginator
 
 
-class LinksModel(BaseModel):
+class CursorPaginationLinks(BaseModel):
     next: str | None = None
     prev: str | None = None
 
@@ -109,9 +109,9 @@ class Envelope:
         from pydantic import BaseModel
 
         __dict__: dict[str, Any] = {}
-        __dict__["data"] = Field(alias="items")
-        __dict__["next_cursor"] = Field(alias="next_encoded_cursor")
-        __dict__["previous_cursor"] = Field(alias="previous_encoded_cursor")
+        __dict__["data"] = Field(validation_alias="items")
+        __dict__["next_cursor"] = Field(validation_alias="next_encoded_cursor")
+        __dict__["previous_cursor"] = Field(validation_alias="previous_encoded_cursor")
 
         __annotations__: dict[str, Any] = {}
         __annotations__["data"] = list[model]
@@ -119,7 +119,7 @@ class Envelope:
         __annotations__["previous_cursor"] = str | None
 
         if self._with_links:
-            __annotations__["links"] = Links
+            __annotations__["links"] = CursorPaginationLinks
 
         __dict__["__annotations__"] = __annotations__
 

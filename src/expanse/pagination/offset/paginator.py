@@ -85,7 +85,8 @@ class Paginator[T](HasAdapter):
         )
 
     @override
-    def get_adapter(self) -> AsyncAdapter[Self]:
+    @classmethod
+    def get_adapter(cls) -> AsyncAdapter[Self]:
         from expanse.pagination.offset.adapters.envelope import Envelope
 
         return Envelope()

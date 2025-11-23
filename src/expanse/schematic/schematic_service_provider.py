@@ -40,6 +40,9 @@ class SchematicServiceProvider(ServiceProvider):
         from expanse.schematic.support.extensions.operations.essentials import (
             EssentialsExtension,
         )
+        from expanse.schematic.support.extensions.operations.pagination_response import (
+            PaginationResponseExtension,
+        )
         from expanse.schematic.support.extensions.operations.parameters import (
             ParametersExtension,
         )
@@ -58,6 +61,7 @@ class SchematicServiceProvider(ServiceProvider):
                 RequestBodyExtension,
                 ResponseExtension,
                 ErrorResponseExtension,
+                PaginationResponseExtension,
             ]
         )
 

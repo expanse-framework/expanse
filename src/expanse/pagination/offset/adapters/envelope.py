@@ -15,7 +15,7 @@ from expanse.http.url import QueryParameters
 from expanse.pagination.offset.paginator import Paginator
 
 
-class LinksModel(BaseModel):
+class OffsetPaginationLinks(BaseModel):
     next: str | None
     prev: str | None
     first: str
@@ -139,7 +139,15 @@ class Envelope:
 
         __dict__: dict[str, Any] = {}
         __dict__["data"] = Field(alias="items")
+        __dict__["next_page"] = Field(None, ge=1)
+        __dict__["previous_page"] = Field(..., ge=1)
+        __dict__["current_page"] = Field(..., ge=1)
+        __dict__["first_page"] = Field(..., ge=1)
+        __dict__["last_page"] = Field(..., ge=1)
 
+        model_name: str = (
+            "OffsetEnvelopeWithoutLinks" if not self._with_links else "OffsetEnvelope"
+        )
         __annotations__: dict[str, Any] = {}
         __annotations__["data"] = list[model]
         __annotations__["next_page"] = int | None
@@ -150,11 +158,11 @@ class Envelope:
         __annotations__["total"] = int
 
         if self._with_links:
-            __annotations__["links"] = Links
+            __annotations__["links"] = OffsetPaginationLinks
 
         __dict__["__annotations__"] = __annotations__
 
-        base_model = type("EnvelopeModel", (BaseModel,), __dict__)
+        base_model = type(model_name, (BaseModel,), __dict__)
 
         return base_model
 
