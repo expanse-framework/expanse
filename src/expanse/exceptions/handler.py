@@ -21,7 +21,6 @@ from expanse.core.http.exceptions import HTTPException
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
-from expanse.logging.logger import Logger
 
 
 if TYPE_CHECKING:
@@ -48,6 +47,8 @@ class ExceptionHandler(ExceptionHandlerContract):
         # TODO: Better logging handling
         if self._raise_unhandled_exceptions:
             raise e
+
+        from expanse.logging.logger import Logger
 
         logger = await self._container.get(Logger)
         logger.exception(e)

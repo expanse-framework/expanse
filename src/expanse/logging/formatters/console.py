@@ -7,6 +7,7 @@ import pendulum
 
 from cleo.formatters.formatter import Formatter
 from cleo.io.outputs.buffered_output import BufferedOutput
+from cleo.io.outputs.output import Verbosity
 from cleo.terminal import Terminal
 from cleo.ui.exception_trace import ExceptionTrace
 
@@ -40,6 +41,7 @@ class ConsoleFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         exception: BaseException | None = None
+        print("========== ERROR =======", record.exc_info)
         if record.exc_info:
             exception = record.exc_info[1]
             record.exc_info = None
@@ -71,6 +73,7 @@ class ConsoleFormatter(logging.Formatter):
 
         if exception:
             output = BufferedOutput(decorated=True)
+            output.set_verbosity(Verbosity.VERY_VERBOSE)
             trace = ExceptionTrace(exception)
             trace.render(output)
             lines.append(output.fetch())
