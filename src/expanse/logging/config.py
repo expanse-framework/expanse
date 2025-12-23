@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated
 from typing import Literal
 
@@ -15,12 +16,20 @@ class BaseConfig(BaseSettings):
 class StreamConfig(BaseConfig):
     driver: Literal["stream"] = "stream"
 
-    stream: str = "sys.stdout"
+    stream: str = "stdout"
 
 
 class ConsoleConfig(BaseConfig):
     driver: Literal["console"] = "console"
 
 
-class ChannelConfig(RootModel[StreamConfig | ConsoleConfig]):
-    root: Annotated[StreamConfig | ConsoleConfig, Field(discriminator="driver")]
+class FileConfig(BaseConfig):
+    driver: Literal["file"] = "file"
+
+    path: Path
+
+
+class ChannelConfig(RootModel[StreamConfig | ConsoleConfig | FileConfig]):
+    root: Annotated[
+        StreamConfig | ConsoleConfig | FileConfig, Field(discriminator="driver")
+    ]
