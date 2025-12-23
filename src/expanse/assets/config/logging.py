@@ -1,8 +1,11 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
 from expanse.logging.config import ChannelConfig
+from expanse.logging.config import FileConfig
 from expanse.logging.config import StreamConfig
 
 
@@ -21,7 +24,10 @@ class Config(BaseSettings):
     # >>> DB_CONNECTIONS__STREAM__STREAM=stdout
     # >>> DB_CONNECTIONS__STREAM__LEVEL=INFO
     channels: dict[str, ChannelConfig] = Field(
-        default={"stream": StreamConfig(stream="stdout")}
+        default_factory=lambda: {
+            "stream": StreamConfig(stream="stdout"),
+            "file": FileConfig(path=Path("log/app.log")),
+        }
     )
 
     model_config = SettingsConfigDict(env_prefix="LOG_", env_nested_delimiter="__")
