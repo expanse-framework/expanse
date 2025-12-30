@@ -20,8 +20,6 @@ from sqlalchemy import util
 from sqlalchemy.orm import Session as BaseSession
 from sqlalchemy.sql import func
 
-from expanse.database.pagination import prepare_pagination
-
 
 if TYPE_CHECKING:
     from types import EllipsisType
@@ -336,6 +334,7 @@ class Session(BaseSession):
         bind_arguments: dict[str, Any] | None = None,
         **kw: Any,
     ) -> CursorPaginator[Any]:
+        from expanse.database.pagination.utils import prepare_pagination
         from expanse.database.synchronous.cursor_paginator import CursorPaginator
 
         if isinstance(statement, str):

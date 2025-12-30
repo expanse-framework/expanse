@@ -20,8 +20,6 @@ from sqlalchemy import text
 from sqlalchemy import util
 from sqlalchemy.ext.asyncio import AsyncSession as BaseAsyncSession
 
-from expanse.database.pagination import prepare_pagination
-
 
 if TYPE_CHECKING:
     from types import EllipsisType
@@ -342,6 +340,7 @@ class AsyncSession(BaseAsyncSession):
         **kw: Any,
     ) -> CursorPaginator[Any]:
         from expanse.database.asynchronous.cursor_paginator import CursorPaginator
+        from expanse.database.pagination.utils import prepare_pagination
 
         if isinstance(statement, str):
             statement = text(statement)

@@ -172,6 +172,24 @@ def test_cursor_paginate_with_a_cursor(session: Session) -> None:
     assert paginator.previous_cursor.parameter("id") == 2
 
 
+def test_cursor_paginate_with_a_reversed_cursor(session: Session) -> None:
+    paginator: CursorPaginator[UserRow] = session.cursor_paginate(
+        sa.select("*").select_from(sa.table("users")).order_by(sa.column("id").desc()),
+        per_page=2,
+        cursor=Cursor({"id": 1}, reversed=True),
+    )
+
+    assert paginator.items == [
+        (3, "Alice", "Johnson", "alice@johnson.com"),
+        (2, "Jane", "Smith", "jane@smith.com"),
+    ]
+    assert paginator.has_more
+    assert paginator.next_cursor is not None
+    assert paginator.next_cursor.parameter("id") == 2
+    assert paginator.previous_cursor is not None
+    assert paginator.previous_cursor.parameter("id") == 3
+
+
 def test_cursor_paginate_without_order_by_raise_an_error(session: Session) -> None:
     with pytest.raises(DatabasePaginationError):
         session.cursor_paginate(

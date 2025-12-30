@@ -24,14 +24,20 @@ class CursorPaginator[T](HasAdapter):
         parameters: Sequence[str] | None = None,
     ) -> None:
         self._per_page: int = per_page or self.DEFAULT_PER_PAGE
-        self.set_items(items)
         self._cursor: Cursor | None = cursor
         self._parameters: Sequence[str] = parameters or []
+
+        self.set_items(items)
 
     def set_items(self, items: Sequence[T]) -> None:
         self._all_items = items
         self._items = items[: self._per_page]
         self._has_more = len(self._all_items) > len(self._items)
+
+        # When paginating backwards (reversed cursor), the results are expected to come back
+        # in reversed order, so we need to reverse them back
+        if self._cursor is not None and self._cursor.is_reversed():
+            self._items = list(reversed(self._items))
 
     @property
     def items(self) -> Sequence[T]:
