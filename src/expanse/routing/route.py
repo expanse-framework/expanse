@@ -39,7 +39,10 @@ class Route:
             self.is_async = inspect.iscoroutinefunction(handler_method)
 
             signature = inspect.signature(handler_method)
-            self.signature = inspect.Signature(list(signature.parameters.values())[1:])
+            self.signature = inspect.Signature(
+                list(signature.parameters.values())[1:],
+                return_annotation=signature.return_annotation,
+            )
 
         else:
             self.is_async = inspect.iscoroutinefunction(endpoint)
