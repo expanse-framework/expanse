@@ -1,6 +1,7 @@
 import logging
 
 from abc import ABC
+from abc import abstractmethod
 from logging.handlers import QueueHandler
 from logging.handlers import QueueListener
 from queue import Queue
@@ -37,6 +38,34 @@ class PreservingQueueHandler(QueueHandler):
 
 
 class LogChannel(ABC):
+    @abstractmethod
+    def start(self) -> Self: ...
+
+    @abstractmethod
+    def stop(self) -> Self: ...
+
+    @abstractmethod
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None: ...
+
+    @abstractmethod
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None: ...
+
+    @abstractmethod
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None: ...
+
+    @abstractmethod
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None: ...
+
+    @abstractmethod
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None: ...
+
+    @abstractmethod
+    def exception(
+        self, message: str | BaseException, *args: Any, **kwargs: Any
+    ) -> None: ...
+
+
+class SimpleLogChannel(LogChannel):
     def __init__(
         self,
         logger: logging.Logger,
@@ -90,3 +119,45 @@ class LogChannel(ABC):
         self, message: str | BaseException, *args: Any, **kwargs: Any
     ) -> None:
         self._logger.exception(message, *args, **kwargs)
+
+
+class GroupLogChannel(LogChannel):
+    def __init__(self, channels: list[LogChannel]) -> None:
+        self._channels: list[LogChannel] = channels
+
+    def start(self) -> Self:
+        for channel in self._channels:
+            channel.start()
+        return self
+
+    def stop(self) -> Self:
+        for channel in self._channels:
+            channel.stop()
+
+        return self
+
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+        for channel in self._channels:
+            channel.debug(message, *args, **kwargs)
+
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+        for channel in self._channels:
+            channel.info(message, *args, **kwargs)
+
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+        for channel in self._channels:
+            channel.warning(message, *args, **kwargs)
+
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+        for channel in self._channels:
+            channel.error(message, *args, **kwargs)
+
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+        for channel in self._channels:
+            channel.critical(message, *args, **kwargs)
+
+    def exception(
+        self, message: str | BaseException, *args: Any, **kwargs: Any
+    ) -> None:
+        for channel in self._channels:
+            channel.exception(message, *args, **kwargs)
