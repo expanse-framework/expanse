@@ -41,7 +41,6 @@ class ConsoleFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         exception: BaseException | None = None
-        print("========== ERROR =======", record.exc_info)
         if record.exc_info:
             exception = record.exc_info[1]
             record.exc_info = None

@@ -4,11 +4,14 @@ import sys
 from typing import Any
 
 from expanse.core.application import Application
+from expanse.logging.channel import GroupLogChannel
 from expanse.logging.channel import LogChannel
+from expanse.logging.channel import SimpleLogChannel
 from expanse.logging.config import BaseConfig
 from expanse.logging.config import ChannelConfig
 from expanse.logging.config import ConsoleConfig
 from expanse.logging.config import FileConfig
+from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
 
 
@@ -29,7 +32,7 @@ class Logger:
 
         config = ChannelConfig.model_validate(self._config["channels"][channel_name])
 
-        channel = self._create_channel(config)
+        channel = self._create_channel(config, channel_name)
 
         self._channels[channel_name] = channel
 
@@ -59,19 +62,23 @@ class Logger:
         for channel in self._channels.values():
             channel.stop()
 
-    def _create_channel(self, config: ChannelConfig) -> LogChannel:
+    def _create_channel(self, config: ChannelConfig, channel_name: str) -> LogChannel:
         match config.root:
             case StreamConfig():
-                channel = self._create_stream_channel(config.root)
+                channel = self._create_stream_channel(config.root, channel_name)
             case ConsoleConfig():
-                channel = self._create_console_channel(config.root)
+                channel = self._create_console_channel(config.root, channel_name)
             case FileConfig():
-                channel = self._create_file_channel(config.root)
+                channel = self._create_file_channel(config.root, channel_name)
+            case GroupConfig():
+                channel = self._create_group_channel(config.root)
 
         return channel
 
-    def _create_stream_channel(self, config: StreamConfig) -> LogChannel:
-        logger = self._create_base_logger(config)
+    def _create_stream_channel(
+        self, config: StreamConfig, channel_name: str
+    ) -> LogChannel:
+        logger = self._create_base_logger(config, channel_name)
 
         stream = config.stream
 
@@ -87,36 +94,45 @@ class Logger:
             logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
         )
 
-        return LogChannel(logger, [handler]).start()
+        return SimpleLogChannel(logger, [handler]).start()
 
-    def _create_console_channel(self, config: ConsoleConfig) -> LogChannel:
+    def _create_console_channel(
+        self, config: ConsoleConfig, channel_name: str
+    ) -> LogChannel:
         from expanse.logging.formatters.console import ConsoleFormatter
 
-        logger = self._create_base_logger(config)
+        logger = self._create_base_logger(config, channel_name)
 
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(ConsoleFormatter())
 
-        return LogChannel(logger, [handler], preserve_exception_info=True).start()
+        return SimpleLogChannel(logger, [handler], preserve_exception_info=True).start()
 
-    def _create_file_channel(self, config: FileConfig) -> LogChannel:
-        logger = self._create_base_logger(config)
+    def _create_file_channel(self, config: FileConfig, channel_name: str) -> LogChannel:
+        logger = self._create_base_logger(config, channel_name)
 
-        print(config)
         path = config.path
         if not path.is_absolute():
             path = self._app.base_path.joinpath(path)
 
-        print(path)
         handler = logging.FileHandler(path)
         handler.setFormatter(
             logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
         )
 
-        return LogChannel(logger, [handler]).start()
+        return SimpleLogChannel(logger, [handler]).start()
 
-    def _create_base_logger(self, config: BaseConfig) -> logging.Logger:
-        logger = logging.getLogger(self._app.config["app.name"].lower())
+    def _create_group_channel(self, config: GroupConfig) -> GroupLogChannel:
+        channels = [self.channel(channel_name) for channel_name in config.channels]
+
+        return GroupLogChannel(channels)
+
+    def _create_base_logger(
+        self, config: BaseConfig, channel_name: str
+    ) -> logging.Logger:
+        logger_name = f"{self._app.config['app.name'].lower()}.{channel_name}"
+        logger = logging.getLogger(logger_name)
         logger.setLevel(config.level)
+        logger.propagate = False
 
         return logger
