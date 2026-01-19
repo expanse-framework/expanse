@@ -117,7 +117,7 @@ class URLGenerator:
                 name = name[1:]
 
             if regex:
-                path = path.replace(f"{{{name}:{regex}}}", f"{{{name}}}", 1)
+                path = path.replace(f"{{{raw_name}:{regex}}}", f"{{{raw_name}}}", 1)
 
             substitutions[raw_name] = parameters.pop(name)
 

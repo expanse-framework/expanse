@@ -208,8 +208,20 @@ class Finder(RouteCollection):
                 regex = child["regex"]
                 converter = child["converter"]
 
-                if regex is not None and not re.match(regex, token):
-                    continue
+                if regex is not None:
+                    if not child["catch_all"] and not re.match(regex, token):
+                        continue
+                    elif child["catch_all"]:
+                        param = "/".join([token, *tokens])
+                        if not re.match(regex, param):
+                            continue
+                        else:
+                            params[child["param"]] = param
+                            tokens.clear()
+                            node = child
+                            found = True
+
+                            break
 
                 if converter is not None:
                     try:
