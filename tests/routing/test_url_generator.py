@@ -2,6 +2,7 @@ import pytest
 
 from expanse.contracts.routing.router import Router
 from expanse.http.request import Request
+from expanse.routing.exceptions import InvalidURLParameter
 from expanse.routing.url_generator import URLGenerator
 
 
@@ -56,3 +57,25 @@ def test_generator_can_generate_route_urls(router: Router, url: URLGenerator) ->
     assert (
         url.to_route("catch_all", {"path": "foo/bar/baz"}) == "/catch-all/foo/bar/baz"
     )
+
+
+def test_generator_can_generate_route_urls_with_catch_all_and_different_regexes(
+    router: Router, url: URLGenerator
+) -> None:
+    router.get("/catch-all/{*path:.+(?<!.md)$}", lambda: "", name="catch_all_1")
+    router.get("/catch-all/{*path:.+(?<=.md)$}", lambda: "", name="catch_all_2")
+
+    assert (
+        url.to_route("catch_all_1", {"path": "documents/report.pdf"})
+        == "/catch-all/documents/report.pdf"
+    )
+    assert (
+        url.to_route("catch_all_2", {"path": "documents/report.md"})
+        == "/catch-all/documents/report.md"
+    )
+
+    with pytest.raises(InvalidURLParameter):
+        url.to_route("catch_all_1", {"path": "documents/report.md"})
+
+    with pytest.raises(InvalidURLParameter):
+        url.to_route("catch_all_2", {"path": "documents/report.pdf"})
