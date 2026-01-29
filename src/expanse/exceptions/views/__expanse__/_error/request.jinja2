@@ -1,14 +1,15 @@
 {% from "__expanse__/_macros.jinja2" import badge %}
 
+<div class="h-auto rounded-[calc(var(--radius-lg)+2px)] bg-blue-400/5 p-0.5 ring ring-slate-950/5 shadow-sm outline-white/15 backdrop-blur-md dark:bg-blue-200/5 dark:ring-blue-300/30">
 <div
-  class="relative z-50 h-auto rounded-lg bg-white px-2 shadow-xs ring ring-stone-950/5 dark:bg-stone-800 dark:ring-white/10"
+  class="relative z-50 h-auto rounded-lg bg-white/80 px-2 ring ring-slate-950/5 dark:bg-slate-800/80 dark:ring-blue-200/25"
   data-controller="disclosure"
 >
   <div class="flex min-h-10 items-center justify-between">
     <div class="relative flex w-full items-center gap-3">
       {%
         set badge_types = {
-            'GET': 'warning',
+            'GET': 'info',
             'HEAD': 'info',
             'OPTIONS': 'info',
             'POST': 'success',
@@ -22,7 +23,7 @@
           {{ error.request.method | upper }}
         {% endcall %}
       </div>
-      <div class="flex-1 truncate font-mono text-sm text-stone-950 dark:text-stone-100">
+      <div class="flex-1 truncate font-mono text-sm text-slate-950 dark:text-slate-100">
         {% with request=error.request %}
           {% include "__expanse__/_error/request_url.jinja2" %}
         {% endwith %}
@@ -35,7 +36,7 @@
       <div class="flex-shrink-0">
         <button
           type="button"
-          class="flex h-6 w-6 cursor-pointer items-center justify-center text-stone-500 transition-colors duration-300 group-hover:text-orange-500 group-data-[open=true]:text-orange-500 dark:text-stone-500 group-data-[open=true]:dark:text-orange-500"
+          class="flex h-6 w-6 cursor-pointer items-center justify-center text-slate-500 transition-colors duration-300 group-hover:text-orange-500 group-data-[open=true]:text-orange-500 dark:text-slate-500 group-data-[open=true]:dark:text-orange-500"
           data-action="click->disclosure#toggle"
         >
           <svg
@@ -69,4 +70,5 @@
       {% endwith %}
     </div>
   </div>
+</div>
 </div>

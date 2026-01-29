@@ -1,5 +1,5 @@
 <div
-  class="flex flex-col gap-2.5 rounded-xl p-2.5 shadow-xs ring ring-stone-200 dark:bg-white/1 dark:ring-stone-800"
+  class="flex flex-col gap-2.5 p-1.5 h-auto rounded-[calc(var(--radius-lg)+4px)] bg-slate-700/2 ring ring-slate-950/3 shadow-sm outline-white/15 backdrop-blur-[2px] dark:bg-blue-200/5 dark:ring-blue-300/30"
 >
   <div class="flex items-center gap-2.5 p-2">
     <div class="flex h-6 w-6 items-center justify-center text-orange-500">
@@ -15,22 +15,21 @@
         />
       </svg>
     </div>
-    <h3 class="text-base font-semibold text-stone-900 dark:text-white">Exception trace</h3>
+    <h3 class="text-base font-semibold text-slate-900 dark:text-white">Exception trace</h3>
   </div>
 
   <div class="flex flex-col gap-1.5">
     {% for trace in error.traces %}
       {% set trace_loop=loop %}
       {% if trace_loop.index > 1 %}
-        <div
-          class="group my-2 rounded-lg border border-dashed border-orange-600/25 bg-orange-600/4 dark:border-orange-400/20 dark:bg-orange-400/10"
-        >
+      <div class="relative w-full mx-auto my-2 rounded-lg bg-gradient-to-br p-[1px] dark:saturate-200 from-red-200 to-orange-200 dark:from-orange-300 dark:to-orange-500">
+      <div class="relative w-full rounded-lg bg-slate-50 dark:bg-slate-950 dark:shadow-none bg-slate-100/80 text-orange-900 dark:bg-slate-950/90 dark:bg-none dark:text-orange-100">
           <div class="flex h-11 items-center gap-3 rounded-lg pr-2.5 pl-2">
             <div
-              class="flex flex-1 items-center gap-1 text-xs leading-3 text-stone-900 dark:text-stone-400"
+              class="flex flex-1 items-center gap-1 text-xs leading-3 text-slate-900 dark:text-slate-400"
             >
               <div
-                class="h-full rounded-lg bg-transparent p-1.5 font-medium text-orange-600 dark:text-orange-400"
+                class="h-full rounded-lg bg-transparent p-1.5 font-medium text-orange-600 dark:text-orange-300"
               >
                 <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
                   <path
@@ -46,20 +45,23 @@
               </div>
               <div>
                 <span
-                  class="rounded-lg border border-transparent py-1.5 text-xs font-medium text-orange-600 dark:text-orange-500"
+                  class="rounded-lg border border-transparent text-xs font-medium text-orange-600 dark:text-orange-400"
                   >{{ trace.error_name }}:</span
                 >
-                <span class="dark:text-stone-400">{{ trace.error_message }}</span>
+                <span class="dark:text-orange-50">{{ trace.error_message }}</span>
               </div>
             </div>
           </div>
-        </div>
+      </div>
+      </div>
       {% endif %}
       {% for collection in trace.frames %}
         {% set collection_loop=loop %}
         {% if collection.is_repeated %}
           {% with collection=collection %}
+            <div class="relative">
             {% include "__expanse__/_error/repeated_collection.jinja2" %}
+            </div>
           {% endwith %}
         {% elif collection.is_vendor %}
           {% with collection=collection %}
@@ -67,7 +69,7 @@
           {% endwith %}
         {% else %}
           <div
-            class="flex flex-col rounded-lg bg-white shadow-xs ring ring-stone-800/5 dark:bg-stone-800/80 dark:ring-stone-600/50 [&_>_div:last-child_hr]:hidden"
+            class="flex flex-col rounded-lg bg-white/80 shadow-xs ring ring-slate-800/5 dark:bg-slate-700/60 dark:ring-slate-500/50 [&_>_div:last-child_hr]:hidden"
           >
             {% for frame in collection.frames %}
               {% with frame=frame, open=trace_loop.index == 1 and collection_loop.index == 1 and loop.index == 1 %}
