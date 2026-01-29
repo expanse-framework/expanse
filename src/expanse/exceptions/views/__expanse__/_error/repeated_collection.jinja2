@@ -1,12 +1,12 @@
 <div
-  class="group my-2 rounded-lg border border-dashed border-stone-200 border-stone-300 bg-stone-100 opacity-90 dark:border-white/10 dark:bg-white/1"
+  class="absolute w-full -z-10 group rounded-lg shadow-xs border mt-2 border-dashed  border-slate-300 bg-slate-400/5 opacity-90 dark:border-white/10 dark:bg-white/1"
 >
-  <div class="flex h-11 items-center gap-3 rounded-lg pr-2.5 pl-2">
+  <div class="py-1 h-11 items-center gap-3 rounded-lg pr-2.5 pl-2">
     <div
-      class="flex flex-1 items-center gap-1 text-xs leading-3 text-stone-900 dark:text-stone-300"
+      class="flex flex-1 items-center gap-1 text-xs leading-3 text-slate-900 dark:text-slate-300"
     >
       <div
-        class="h-full rounded-lg bg-transparent p-1.5 font-medium text-stone-800 dark:border-stone-50/5 dark:bg-stone-100/10 dark:text-stone-50"
+        class="h-full rounded-lg bg-transparent p-1.5 font-medium text-slate-800 dark:text-slate-50"
       >
         <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
           <path
@@ -34,7 +34,7 @@
 </div>
 
 <div
-  class="flex flex-col rounded-lg bg-white shadow-xs ring ring-stone-800/5 dark:bg-stone-800/80 dark:ring-stone-600/50 [&_>_div:last-child_hr]:hidden"
+  class="flex flex-col mt-10 rounded-lg bg-white shadow-xs ring ring-slate-800/5 dark:bg-slate-800/80 dark:ring-slate-600/50 [&_>_div:last-child_hr]:hidden"
 >
   {% for frame in collection.frames %}
     {% with frame=frame, open=trace_loop.index == 1 and collection_loop.index == 1 and loop.index == 1 %}

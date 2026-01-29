@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-3">
-  <h2 class="text-lg font-semibold text-stone-900 dark:text-white">Headers</h2>
+  <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Headers</h2>
   <div class="flex flex-col">
     {% for key, value in headers.items() %}
       <div
@@ -7,20 +7,20 @@
         data-controller="tooltip"
         data-tooltip-placement="top"
       >
-        <div class="shrink-0 text-stone-500 uppercase dark:text-stone-400">{{ key }}</div>
+        <div class="shrink-0 text-slate-500 uppercase dark:text-slate-400">{{ key }}</div>
         <div
-          class="h-3 min-w-6 grow border-b-2 border-dotted border-stone-300 dark:border-white/20"
+          class="h-3 min-w-6 grow border-b-2 border-dotted border-slate-300 dark:border-white/20"
         ></div>
         <div
           class="group relative"
           data-action="mouseover->tooltip#show mouseout->tooltip#hide"
           data-tooltip-target="reference"
         >
-          <div class="truncate text-stone-900 dark:text-white">
+          <div class="truncate text-slate-900 dark:text-white">
             <span> {{ value }} </span>
           </div>
           <div
-            class="absolute top-0 left-0 hidden max-w-64 rounded-lg bg-stone-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg group-hover:block md:w-max md:max-w-none md:p-2 dark:border dark:border-stone-600 dark:bg-stone-700"
+            class="absolute top-0 left-0 hidden max-w-64 rounded-lg bg-slate-800 px-4 py-3 leading-4 text-white opacity-0 shadow-lg group-hover:block md:w-max md:max-w-none md:p-2 dark:border dark:border-slate-600 dark:bg-slate-700"
             data-tooltip-target="content"
           >
             {{ value }}

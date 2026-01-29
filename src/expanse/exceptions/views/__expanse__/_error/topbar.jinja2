@@ -1,5 +1,5 @@
 <div class="flex items-center justify-between">
-  <div class="flex h-[56px] items-center gap-2">
+  <div class="flex h-[4rem] items-center gap-2">
     <div class="flex items-center justify-center text-orange-500">
       <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
         <path
@@ -13,7 +13,23 @@
         />
       </svg>
     </div>
-    <div class="text-sm font-medium text-stone-900 dark:text-white">{{ error.title }}</div>
+    <div class="text-sm font-medium text-slate-900 dark:text-white">{{ error.title }}</div>
+  </div>
+  <div class="flex items-center gap-8">
+  <div class="flex gap-2">
+    <div
+      class="flex items-center gap-0.5"
+    >
+      <div class="flex h-6 items-center gap-1.5 px-[6px] text-[13px]">
+        <span class="text-slate-500 dark:text-slate-500">Expanse</span>
+        <span class="text-slate-600 dark:text-slate-300 font-mono">{{ expanse_version }}</span>
+      </div>
+      <div class="flex h-6 items-center gap-1.5 px-[6px] text-[13px]">
+        <span class="text-slate-500 dark:text-slate-400">Python</span>
+        <span class="text-slate-600 dark:text-slate-300 font-mono">{{ python_version }}</span>
+      </div>
+    </div>
   </div>
   {% include "__expanse__/_partials/dark_mode_switcher.jinja2" %}
+  </div>
 </div>

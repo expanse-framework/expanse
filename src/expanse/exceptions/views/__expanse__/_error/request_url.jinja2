@@ -1,6 +1,6 @@
 <div class="highlight">
-  <pre><code class="!p-0"><span class="n">{{ request.url.scheme }}</span><span class="p">://</span><span
-    class="n">{{ request.url.netloc }}</span><span class="s">{{ request.url.path }}</span>{% if request.url.query %}
-    <span class="p">?</span><span>{{ request.url.query }}</span>
+  <pre><code class="!p-0 !inline-flex"><span class="text-slate-500 dark:text-slate-400">{{ request.url.scheme }}</span><span class="text-slate-300 dark:text-slate-700">://</span><span
+    class="text-slate-500 dark:text-slate-400">{{ request.url.netloc }}</span><span class="text-slate-700 dark:text-slate-200">{{ request.url.path }}</span>{% if request.url.query %}
+    <span class="text-slate-300 dark:text-slate-700">?</span><span class="text-slate-500 dark:text-slate-400">{{ request.url.query }}</span>
   {% endif %}</code></pre>
 </div>

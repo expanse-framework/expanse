@@ -15,7 +15,7 @@
     </style>
   </head>
   <body
-    class="overflow-x-hidden bg-stone-50 font-sans antialiased dark:bg-stone-900 dark:text-white"
+    class="overflow-x-hidden bg-slate-50 font-sans antialiased dark:bg-slate-900 dark:text-white"
   >
     <div class="min-h-dvh">
       {% include "__expanse__/_partials/dark_mode.jinja2" %}
@@ -33,7 +33,7 @@
       {% endcall %}
 
       <div class="relative">
-        {{ separator(class="absolute top-5") }}
+        {{ separator(class="absolute top-[calc(var(--spacing)*5.5)]") }}
         {% call section(class="flex flex-col gap-8 py-0 sm:py-0") %}
           {% include "__expanse__/_error/request.jinja2" %}
         {% endcall %}
@@ -58,7 +58,9 @@
       {{ separator() }}
 
       {% call section(class="pb-0") %}
-        {% include "__expanse__/_error/footer.jinja2" %}
+        {% with route=error.request.route %}
+          {% include "__expanse__/_error/footer.jinja2" %}
+        {% endwith %}
       {% endcall %}
     </div>
 
