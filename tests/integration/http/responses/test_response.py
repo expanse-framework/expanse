@@ -6,9 +6,11 @@ from expanse.testing.client import TestClient
 def test_simple_response(router: Registrar, client: TestClient) -> None:
     router.get(
         "/test",
-        lambda: Response("Hello, World!")
-        .with_header("X-foo", "bar")
-        .with_cookie("cookie_name", "cookie_value"),
+        lambda: (
+            Response("Hello, World!")
+            .with_header("X-foo", "bar")
+            .with_cookie("cookie_name", "cookie_value")
+        ),
     )
     response = client.get("/test")
     assert response.status_code == 200
