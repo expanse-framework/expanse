@@ -27,6 +27,7 @@ from expanse.container.exceptions import ResolutionException
 from expanse.container.exceptions import UnboundAbstractException
 from expanse.support._concurrency import AsyncRLock
 from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import should_run_in_threadpool
 from expanse.support._utils import eval_type_lenient
 from expanse.support._utils import string_to_class
 
@@ -188,10 +189,13 @@ class Container:
         if is_class:
             return concrete(*positional, **keywords), None
 
-        if not asyncio.iscoroutinefunction(concrete):
-            return await run_in_threadpool(concrete, *positional, **keywords), None
+        if asyncio.iscoroutinefunction(concrete):
+            return await concrete(*positional, **keywords), None
 
-        return await concrete(*positional, **keywords), None
+        if not should_run_in_threadpool(concrete):
+            return concrete(*positional, **keywords), None
+
+        return await run_in_threadpool(concrete, *positional, **keywords), None
 
     @overload
     async def get(self, abstract: type[T]) -> T: ...
@@ -222,6 +226,9 @@ class Container:
 
         if asyncio.iscoroutinefunction(callable_):
             return await callable_(*positional, **keywords)
+
+        if not should_run_in_threadpool(callable_):
+            return callable_(*positional, **keywords)
 
         return await run_in_threadpool(callable_, *positional, **keywords)
 

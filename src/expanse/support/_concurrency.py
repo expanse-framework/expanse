@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
 from contextvars import copy_context
+from typing import Any
 from typing import ParamSpec
 from typing import TypeVar
 
@@ -32,6 +33,15 @@ def _restore_context(context: Context) -> None:
         except LookupError:
             # the context variable was first set inside `context`
             cvar.set(new_val)
+
+
+def should_run_in_threadpool(func: Callable[..., Any]) -> bool:
+    is_async_safe: bool | None = getattr(func, "is_async_safe", None)
+
+    if is_async_safe is None:
+        is_async_safe = True
+
+    return not is_async_safe
 
 
 async def run_in_threadpool(
