@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
 
 from typing import TYPE_CHECKING
 from typing import Self
@@ -314,7 +314,7 @@ class Response:
         Runs all deferred functions after the response has been sent.
         """
         for func in self._deferred:
-            if asyncio.iscoroutinefunction(func):
+            if inspect.iscoroutinefunction(func):
                 await func()
             elif not should_run_in_threadpool(func):
                 func()

@@ -1,4 +1,3 @@
-import asyncio
 import builtins
 import collections
 import inspect
@@ -189,7 +188,7 @@ class Container:
         if is_class:
             return concrete(*positional, **keywords), None
 
-        if asyncio.iscoroutinefunction(concrete):
+        if inspect.iscoroutinefunction(concrete):
             return await concrete(*positional, **keywords), None
 
         if not should_run_in_threadpool(concrete):
@@ -224,7 +223,7 @@ class Container:
             keywords,
         ) = await self._resolve_callable_dependencies(callable_, *args, **kwargs)
 
-        if asyncio.iscoroutinefunction(callable_):
+        if inspect.iscoroutinefunction(callable_):
             return await callable_(*positional, **keywords)
 
         if not should_run_in_threadpool(callable_):

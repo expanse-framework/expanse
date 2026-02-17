@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 
 from typing import TYPE_CHECKING
@@ -83,7 +82,7 @@ class Command:
 
         try:
             if not self._container:
-                if asyncio.iscoroutinefunction(handle):
+                if inspect.iscoroutinefunction(handle):
                     return await handle()
 
                 if not should_run_in_threadpool(handle):
