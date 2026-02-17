@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 import pytest
 
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
 from expanse.contracts.routing.router import Router as RouterContract
@@ -39,7 +40,7 @@ def container(encryptor: Encryptor) -> Container:
 
 @pytest.fixture
 def router() -> RouterContract:
-    return Router()
+    return Router(Config({}))
 
 
 @pytest.fixture

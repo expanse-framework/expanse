@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 
 from typing import TYPE_CHECKING
@@ -16,6 +15,7 @@ from cleo.io.null_io import NullIO
 from cleo.io.outputs.output import Verbosity
 
 from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import should_run_in_threadpool
 
 
 if TYPE_CHECKING:
@@ -82,8 +82,11 @@ class Command:
 
         try:
             if not self._container:
-                if asyncio.iscoroutinefunction(handle):
+                if inspect.iscoroutinefunction(handle):
                     return await handle()
+
+                if not should_run_in_threadpool(handle):
+                    return handle()
 
                 return await run_in_threadpool(handle)
 

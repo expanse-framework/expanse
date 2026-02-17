@@ -10,6 +10,7 @@ from typing import get_origin
 
 from pydantic import BaseModel
 
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.routing.route_collection import RouteCollection
 from expanse.contracts.routing.router import Router as RouterContract
@@ -25,6 +26,8 @@ from expanse.routing.pipeline import Pipeline
 from expanse.routing.route import Route
 from expanse.routing.route_group import RouteGroup
 from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import warn_about_implicit_async_safe_status
 from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
 
@@ -34,8 +37,9 @@ if TYPE_CHECKING:
 
 
 class Router(RouterContract):
-    def __init__(self) -> None:
-        self._finder = Finder()
+    def __init__(self, config: Config) -> None:
+        self._config: Config = config
+        self._finder: Finder = Finder()
         self._middleware_groups: dict[str, list[type[Middleware]]] = {}
 
     @property
@@ -193,6 +197,10 @@ class Router(RouterContract):
 
             if route.is_async:
                 raw_response = await endpoint(*positional, **keywords)
+            elif not should_run_in_threadpool(endpoint):
+                warn_about_implicit_async_safe_status(endpoint, self._config)
+
+                raw_response = endpoint(*positional, **keywords)
             else:
                 raw_response = await run_in_threadpool(
                     endpoint, *positional, **keywords

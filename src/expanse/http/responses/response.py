@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
 
 from typing import TYPE_CHECKING
 from typing import Self
@@ -11,6 +11,7 @@ from expanse.http.cookie import Cookie
 from expanse.http.cookie import SameSite
 from expanse.http.response_header_bag import ResponseHeaderBag
 from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import should_run_in_threadpool
 
 
 if TYPE_CHECKING:
@@ -313,7 +314,9 @@ class Response:
         Runs all deferred functions after the response has been sent.
         """
         for func in self._deferred:
-            if asyncio.iscoroutinefunction(func):
+            if inspect.iscoroutinefunction(func):
                 await func()
+            elif not should_run_in_threadpool(func):
+                func()
             else:
                 await run_in_threadpool(func)
