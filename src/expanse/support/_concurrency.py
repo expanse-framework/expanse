@@ -10,11 +10,16 @@ from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
 from contextvars import copy_context
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import ParamSpec
 from typing import TypeVar
 
 import anyio.to_thread
+
+
+if TYPE_CHECKING:
+    from expanse.configuration.config import Config
 
 
 P = ParamSpec("P")
@@ -42,6 +47,24 @@ def should_run_in_threadpool(func: Callable[..., Any]) -> bool:
         is_async_safe = True
 
     return not is_async_safe
+
+
+def warn_about_implicit_async_safe_status(
+    func: Callable[..., Any], config: Config
+) -> None:
+    if not hasattr(func, "is_async_safe") and config.get(
+        "app.warn_implicit_async_safe", True
+    ):
+        import warnings
+
+        warnings.warn(
+            f"Synchronous function {func} is not explicitly declared"
+            + " as safe to run as-is in an asynchronous context. "
+            + "Use @async_safe() or @async_safe(False)."
+            + "You can silence this warning globally by setting"
+            + "the `APP_WARN_IMPLICIT_ASYNC_SAFE` environment variable to `false`.",
+            stacklevel=3,
+        )
 
 
 async def run_in_threadpool(

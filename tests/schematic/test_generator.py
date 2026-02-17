@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from expanse.configuration.config import Config
 from expanse.core.application import Application
 from expanse.routing.router import Router
 from expanse.schematic.generator import Generator
@@ -27,7 +28,7 @@ async def test_generated_schema(unbootstrapped_app: Application, fixture: str) -
     container = unbootstrapped_app.container
     route_file = Path(__file__).parent / "fixtures" / fixture / "routes.py"
     schema_file = Path(__file__).parent / "fixtures" / fixture / "schema.json"
-    router = Router()
+    router = Router(Config({}))
     with router.group("api", prefix="/api") as group:
         group.load_file(route_file)
 
