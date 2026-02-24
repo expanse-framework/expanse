@@ -48,26 +48,16 @@ class ConsoleFormatter(logging.Formatter):
         log_message = super().format(record)
         width = min(self._terminal.width, 80)
         level = record.levelname
-        time = pendulum.from_timestamp(record.created, tz="local").format("HH:mm:ss")
+        time = pendulum.from_timestamp(record.created, tz="local").format(
+            "HH:mm:ss.SSS"
+        )
         lines = []
         lines.append(
             "".join(
                 [
-                    f"<options=dark>{self._top_left_marker}</>",
-                    f" <options=dark>{time}</> <fg={self.COLORS[level]}>{level}</> ",
-                    f"<options=dark>{(width - len(level) - len(time) - 1 - 4) * '─'}</>",
-                    f"<options=dark>{self._top_right_marker}</>",
+                    f"<fg={self.COLORS[level]}>⦿︎</> <options=dark>{time}</> <fg={self.COLORS[level]}>{level}</> - {log_message}",
                 ]
             )
-        )
-        lines.append(
-            f"<options=dark>{self._vertical_marker}</>"
-            f" {log_message} "
-            f"{' ' * (width - len(log_message) - 4)}"
-            f"<options=dark>{self._vertical_marker}</>"
-        )
-        lines.append(
-            f"<options=dark>{self._bottom_left_marker}{(width - 2) * '─'}{self._bottom_right_marker}</>"
         )
 
         if exception:
