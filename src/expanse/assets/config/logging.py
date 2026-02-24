@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pydantic import Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -30,4 +31,20 @@ class Config(BaseSettings):
         }
     )
 
+    routing: dict[str, list[str]] = Field(default_factory=dict)
+
     model_config = SettingsConfigDict(env_prefix="LOG_", env_nested_delimiter="__")
+
+    @field_validator("routing", mode="before")
+    @classmethod
+    def decode_proxies(
+        cls, v: dict[str, str] | dict[str, list[str]]
+    ) -> dict[str, list[str]]:
+        new_v: dict[str, list[str]] = {}
+        for key, value in v.items():
+            if isinstance(value, str):
+                new_v[key] = [v.strip() for v in value.split(",")]
+            else:
+                new_v[key] = value
+
+        return new_v

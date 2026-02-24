@@ -19,6 +19,7 @@ class Logger:
     def __init__(self, app: Application) -> None:
         self._app: Application = app
         self._channels: dict[str, LogChannel] = {}
+        self._routing: dict[str, list[LogChannel]] = {}
         self._config: dict[str, Any] = self._app.config.get("logging", {})
 
     def channel(self, name: str | None = None) -> LogChannel:
@@ -62,23 +63,74 @@ class Logger:
         for channel in self._channels.values():
             channel.stop()
 
-    def _create_channel(self, config: ChannelConfig, channel_name: str) -> LogChannel:
+        for channels in self._routing.values():
+            for channel in channels:
+                channel.stop()
+
+    def route_base_logger(self, logger_name: str) -> list[LogChannel]:
+        if logger_name in self._routing:
+            return self._routing[logger_name]
+
+        if logger_name not in self._config.get("routing", {}):
+            raise RuntimeError(
+                f"Log routing for logger '{logger_name}' is not defined."
+            )
+
+        channel_names = self._config["routing"][logger_name]
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.DEBUG)
+        minimum_level = logger.level
+        configs = {}
+        for channel_name in channel_names:
+            chanel_config = ChannelConfig.model_validate(
+                self._config["channels"][channel_name]
+            )
+            configs[channel_name] = chanel_config
+            minimum_level = min(
+                minimum_level, getattr(logging, chanel_config.root.level)
+            )
+
+        logger.setLevel(minimum_level)
+
+        for channel_name, chanel_config in configs.items():
+            channel = self._create_channel(
+                chanel_config, channel_name, base_logger=logger
+            )
+            self._routing.setdefault(logger_name, []).append(channel)
+
+        return self._routing[logger_name]
+
+    def _create_channel(
+        self,
+        config: ChannelConfig,
+        channel_name: str,
+        base_logger: logging.Logger | None = None,
+    ) -> LogChannel:
         match config.root:
             case StreamConfig():
-                channel = self._create_stream_channel(config.root, channel_name)
+                channel = self._create_stream_channel(
+                    config.root, channel_name, base_logger=base_logger
+                )
             case ConsoleConfig():
-                channel = self._create_console_channel(config.root, channel_name)
+                channel = self._create_console_channel(
+                    config.root, channel_name, base_logger=base_logger
+                )
             case FileConfig():
-                channel = self._create_file_channel(config.root, channel_name)
+                channel = self._create_file_channel(
+                    config.root, channel_name, base_logger=base_logger
+                )
             case GroupConfig():
                 channel = self._create_group_channel(config.root)
 
         return channel
 
     def _create_stream_channel(
-        self, config: StreamConfig, channel_name: str
+        self,
+        config: StreamConfig,
+        channel_name: str,
+        base_logger: logging.Logger | None = None,
     ) -> LogChannel:
-        logger = self._create_base_logger(config, channel_name)
+        logger = base_logger or self._create_base_logger(config, channel_name)
 
         stream = config.stream
 
@@ -97,19 +149,27 @@ class Logger:
         return SimpleLogChannel(logger, [handler]).start()
 
     def _create_console_channel(
-        self, config: ConsoleConfig, channel_name: str
+        self,
+        config: ConsoleConfig,
+        channel_name: str,
+        base_logger: logging.Logger | None = None,
     ) -> LogChannel:
         from expanse.logging.formatters.console import ConsoleFormatter
 
-        logger = self._create_base_logger(config, channel_name)
+        logger = base_logger or self._create_base_logger(config, channel_name)
 
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(ConsoleFormatter())
 
         return SimpleLogChannel(logger, [handler], preserve_exception_info=True).start()
 
-    def _create_file_channel(self, config: FileConfig, channel_name: str) -> LogChannel:
-        logger = self._create_base_logger(config, channel_name)
+    def _create_file_channel(
+        self,
+        config: FileConfig,
+        channel_name: str,
+        base_logger: logging.Logger | None = None,
+    ) -> LogChannel:
+        logger = base_logger or self._create_base_logger(config, channel_name)
 
         path = config.path
         if not path.is_absolute():
