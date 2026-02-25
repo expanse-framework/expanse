@@ -158,7 +158,7 @@ class Logger:
 
         logger = base_logger or self._create_base_logger(config, channel_name)
 
-        handler = logging.StreamHandler(sys.stdout)
+        handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(ConsoleFormatter())
 
         return SimpleLogChannel(logger, [handler], preserve_exception_info=True).start()

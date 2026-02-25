@@ -6,7 +6,9 @@ from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
 from expanse.logging.config import ChannelConfig
+from expanse.logging.config import ConsoleConfig
 from expanse.logging.config import FileConfig
+from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
 
 
@@ -26,7 +28,9 @@ class Config(BaseSettings):
     # >>> DB_CONNECTIONS__STREAM__LEVEL=INFO
     channels: dict[str, ChannelConfig] = Field(
         default_factory=lambda: {
-            "stream": StreamConfig(stream="stdout"),
+            "group": GroupConfig(channels=["console", "file"]),
+            "console": ConsoleConfig(),
+            "stream": StreamConfig(stream="stderr"),
             "file": FileConfig(path=Path("log/app.log")),
         }
     )
