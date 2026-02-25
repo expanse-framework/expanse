@@ -17,7 +17,7 @@ class BaseConfig(BaseSettings):
 class StreamConfig(BaseConfig):
     driver: Literal["stream"] = "stream"
 
-    stream: str = "stdout"
+    stream: str = "stderr"
 
 
 class ConsoleConfig(BaseConfig):
