@@ -19,20 +19,27 @@ class PreservingQueueHandler(QueueHandler):
 
     def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
         """
-        Prepare a record for queuing while preserving exc_info.
+        Prepare a record for queuing while preserving exc_info, msg and args.
 
-        The default QueueHandler.prepare() converts exc_info to a string,
-        but we need the actual exception object for custom formatting.
+        The default QueueHandler.prepare() merges msg and args into a single
+        formatted string, but we need the original msg template and args
+        so that the ConsoleFormatter can colorize individual arguments.
         """
         record = logging.makeLogRecord(record.__dict__)
 
         exc_info = record.exc_info
         record.exc_info = None
 
+        args = record.args
+        msg = record.msg
+
         record = super().prepare(record)
 
         if exc_info:
             record.exc_info = exc_info
+
+        record.args = args
+        record.msg = msg
 
         return record
 
