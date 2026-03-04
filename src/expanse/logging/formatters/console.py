@@ -15,12 +15,12 @@ from cleo.ui.exception_trace import ExceptionTrace
 
 class ConsoleFormatter(logging.Formatter):
     COLORS: ClassVar[dict[str, str]] = {
-        "DEBUG": "#5f5fff",
-        "INFO": "#5fffd7",
-        "WARNING": "#d7ff87",
-        "ERROR": "#ff5f87",
-        "CRITICAL": "#af5fd7",
-        "Exception": "#ff5f87",
+        "DEBUG": "#5f87ff",
+        "INFO": "#5fd7ff",
+        "WARNING": "#ffd700",
+        "ERROR": "#ff5f5f",
+        "CRITICAL": "#d75fff",
+        "Exception": "#ff5f5f",
     }
 
     def __init__(
@@ -62,7 +62,7 @@ class ConsoleFormatter(logging.Formatter):
         lines.append(
             "".join(
                 [
-                    f"<options=dark>{time}</> <fg={self.COLORS[level]}>{level[:4]}</> {log_message}",
+                    f"<options=dark>{time}</> <fg={self.COLORS[level]};options=bold>{level[:4]}</> {log_message}",
                 ]
             )
         )
