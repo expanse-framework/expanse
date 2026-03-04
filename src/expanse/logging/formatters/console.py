@@ -1,5 +1,6 @@
 import logging
 
+from collections.abc import Mapping
 from typing import ClassVar
 from typing import Literal
 
@@ -14,12 +15,12 @@ from cleo.ui.exception_trace import ExceptionTrace
 
 class ConsoleFormatter(logging.Formatter):
     COLORS: ClassVar[dict[str, str]] = {
-        "DEBUG": "cyan",
-        "INFO": "green",
-        "WARNING": "yellow",
-        "ERROR": "red",
-        "CRITICAL": "red",
-        "Exception": "red",
+        "DEBUG": "#5f5fff",
+        "INFO": "#5fffd7",
+        "WARNING": "#d7ff87",
+        "ERROR": "#ff5f87",
+        "CRITICAL": "#af5fd7",
+        "Exception": "#ff5f87",
     }
 
     def __init__(
@@ -45,17 +46,23 @@ class ConsoleFormatter(logging.Formatter):
             exception = record.exc_info[1]
             record.exc_info = None
 
-        log_message = super().format(record)
-        width = min(self._terminal.width, 80)
+        args = record.args
+        if isinstance(args, Mapping):
+            for arg_name, arg_value in args.items():
+                args[arg_name] = f"<fg=blue>{arg_value}</>"
+        elif args:
+            args = tuple(f"<options=bold>{arg_value}</>" for arg_value in args)
+        else:
+            args = ()
+
+        log_message = record.msg % args
         level = record.levelname
-        time = pendulum.from_timestamp(record.created, tz="local").format(
-            "HH:mm:ss.SSS"
-        )
+        time = pendulum.from_timestamp(record.created, tz="local").format("HH:mm:ss")
         lines = []
         lines.append(
             "".join(
                 [
-                    f"<fg={self.COLORS[level]}>⦿︎</> <options=dark>{time}</> <fg={self.COLORS[level]}>{level}</> - {log_message}",
+                    f"<options=dark>{time}</> <fg={self.COLORS[level]}>{level[:4]}</> {log_message}",
                 ]
             )
         )
