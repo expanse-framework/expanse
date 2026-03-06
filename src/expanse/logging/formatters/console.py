@@ -13,6 +13,33 @@ from cleo.terminal import Terminal
 from cleo.ui.exception_trace import ExceptionTrace
 
 
+RESERVED_ATTRS: set[str] = {
+    "args",
+    "asctime",
+    "created",
+    "exc_info",
+    "exc_text",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "module",
+    "msecs",
+    "message",
+    "msg",
+    "name",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "thread",
+    "threadName",
+    "taskName",
+}
+
+
 class ConsoleFormatter(logging.Formatter):
     COLORS: ClassVar[dict[str, str]] = {
         "DEBUG": "#5f87ff",
@@ -55,7 +82,7 @@ class ConsoleFormatter(logging.Formatter):
         else:
             args = ()
 
-        log_message = record.msg % args
+        log_message = str(record.msg) % args
         level = record.levelname
         time = pendulum.from_timestamp(record.created, tz="local").format("HH:mm:ss")
         lines = []
@@ -66,6 +93,10 @@ class ConsoleFormatter(logging.Formatter):
                 ]
             )
         )
+
+        extra = {k: v for k, v in record.__dict__.items() if k not in RESERVED_ATTRS}
+        if extra:
+            lines.extend([f"  <options=bold>{k}</>: {v}" for k, v in extra.items()])
 
         if exception:
             output = BufferedOutput(decorated=True)
