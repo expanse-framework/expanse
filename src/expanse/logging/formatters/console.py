@@ -75,8 +75,10 @@ class ConsoleFormatter(logging.Formatter):
 
         args = record.args
         if isinstance(args, Mapping):
-            for arg_name, arg_value in args.items():
-                args[arg_name] = f"<fg=blue>{arg_value}</>"
+            args = {
+                arg_name: f"<fg=blue>{arg_value}</>"
+                for arg_name, arg_value in args.items()
+            }
         elif args:
             args = tuple(f"<options=bold>{arg_value}</>" for arg_value in args)
         else:
@@ -98,7 +100,7 @@ class ConsoleFormatter(logging.Formatter):
         if extra:
             lines.extend([f"  <options=bold>{k}</>: {v}" for k, v in extra.items()])
 
-        if exception:
+        if exception and isinstance(exception, Exception):
             output = BufferedOutput(decorated=True)
             output.set_verbosity(Verbosity.VERY_VERBOSE)
             trace = ExceptionTrace(exception)

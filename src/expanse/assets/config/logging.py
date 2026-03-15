@@ -28,10 +28,10 @@ class Config(BaseSettings):
     # >>> DB_CONNECTIONS__STREAM__LEVEL=INFO
     channels: dict[str, ChannelConfig] = Field(
         default_factory=lambda: {
-            "group": GroupConfig(channels=["console", "file"]),
-            "console": ConsoleConfig(),
-            "stream": StreamConfig(stream="stderr"),
-            "file": FileConfig(path=Path("log/app.log")),
+            "group": ChannelConfig(root=GroupConfig(channels=["console", "file"])),
+            "console": ChannelConfig(root=ConsoleConfig()),
+            "stream": ChannelConfig(root=StreamConfig(stream="stderr")),
+            "file": ChannelConfig(root=FileConfig(path=Path("log/app.log"))),
         }
     )
 
