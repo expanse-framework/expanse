@@ -44,7 +44,7 @@ class GroupConfig(BaseConfig):
         return [v.strip() for v in v.split(",")]
 
 
-class ChannelConfig(RootModel[StreamConfig | ConsoleConfig | FileConfig]):
+class ChannelConfig(RootModel[StreamConfig | ConsoleConfig | FileConfig | GroupConfig]):
     root: Annotated[
         StreamConfig | ConsoleConfig | FileConfig | GroupConfig,
         Field(discriminator="driver"),
