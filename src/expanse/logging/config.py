@@ -1,8 +1,11 @@
+from collections.abc import Callable
+from logging import LogRecord
 from pathlib import Path
 from typing import Annotated
 from typing import Literal
 
 from pydantic import Field
+from pydantic import ImportString
 from pydantic import RootModel
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -12,6 +15,9 @@ class BaseConfig(BaseSettings):
     enabled: bool = True
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     formatter: str | None = None
+    processors: list[ImportString | Callable[[LogRecord], LogRecord]] = Field(
+        default_factory=list
+    )
 
 
 class StreamConfig(BaseConfig):
