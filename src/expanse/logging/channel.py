@@ -2,11 +2,28 @@ import logging
 
 from abc import ABC
 from abc import abstractmethod
-from logging.handlers import QueueHandler
+from collections.abc import Callable
+from logging.handlers import QueueHandler as BaseQueueHandler
 from logging.handlers import QueueListener
 from queue import Queue
 from typing import Any
 from typing import Self
+
+
+class QueueHandler(BaseQueueHandler):
+    """
+    A simple extension of logging.handlers.QueueHandler that allows for
+    custom preparation of log records before they are enqueued.
+    """
+
+    def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
+        """
+        Prepare a record for queuing.
+
+        This copies the record to ensure that any modifications
+        made by handlers or processors are scoped to a specific channel.
+        """
+        return logging.makeLogRecord(record.__dict__)
 
 
 class PreservingQueueHandler(QueueHandler):
@@ -16,32 +33,6 @@ class PreservingQueueHandler(QueueHandler):
     This is mainly useful for the Console formatter that needs the actual
     exception object to format tracebacks properly.
     """
-
-    def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
-        """
-        Prepare a record for queuing while preserving exc_info, msg and args.
-
-        The default QueueHandler.prepare() merges msg and args into a single
-        formatted string, but we need the original msg template and args
-        so that the ConsoleFormatter can colorize individual arguments.
-        """
-        record = logging.makeLogRecord(record.__dict__)
-
-        exc_info = record.exc_info
-        record.exc_info = None
-
-        args = record.args
-        msg = record.msg
-
-        record = super().prepare(record)
-
-        if exc_info:
-            record.exc_info = exc_info
-
-        record.args = args
-        record.msg = msg
-
-        return record
 
 
 class LogChannel(ABC):
@@ -77,6 +68,7 @@ class SimpleLogChannel(LogChannel):
         self,
         logger: logging.Logger,
         handlers: list[logging.Handler],
+        processors: Callable[[logging.LogRecord], logging.LogRecord] | None = None,
         preserve_exception_info: bool = False,
     ) -> None:
         self._logger: logging.Logger = logger

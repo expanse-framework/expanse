@@ -233,11 +233,13 @@ class Application:
         self._container.singleton(ExceptionHandlerContract, ExceptionHandler)
 
     async def _register_base_service_providers(self) -> None:
+        from expanse.context.context_service_provider import ContextServiceProvider
         from expanse.http.http_service_provider import HTTPServiceProvider
         from expanse.routing.routing_service_provider import RoutingServiceProvider
 
         await self.register(HTTPServiceProvider(self._container))
         await self.register(RoutingServiceProvider(self._container))
+        await self.register(ContextServiceProvider(self._container))
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
