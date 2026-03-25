@@ -10,6 +10,7 @@ from expanse.messenger.asynchronous.message_bus import MessageBus
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 
 
@@ -47,8 +48,17 @@ def transport_manager(
 
 
 @pytest.fixture()
-def bus(container: Container, transport_manager: TransportManager) -> MessageBus:
-    return MessageBus(transport_manager, container)
+def middleware_stack() -> MiddlewareStack:
+    return MiddlewareStack()
+
+
+@pytest.fixture()
+def bus(
+    container: Container,
+    transport_manager: TransportManager,
+    middleware_stack: MiddlewareStack,
+) -> MessageBus:
+    return MessageBus(transport_manager, container, middleware_stack)
 
 
 @dataclass
@@ -74,7 +84,9 @@ async def test_dispatching_messages_calls_transport(
     )
 
 
-async def test_dispatching_messages_calls_middleware(bus: MessageBus) -> None:
+async def test_dispatching_messages_calls_middleware(
+    bus: MessageBus, middleware_stack: MiddlewareStack
+) -> None:
     @dataclass
     class BeforeStamp:
         value: str
@@ -93,7 +105,7 @@ async def test_dispatching_messages_calls_middleware(bus: MessageBus) -> None:
 
             return result.with_stamps(AfterStamp(value="after"))
 
-    bus.append_middleware(MyMiddleware)
+    middleware_stack.append(MyMiddleware)
 
     message = MyMessage(foo="baz")
     envelope = await bus.dispatch(message)
