@@ -30,7 +30,7 @@ class MessageBus(MessageBusContract):
         :param message: The message, or envelope, to dispatch.
         """
         envelope = Envelope.wrap(message)
-        transport = self._transport_manager.transport()
+        transport = await self._transport_manager.transport()
 
         pipeline = Pipeline[Envelope, Envelope]()
 

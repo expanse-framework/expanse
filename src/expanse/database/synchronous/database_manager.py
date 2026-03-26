@@ -63,6 +63,16 @@ class DatabaseManager:
 
         return self._engines[name]
 
+    def dispose(self) -> None:
+        """
+        Dispose of all database engines (and associated connection pools) and clear the engine and factory caches.
+        """
+        for engine in self._engines.values():
+            engine.dispose()
+
+        self._engines.clear()
+        self._factories.clear()
+
     def _create_engine(self, raw_config: dict[str, Any]) -> Engine:
         config = DatabaseConfig.model_validate(raw_config).root
 

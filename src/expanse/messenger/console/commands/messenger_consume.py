@@ -1,3 +1,6 @@
+import asyncio
+import signal
+
 from typing import ClassVar
 
 from cleo.helpers import argument
@@ -25,13 +28,17 @@ class MessengerConsumeCommand(Command):
     async def handle(self, worker: Worker) -> None:
         transport_name: str | None = self.argument("transport")
 
-        # Register a shutdown handler to gracefully stop the worker on termination signals
-        self._register_shutdown_handler(worker)
+        loop = asyncio.get_running_loop()
+
+        def _shutdown() -> None:
+            worker.stop()
+
+            # Remove custom handlers so that a subsequent signal
+            # falls back to default behavior (KeyboardInterrupt / termination).
+            loop.remove_signal_handler(signal.SIGINT)
+            loop.remove_signal_handler(signal.SIGTERM)
+
+        loop.add_signal_handler(signal.SIGINT, _shutdown)
+        loop.add_signal_handler(signal.SIGTERM, _shutdown)
 
         await worker.run(transport_name=transport_name)
-
-    def _register_shutdown_handler(self, worker: Worker) -> None:
-        import signal
-
-        signal.signal(signal.SIGINT, lambda sig, frame: worker.stop())
-        signal.signal(signal.SIGTERM, lambda sig, frame: worker.stop())
