@@ -3,6 +3,7 @@ import json
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.asynchronous.transports.database.connection import Connection
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
@@ -52,7 +53,12 @@ class DatabaseTransport:
     async def acknowledge(self, envelope: Envelope) -> None:
         message_id_stamp = envelope.stamp(TransportMessageIdStamp)
         if message_id_stamp is None:
-            raise ValueError(
+            # If, for some reason, the message doesn't have a TransportMessageIdStamp,
+            # we cannot acknowledge it, meaning the message is unprocessable.
+            # We notify the worker of this by raising an UnrecoverableMessageHandlingError,
+            # which will cause the worker to reject the message without retrying it,
+            # and optionally send it to a failure transport if one is configured.
+            raise UnrecoverableMessageHandlingError(
                 "Cannot acknowledge an envelope without a TransportMessageIdStamp"
             )
 
@@ -61,7 +67,12 @@ class DatabaseTransport:
     async def reject(self, envelope: Envelope) -> None:
         message_id_stamp = envelope.stamp(TransportMessageIdStamp)
         if message_id_stamp is None:
-            raise ValueError(
+            # If, for some reason, the message doesn't have a TransportMessageIdStamp,
+            # we cannot reject it, meaning the message is unprocessable.
+            # We notify the worker of this by raising an UnrecoverableMessageHandlingError,
+            # which will cause the worker to reject the message without retrying it,
+            # and optionally send it to a failure transport if one is configured.
+            raise UnrecoverableMessageHandlingError(
                 "Cannot reject an envelope without a TransportMessageIdStamp"
             )
 

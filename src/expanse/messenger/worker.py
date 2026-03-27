@@ -2,7 +2,6 @@ import asyncio
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.contracts.messenger.asynchronous.transport import Transport
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
@@ -114,34 +113,6 @@ class Worker:
                 continue
 
             await transport.acknowledge(envelope)
-
-    async def _receive_or_stop(self, transport: Transport) -> Envelope | None:
-        """
-        Receive the next message from the transport, or return None if
-        a stop signal was received or no messages are available.
-
-        The receive call is not cancelled on stop: transport I/O (e.g. a
-        database query) may not respond to cancellation cleanly, which would
-        block shutdown.  Instead, the (fast) receive is allowed to complete
-        and the stop event is checked afterwards.
-        """
-        if self._stop_event.is_set():
-            return None
-
-        envelope = await transport.receive()
-
-        if envelope is None:
-            if not self._stop_event.is_set():
-                # No messages available — wait briefly before polling again,
-                # but return immediately if a stop signal arrives.
-                try:
-                    await asyncio.wait_for(self._stop_event.wait(), timeout=1.0)
-                except TimeoutError:
-                    pass
-
-            return None
-
-        return envelope
 
     def stop(self) -> None:
         """

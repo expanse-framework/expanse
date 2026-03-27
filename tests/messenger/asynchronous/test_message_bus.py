@@ -72,7 +72,7 @@ async def test_dispatching_messages_calls_transport(
     message = MyMessage(foo="bar")
     await bus.dispatch(message)
 
-    transport = transport_manager.transport("memory")
+    transport = await transport_manager.transport("memory")
     assert isinstance(transport, MemoryTransport), (
         "Expected transport to be a MemoryTransport"
     )

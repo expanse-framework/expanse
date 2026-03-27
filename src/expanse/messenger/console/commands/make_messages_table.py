@@ -3,6 +3,7 @@ from typing import Literal
 
 from cleo.helpers import option
 from cleo.io.inputs.option import Option
+from sqlalchemy.dialects.mysql import DATETIME
 
 from expanse.console.commands.command import Command
 from expanse.database.migration.migrator import Migrator
@@ -55,13 +56,24 @@ class MakeMessagesTableCommand(Command):
             headers: Mapped[str] = column(Text(), nullable=False)
             queue_name: Mapped[str] = column(String(255), nullable=False, index=True)
             created_at: Mapped[datetime] = column(
-                DateTime(timezone=True), nullable=False
+                DateTime(timezone=True).with_variant(
+                    DATETIME(timezone=True, fsp=6), "mysql"
+                ),
+                nullable=False,
             )
             available_at: Mapped[datetime] = column(
-                DateTime(timezone=True), nullable=False, index=True
+                DateTime(timezone=True).with_variant(
+                    DATETIME(timezone=True, fsp=6), "mysql"
+                ),
+                nullable=False,
+                index=True,
             )
             delivered_at: Mapped[datetime] = column(
-                DateTime(timezone=True), nullable=True, index=True
+                DateTime(timezone=True).with_variant(
+                    DATETIME(timezone=True, fsp=6), "mysql"
+                ),
+                nullable=True,
+                index=True,
             )
 
         migrator.config.attributes["include_name"] = self.include_name
@@ -72,13 +84,6 @@ class MakeMessagesTableCommand(Command):
         )
 
         return 0
-
-    def _load_models(self) -> None:
-        from expanse.messenger.asynchronous.transports.database.models.message import (
-            Message,
-        )
-
-        Message.__tablename__ = self.option("table-name")
 
     def include_name(
         self,

@@ -67,21 +67,27 @@ def bus(async_bus: AsyncMessageBus) -> MessageBus:
     return MessageBus(async_bus)
 
 
+@pytest.fixture()
+async def transport(
+    transport_manager: TransportManager,
+) -> MemoryTransport:
+    transport = await transport_manager.transport("memory")
+
+    assert isinstance(transport, MemoryTransport)
+
+    return transport
+
+
 @dataclass
 class MyMessage:
     foo: str
 
 
 def test_dispatching_messages_calls_transport(
-    bus: MessageBus, transport_manager: TransportManager
+    bus: MessageBus, transport: MemoryTransport
 ) -> None:
     message = MyMessage(foo="bar")
     bus.dispatch(message)
-
-    transport = transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport), (
-        "Expected transport to be a MemoryTransport"
-    )
 
     sent_envelopes = transport.sent
     assert len(sent_envelopes) == 1, "Expected exactly one envelope to be sent"
