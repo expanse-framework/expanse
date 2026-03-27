@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import msgspec
 
+from pydantic import BaseModel
+
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.serializer import Serializer
 
@@ -13,6 +15,10 @@ class Foo:
 
 class Bar(msgspec.Struct):
     bar: str
+
+
+class Baz(BaseModel):
+    baz: str
 
 
 class MyStamp(msgspec.Struct):
@@ -51,6 +57,23 @@ def test_serializer_supports_envelope_with_msgspec_message() -> None:
     message = decoded_envelope.open()
     assert isinstance(message, Bar)
     assert message.bar == "baz"
+
+
+def test_serializer_supports_envelope_with_pydantic_message() -> None:
+    serializer = Serializer()
+
+    envelope = Envelope.wrap(Baz(baz="qux"))
+    encoded_envelope = serializer.encode(envelope)
+
+    assert encoded_envelope["body"] == {
+        "data": '{"baz":"qux"}',
+        "type": "tests.messenger.test_serializer.Baz",
+    }
+
+    decoded_envelope = serializer.decode(encoded_envelope)
+    message = decoded_envelope.open()
+    assert isinstance(message, Baz)
+    assert message.baz == "qux"
 
 
 def test_serializer_serializes_envelope_with_stamps() -> None:

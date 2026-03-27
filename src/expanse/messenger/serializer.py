@@ -3,6 +3,7 @@ from typing import TypeVar
 
 from expanse.messenger._serializers.dataclass import DataclassSerializer
 from expanse.messenger._serializers.msgspec import MsgSpecSerializer
+from expanse.messenger._serializers.pydantic import PydanticSerializer
 from expanse.messenger._serializers.serializer import Serializer as BaseSerializer
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
@@ -20,7 +21,7 @@ class Serializer:
     def __init__(self) -> None:
         self._serializers: dict[str, BaseSerializer[Any]] = {}
 
-        self.register(MsgSpecSerializer(), DataclassSerializer())
+        self.register(MsgSpecSerializer(), DataclassSerializer(), PydanticSerializer())
 
     def encode(self, envelope: Envelope) -> EncodedEnvelope:
         if not self._serializers:
