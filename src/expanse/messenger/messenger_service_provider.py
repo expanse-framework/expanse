@@ -18,8 +18,10 @@ class MessengerServiceProvider(ServiceProvider):
             MessageBus as MessageBusContract,
         )
         from expanse.messenger.registry import Registry
+        from expanse.messenger.serializer import Serializer
 
         self._container.singleton(Registry)
+        self._container.singleton(Serializer)
         self._container.scoped(TransportManager)
         self._container.scoped(MiddlewareStack)
         self._container.scoped(MessageBusContract, self._create_message_bus)

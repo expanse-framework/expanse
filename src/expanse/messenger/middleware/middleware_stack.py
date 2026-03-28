@@ -11,4 +11,6 @@ class MiddlewareStack(BaseMiddlewareStack[Envelope, Envelope]):
     """
 
     def get_default_middleware(self) -> list[type[Middleware[Envelope, Envelope]]]:
-        return []
+        from expanse.messenger.middleware.handle_encryption import HandleEncryption
+
+        return [HandleEncryption]

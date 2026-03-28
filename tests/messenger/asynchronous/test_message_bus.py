@@ -49,7 +49,7 @@ def transport_manager(
 
 @pytest.fixture()
 def middleware_stack() -> MiddlewareStack:
-    return MiddlewareStack()
+    return MiddlewareStack().use([])
 
 
 @pytest.fixture()
