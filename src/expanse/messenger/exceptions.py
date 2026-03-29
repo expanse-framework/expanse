@@ -40,3 +40,9 @@ class NoDefaultTransportError(Exception):
     """
     Raised when no default transport is configured and no transport name is provided.
     """
+
+
+class SelfHandlingMessageWithNoHandlerError(Exception):
+    """
+    Raised when a message marked with SelfHandlingStamp does not have a callable 'handle' method.
+    """

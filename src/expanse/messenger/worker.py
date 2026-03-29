@@ -4,6 +4,7 @@ from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
@@ -13,6 +14,7 @@ from expanse.messenger.retry.retry_strategy import RetryStrategy
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
+from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
@@ -135,6 +137,20 @@ class Worker:
 
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
         message = envelope.open()
+
+        if envelope.has_stamp(SelfHandlingStamp):
+            # If the envelope is marked with the SelfHandlingStamp,
+            # we skip the registry and handle it directly.
+            handler = getattr(message, "handle", None)
+            if handler is None or not callable(handler):
+                raise SelfHandlingMessageWithNoHandlerError(
+                    "Self handling messages must have a callable 'handle' method"
+                )
+
+            await self._container.call(handler)
+
+            return envelope
+
         handlers = self._registry.get_handlers(message.__class__)
 
         for handler in handlers:
@@ -171,7 +187,6 @@ class Worker:
         if retry_strategy_alias not in self._config.get(
             "messenger.retry_strategies", {}
         ):
-            # TODO: log an error
             return None
 
         config = RetryStrategyConfig.model_validate(
