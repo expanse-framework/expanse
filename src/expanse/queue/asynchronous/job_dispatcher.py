@@ -1,5 +1,5 @@
+from expanse.contracts.messenger.asynchronous.message_bus import MessageBus
 from expanse.contracts.queue.job import Job
-from expanse.messenger.asynchronous.message_bus import MessageBus
 from expanse.queue.asynchronous.pending_job import AsyncPendingJob
 
 
