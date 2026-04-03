@@ -10,6 +10,7 @@ from expanse.contracts.messenger.synchronous.message_bus import (
 )
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
+from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.support.service_provider import ServiceProvider
 
 
@@ -27,6 +28,7 @@ class MessengerServiceProvider(ServiceProvider):
         self._container.singleton(Registry)
         self._container.singleton(Serializer)
         self._container.scoped(TransportManager)
+        self._container.scoped(RetryStrategyManager)
         self._container.scoped(MiddlewareStack)
         self._container.scoped(MessageBusContract, self._create_message_bus)
         self._container.scoped(SyncMessageBusContract, self._create_sync_message_bus)

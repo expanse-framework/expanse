@@ -5,12 +5,10 @@ from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.transport import Transport
 from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
 from expanse.messenger.asynchronous.transports.sync.transport import SyncTransport
-from expanse.messenger.config import TransportConfig
 from expanse.messenger.exceptions import NoDefaultTransportError
+from expanse.messenger.exceptions import UnconfiguredTransportError
+from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
-from expanse.messenger.transports.database.config import DatabaseTransportConfig
-from expanse.messenger.transports.memory.config import MemoryTransportConfig
-from expanse.messenger.transports.sync.config import SyncTransportConfig
 
 
 class TransportManager:
@@ -44,32 +42,41 @@ class TransportManager:
     async def _create_transport(self, name: str) -> Transport:
         transports: dict[str, Any] = self._config.get("messenger.transports", {})
         if name not in transports:
-            raise ValueError(f"Transport '{name}' is not configured.")
+            raise UnconfiguredTransportError(f"Transport '{name}' is not configured.")
 
-        transport_config = TransportConfig.model_validate(transports[name]).root
+        transport_config = transports[name]
 
-        match transport_config:
-            case SyncTransportConfig():
+        if "driver" not in transport_config:
+            raise UnconfiguredTransportError(
+                f"Transport '{name}' is missing a driver configuration."
+            )
+
+        match transport_config["driver"]:
+            case "sync":
                 return self._create_sync_transport(transport_config)
-            case MemoryTransportConfig():
+            case "memory":
                 return self._create_memory_transport(transport_config)
-            case DatabaseTransportConfig():
+            case "database":
                 return await self._create_database_transport(transport_config)
+            case _:
+                raise UnsupportedTransportDriverError(
+                    f"Transport '{name}' has an unsupported driver '{transport_config['driver']}'."
+                )
 
-    def _create_sync_transport(self, config: SyncTransportConfig) -> Transport:
+    def _create_sync_transport(self, config: dict[str, Any]) -> Transport:
         return SyncTransport(self._container, self._registry)
 
-    def _create_memory_transport(self, config: MemoryTransportConfig) -> Transport:
+    def _create_memory_transport(self, config: dict[str, Any]) -> Transport:
         return MemoryTransport()
 
-    async def _create_database_transport(
-        self, config: DatabaseTransportConfig
-    ) -> Transport:
+    async def _create_database_transport(self, config: dict[str, Any]) -> Transport:
         from expanse.database.database_manager import AsyncDatabaseManager
         from expanse.messenger.asynchronous.transports.database.transport import (
             DatabaseTransport,
         )
+        from expanse.messenger.transports.database.config import DatabaseTransportConfig
 
         return DatabaseTransport(
-            config, await self._container.get(AsyncDatabaseManager)
+            DatabaseTransportConfig.model_validate(config),
+            await self._container.get(AsyncDatabaseManager),
         )

@@ -11,6 +11,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
+from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
@@ -107,14 +108,27 @@ def transport_manager(
 
 
 @pytest.fixture()
+def retry_strategy_manager(config: Config) -> RetryStrategyManager:
+    return RetryStrategyManager(config)
+
+
+@pytest.fixture()
 def worker(
     transport_manager: TransportManager,
+    retry_strategy_manager: RetryStrategyManager,
     config: Config,
     middleware_stack: MiddlewareStack,
     container: Container,
     registry: Registry,
 ) -> Worker:
-    return Worker(transport_manager, config, middleware_stack, container, registry)
+    return Worker(
+        transport_manager,
+        retry_strategy_manager,
+        config,
+        middleware_stack,
+        container,
+        registry,
+    )
 
 
 async def test_worker_handles_messages(
@@ -259,6 +273,7 @@ async def test_worker_self_handling_message_receives_injected_dependencies(
 
 async def test_worker_routes_no_handle_method_message_to_failure_transport(
     transport_manager: TransportManager,
+    retry_strategy_manager: RetryStrategyManager,
     middleware_stack: MiddlewareStack,
     container: Container,
     registry: Registry,
@@ -278,7 +293,12 @@ async def test_worker_routes_no_handle_method_message_to_failure_transport(
         }
     )
     worker = Worker(
-        transport_manager, config_no_retry, middleware_stack, container, registry
+        transport_manager,
+        retry_strategy_manager,
+        config_no_retry,
+        middleware_stack,
+        container,
+        registry,
     )
 
     transport = await transport_manager.transport("memory")
@@ -331,6 +351,7 @@ async def test_worker_adds_received_stamp_when_processing(
 
 async def test_worker_routes_to_failure_transport_when_no_retry_strategy_configured(
     transport_manager: TransportManager,
+    retry_strategy_manager: RetryStrategyManager,
     middleware_stack: MiddlewareStack,
     container: Container,
     registry: Registry,
@@ -348,7 +369,12 @@ async def test_worker_routes_to_failure_transport_when_no_retry_strategy_configu
         }
     )
     worker = Worker(
-        transport_manager, config_without_retry, middleware_stack, container, registry
+        transport_manager,
+        retry_strategy_manager,
+        config_without_retry,
+        middleware_stack,
+        container,
+        registry,
     )
 
     async def handler(_message: WorkerMessage) -> None:

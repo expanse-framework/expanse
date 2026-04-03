@@ -170,26 +170,6 @@ class Connection:
         # To ensure atomicity, we will execute both statements within the same transaction
         # and use a SELECT ... FOR UPDATE SKIP LOCKED to claim the message.
         async with self._db.connection(self._config.connection) as connection:
-            print(now)
-            print((await connection.execute(self._table.select())).fetchall())
-            print(
-                (
-                    await connection.execute(
-                        self._table.select().where(
-                            self._table.c.queue_name == self._config.queue_name
-                        )
-                    )
-                ).fetchall()
-            )
-            print(
-                (
-                    await connection.execute(
-                        self._table.select()
-                        .where(self._table.c.queue_name == self._config.queue_name)
-                        .where(self._table.c.available_at <= now)
-                    )
-                ).fetchall()
-            )
             row_id: int | None = await connection.scalar(
                 self._table.select()
                 .with_only_columns(self._table.c.id)
@@ -205,7 +185,6 @@ class Connection:
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
-            print(row_id)
 
             if row_id is None:
                 await connection.commit()

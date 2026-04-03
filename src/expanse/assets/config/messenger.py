@@ -1,12 +1,8 @@
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-
-from expanse.messenger.config import TransportConfig
-from expanse.messenger.retry.config import RetryStrategyConfig
-from expanse.messenger.retry.multiplier.config import MultiplierRetryStrategyConfig
-from expanse.messenger.transports.memory.config import MemoryTransportConfig
-from expanse.messenger.transports.sync.config import SyncTransportConfig
 
 
 class Config(BaseSettings):
@@ -27,10 +23,10 @@ class Config(BaseSettings):
     # They can all be defined with environment variables in you `.env` file.
     # For instance:
     # >>> TRANSPORTS__MEMORY__DRIVER=memory
-    transports: dict[str, TransportConfig] = Field(
+    transports: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
-            "sqlite": TransportConfig(root=SyncTransportConfig()),
-            "memory": TransportConfig(root=MemoryTransportConfig()),
+            "sync": {"driver": "sync"},
+            "memory": {"driver": "memory"},
         }
     )
 
@@ -42,9 +38,16 @@ class Config(BaseSettings):
     # >>> RETRY_STRATEGIES__MULTIPLIER__TYPE=multiplier
     # >>> RETRY_STRATEGIES__MULTIPLIER__DELAY=1000
     # >>> RETRY_STRATEGIES__MULTIPLIER__MULTIPLIER=2
-    retry_strategies: dict[str, RetryStrategyConfig] = Field(
+    retry_strategies: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
-            "multiplier": RetryStrategyConfig(root=MultiplierRetryStrategyConfig())
+            "multiplier": {
+                "type": "multiplier",
+                "max_retries": 3,
+                "delay": 1000,
+                "multiplier": 2,
+                "max_delay": None,
+                "jitter": 0.1,
+            }
         }
     )
 

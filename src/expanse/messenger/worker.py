@@ -5,12 +5,13 @@ from expanse.container.container import Container
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
+from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
+from expanse.messenger.exceptions import UnsupportedRetryStrategyError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
-from expanse.messenger.retry.config import RetryStrategyConfig
-from expanse.messenger.retry.multiplier.config import MultiplierRetryStrategyConfig
 from expanse.messenger.retry.retry_strategy import RetryStrategy
+from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
@@ -25,12 +26,14 @@ class Worker:
     def __init__(
         self,
         transport_manager: TransportManager,
+        retry_strategy_manager: RetryStrategyManager,
         config: Config,
         middleware_stack: MiddlewareStack,
         container: Container,
         registry: Registry,
     ) -> None:
         self._transport_manager: TransportManager = transport_manager
+        self._retry_strategy_manager: RetryStrategyManager = retry_strategy_manager
         self._config: Config = config
         self._middleware_stack: MiddlewareStack = middleware_stack
         self._container: Container = container
@@ -177,26 +180,14 @@ class Worker:
         )
 
     def _get_retry_strategy(self, transport_name: str) -> RetryStrategy | None:
-        retry_strategy_alias = self._config.get(
+        retry_strategy_alias: str | None = self._config.get(
             f"messenger.transports.{transport_name}", {}
         ).get("retry_strategy")
 
         if retry_strategy_alias is None:
             return None
 
-        if retry_strategy_alias not in self._config.get(
-            "messenger.retry_strategies", {}
-        ):
+        try:
+            return self._retry_strategy_manager.strategy(retry_strategy_alias)
+        except (UnconfiguredRetryStrategyError, UnsupportedRetryStrategyError):
             return None
-
-        config = RetryStrategyConfig.model_validate(
-            self._config.get(f"messenger.retry_strategies.{retry_strategy_alias}", {})
-        ).root
-
-        match config:
-            case MultiplierRetryStrategyConfig():
-                from expanse.messenger.retry.multiplier.multiplier_retry_strategy import (
-                    MultiplierRetryStrategy,
-                )
-
-                return MultiplierRetryStrategy(config)

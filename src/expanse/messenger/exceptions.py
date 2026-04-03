@@ -46,3 +46,27 @@ class SelfHandlingMessageWithNoHandlerError(Exception):
     """
     Raised when a message marked with SelfHandlingStamp does not have a callable 'handle' method.
     """
+
+
+class UnconfiguredTransportError(Exception):
+    """
+    Raised when a transport is requested that is not configured.
+    """
+
+
+class UnsupportedTransportDriverError(Exception):
+    """
+    Raised when a transport is configured with an unsupported driver.
+    """
+
+
+class UnconfiguredRetryStrategyError(Exception):
+    """
+    Raised when a retry strategy is requested that is not configured.
+    """
+
+
+class UnsupportedRetryStrategyError(Exception):
+    """
+    Raised when a retry strategy is configured with an unsupported type.
+    """
