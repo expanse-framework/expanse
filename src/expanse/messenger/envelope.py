@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from expanse.types.messenger import Message
 from expanse.types.messenger import Stamp
 from expanse.types.messenger import StampT
@@ -6,11 +8,11 @@ from expanse.types.messenger import StampT
 class Envelope:
     def __init__(self, message: Message, stamps: list[Stamp] | None = None):
         self._message: Message = message
-        self._stamps: dict[type[Stamp], Stamp] = {}
+        self._stamps: dict[type[Stamp], list[Stamp]] = defaultdict(list)
 
         if stamps:
             for stamp in stamps:
-                self._stamps[stamp.__class__] = stamp
+                self._stamps[stamp.__class__].append(stamp)
 
     @classmethod
     def wrap(
@@ -31,15 +33,20 @@ class Envelope:
         :param stamps: The stamps to add to the envelope.
         :return: A new envelope with the added stamps.
         """
-        return self.__class__(self._message, stamps=[*self.stamps, *stamps])
+        return self.__class__(self._message, stamps=[*self.stamps(), *stamps])
 
     def stamp(self, stamp_type: type[StampT]) -> StampT | None:
         """
-        Get a stamp of the given type from the envelope.
+        Get the last stamp of the given type from the envelope.
 
         :param stamp_type: The type of the stamp to retrieve.
         """
-        return self._stamps.get(stamp_type)
+        stamps = self._stamps.get(stamp_type)
+
+        if not stamps:
+            return None
+
+        return stamps[-1]
 
     def has_stamp(self, stamp_type: type[Stamp]) -> bool:
         """
@@ -57,11 +64,31 @@ class Envelope:
         """
         return bool(self._stamps)
 
-    @property
-    def stamps(self) -> list[Stamp]:
+    def without_stamps(self, *stamp_types: type[Stamp]) -> "Envelope":
         """
-        Get all stamps from the envelope.
+        Remove all stamps of the given types from the envelope.
 
-        :return: A list of all stamps in the envelope.
+        :param stamp_types: The types of the stamps to remove from the envelope.
+        :return: A new envelope without the specified stamps.
         """
-        return list(self._stamps.values())
+        return self.__class__(
+            self._message,
+            stamps=[
+                s
+                for t, ls in self._stamps.items()
+                for s in ls
+                if t not in stamp_types
+            ],
+        )
+
+    def stamps(self, stamp_type: type[StampT] | None = None) -> list[StampT]:
+        """
+        Get all stamps from the envelope, optionally filtered by type.
+
+        :param stamp_type: The type of the stamps to retrieve. If None, return all stamps.
+        :return: A list of stamps.
+        """
+        if stamp_type is not None:
+            return self._stamps.get(stamp_type, [])
+
+        return [s for ls in self._stamps.values() for s in ls]

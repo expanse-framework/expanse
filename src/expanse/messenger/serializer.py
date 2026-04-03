@@ -37,7 +37,7 @@ class Serializer:
         }
 
         if envelope.is_stamped():
-            headers["stamps"] = [self._encode(stamp) for stamp in envelope.stamps]
+            headers["stamps"] = [self._encode(stamp) for stamp in envelope.stamps()]
 
         return EncodedEnvelope(body=body, headers=headers)
 

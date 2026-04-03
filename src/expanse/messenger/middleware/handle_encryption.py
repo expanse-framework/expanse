@@ -61,7 +61,7 @@ class HandleEncryption:
         message = EncryptedMessage(data=encrypted_payload)
 
         return Envelope.wrap(
-            message, stamps=[*envelope.stamps, EncryptedStamp(label=label)]
+            message, stamps=[*envelope.stamps(), EncryptedStamp(label=label)]
         )
 
     def _decrypt(self, envelope: Envelope) -> Envelope:
@@ -77,5 +77,5 @@ class HandleEncryption:
         decoded_envelope: EncodedEnvelope = msgspec.json.decode(decrypted_payload)
 
         return self._serializer.decode(decoded_envelope).with_stamps(
-            *[s for s in envelope.stamps if not isinstance(s, EncryptedStamp)]
+            *[s for s in envelope.stamps() if not isinstance(s, EncryptedStamp)]
         )
