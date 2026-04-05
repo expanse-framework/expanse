@@ -1,3 +1,6 @@
+from expanse.messenger.envelope import Envelope
+
+
 class SerializerError(Exception):
     """
     Raised when a message cannot be serialized or deserialized.
@@ -42,7 +45,7 @@ class NoDefaultTransportError(Exception):
     """
 
 
-class SelfHandlingMessageWithNoHandlerError(Exception):
+class SelfHandlingMessageWithNoHandlerError(UnrecoverableMessageHandlingError):
     """
     Raised when a message marked with SelfHandlingStamp does not have a callable 'handle' method.
     """
@@ -70,3 +73,29 @@ class UnsupportedRetryStrategyError(Exception):
     """
     Raised when a retry strategy is configured with an unsupported type.
     """
+
+
+class MessageHandlingFailedError(Exception):
+    """
+    Raised when a message handling fails with one or more exceptions.
+
+    The exceptions can be retrieved from the `errors` attribute, which is a dictionary mapping handler identifiers to exceptions.
+    """
+
+    def __init__(self, envelope: Envelope, errors: dict[str, Exception]) -> None:
+        self.envelope: Envelope = envelope
+        self.errors: dict[str, Exception] = errors
+
+        first_failed_handler, first_exception = next(iter(errors.items()))
+        error_message = [
+            f"Message handling failed for message {envelope.open.__class__}: "
+        ]
+
+        if len(errors) == 1:
+            error_message.append(str(first_exception))
+        else:
+            error_message.append(
+                f"{len(errors)} handlers failed. First failed handler: {first_failed_handler} with exception: {first_exception}"
+            )
+
+        super().__init__("".join(error_message))

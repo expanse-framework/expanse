@@ -12,8 +12,10 @@ class Pipeline[I, O]:
         self._pipes: list[Pipe[I, O]] = []
         self._input: I | None = None
 
-    def use(self, pipes: list[Pipe[I, O]]) -> None:
+    def use(self, pipes: list[Pipe[I, O]]) -> Self:
         self._pipes = pipes
+
+        return self
 
     def send(self, input: I) -> Self:
         self._input = input

@@ -4,6 +4,7 @@ from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
 from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
@@ -13,6 +14,7 @@ from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy import RetryStrategy
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
+from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.self_handling import SelfHandlingStamp
@@ -20,6 +22,7 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
 from expanse.support.asynchronous.pipeline import Pipeline
+from expanse.types.messenger import MessageHandler
 
 
 class Worker:
@@ -62,8 +65,7 @@ class Worker:
             envelope = await transport.receive()
 
             if envelope is None:
-                # No messages available — wait briefly before polling again,
-                # but return immediately if a stop signal arrives.
+                # No messages available — wait briefly before polling again.
                 await asyncio.sleep(1)
 
                 continue
@@ -71,35 +73,35 @@ class Worker:
             handled_messages += 1
 
             try:
-                await self._process_envelope(envelope)
-            except UnrecoverableMessageHandlingError:
-                # The message handling error is unrecoverable, we don't want to retry it.
-                # If a failure transport is configured, we send the message to the failure transport
-                # for further analysis.
-                await self._send_to_failure_transport(
-                    envelope, transport_name=transport_name
-                )
-                await transport.reject(envelope)
+                envelope = await self._handle_envelope(envelope)
             except Exception as e:
-                # Check if the message should be retried according to the transport's retry strategy.
-                # If it should, we send it to the same transport with the configured delay.
-                # If it shouldn't, we send it to the failure transport if configured, or discard it otherwise.
+                if isinstance(e, MessageHandlingFailedError):
+                    envelope = e.envelope
+
+                    if any(
+                        isinstance(error, UnrecoverableMessageHandlingError)
+                        for error in e.errors.values()
+                    ):
+                        # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
+                        await self._send_to_failure_transport(
+                            e.envelope, transport_name=transport_name
+                        )
+                        await transport.reject(e.envelope)
+
+                        continue
+
+                # If there were errors during message handling, we consider the message as not handled.
+                # If the message can and should be retried we send it back to the same transport with the appropriate delay.
+                # Otherwise, if a failure transport is configured, we send it to the failure transport for further analysis.
                 retry_strategy = self._get_retry_strategy(transport_name)
-
-                if retry_strategy is None:
-                    # If no retry strategy is configured for the transport,
-                    # we consider that the message shouldn't be retried.
+                if retry_strategy is None or not retry_strategy.should_retry(
+                    envelope, exception=e
+                ):
                     await self._send_to_failure_transport(
                         envelope, transport_name=transport_name
                     )
                     await transport.reject(envelope)
-                    continue
 
-                if not retry_strategy.should_retry(envelope, e):
-                    await self._send_to_failure_transport(
-                        envelope, transport_name=transport_name
-                    )
-                    await transport.reject(envelope)
                     continue
 
                 delay = retry_strategy.retry_delay(envelope, e)
@@ -125,41 +127,72 @@ class Worker:
         """
         self._stop_event.set()
 
-    async def _process_envelope(self, envelope: Envelope) -> Envelope:
-        pipeline = Pipeline[Envelope, Envelope]()
-        pipeline.use(
-            [
-                (await self._container.get(m)).handle
-                for m in self._middleware_stack.middleware
-            ]
-        )
-
-        return await pipeline.send(envelope.with_stamps(ReceivedStamp())).to(
-            self._handle_envelope
-        )
-
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
-        message = envelope.open()
+        # Build the middleware pipeline and process the envelope through it.
+        envelope = await (
+            Pipeline[Envelope, Envelope]()
+            .use(
+                [
+                    (await self._container.get(m)).handle
+                    for m in self._middleware_stack.middleware
+                ]
+            )
+            .send(envelope.with_stamps(ReceivedStamp()))
+            .to(self._get_envelope)
+        )
 
+        message = envelope.open()
+        errors: dict[str, Exception] = {}
+        handlers: list[MessageHandler] = []
         if envelope.has_stamp(SelfHandlingStamp):
             # If the envelope is marked with the SelfHandlingStamp,
             # we skip the registry and handle it directly.
             handler = getattr(message, "handle", None)
-            if handler is None or not callable(handler):
-                raise SelfHandlingMessageWithNoHandlerError(
-                    "Self handling messages must have a callable 'handle' method"
+            try:
+                if handler is None or not callable(handler):
+                    raise SelfHandlingMessageWithNoHandlerError(
+                        "Self handling messages must have a callable 'handle' method"
+                    )
+                await self._container.call(handler)
+
+                envelope = envelope.with_stamps(
+                    HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
                 )
-
-            await self._container.call(handler)
-
-            return envelope
-
-        handlers = self._registry.get_handlers(message.__class__)
+            except Exception as e:
+                errors[f"{handler.__module__}.{handler.__qualname__}"] = e
+        else:
+            handlers = self._registry.get_handlers(message.__class__)
 
         for handler in handlers:
-            await self._container.call(handler, message)
+            if self._has_already_been_handled(envelope, handler):
+                continue
+
+            try:
+                await self._container.call(handler, message)
+
+                envelope = envelope.with_stamps(
+                    HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
+                )
+            except Exception as e:
+                errors[f"{handler.__module__}.{handler.__qualname__}"] = e
+
+        if errors:
+            raise MessageHandlingFailedError(envelope=envelope, errors=errors)
 
         return envelope
+
+    async def _get_envelope(self, envelope: Envelope) -> Envelope:
+        return envelope
+
+    def _has_already_been_handled(
+        self, envelope: Envelope, handler: MessageHandler
+    ) -> bool:
+        handler_identifier = f"{handler.__module__}.{handler.__qualname__}"
+        for handled_stamp in envelope.stamps(HandledStamp):
+            if handled_stamp.handler == handler_identifier:
+                return True
+
+        return False
 
     async def _send_to_failure_transport(
         self, envelope: Envelope, transport_name: str

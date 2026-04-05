@@ -13,6 +13,7 @@ from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
+from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.self_handling import SelfHandlingStamp
@@ -394,6 +395,142 @@ async def test_worker_routes_to_failure_transport_when_no_retry_strategy_configu
     sent_stamp = failure_transport.sent[0].stamp(SentToFailureTransportStamp)
     assert sent_stamp is not None
     assert sent_stamp.original_transport == "memory"
+
+
+async def test_worker_adds_handled_stamp_after_successful_handling(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled_envelopes: list[Envelope] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        pass
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="stamped")))
+    registry.register_handler(handler)
+
+    original_acknowledge = transport.acknowledge
+
+    async def capturing_acknowledge(envelope: Envelope) -> None:
+        handled_envelopes.append(envelope)
+        await original_acknowledge(envelope)
+
+    transport.acknowledge = capturing_acknowledge  # type: ignore[assignment]
+
+    await worker.run(limit=1)
+
+    assert len(handled_envelopes) == 1
+    stamps = handled_envelopes[0].stamps(HandledStamp)
+    assert len(stamps) == 1
+    assert handler.__qualname__ in stamps[0].handler
+
+
+async def test_worker_adds_handled_stamp_for_self_handling_messages(
+    worker: Worker, transport_manager: TransportManager
+) -> None:
+    SelfHandlingJob.call_log.clear()
+    handled_envelopes: list[Envelope] = []
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(
+        Envelope.wrap(
+            SelfHandlingJob(value="self-stamped"), stamps=[SelfHandlingStamp()]
+        )
+    )
+
+    original_acknowledge = transport.acknowledge
+
+    async def capturing_acknowledge(envelope: Envelope) -> None:
+        handled_envelopes.append(envelope)
+        await original_acknowledge(envelope)
+
+    transport.acknowledge = capturing_acknowledge  # type: ignore[assignment]
+
+    await worker.run(limit=1)
+
+    assert SelfHandlingJob.call_log == ["self-stamped"]
+    assert len(handled_envelopes) == 1
+    stamps = handled_envelopes[0].stamps(HandledStamp)
+    assert len(stamps) == 1
+    assert "SelfHandlingJob.handle" in stamps[0].handler
+
+
+async def test_worker_skips_already_handled_handlers(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    call_count = 0
+
+    async def handler(message: WorkerMessage) -> None:
+        nonlocal call_count
+        call_count += 1
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    # Pre-stamp the envelope as already handled by this handler
+    envelope = Envelope.wrap(WorkerMessage(value="already-handled")).with_stamps(
+        HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
+    )
+    await transport.send(envelope)
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert call_count == 0
+
+
+async def test_worker_raises_message_handling_failed_error_with_errors(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("transient failure")
+
+    transport = await transport_manager.transport("memory")
+    failure_transport = await transport_manager.transport("failed")
+    assert isinstance(transport, MemoryTransport)
+    assert isinstance(failure_transport, MemoryTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="fail")))
+    registry.register_handler(handler)
+
+    # With retry strategy configured, the message should be retried
+    await worker.run(limit=1)
+
+    # The message was retried (sent back to the transport)
+    assert len(transport.sent) == 2
+    retried = transport.sent[1]
+    redelivery_stamp = retried.stamp(RedeliveryStamp)
+    assert redelivery_stamp is not None
+
+
+async def test_worker_multiple_handlers_partial_failure(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    successful_calls: list[str] = []
+
+    async def good_handler(message: WorkerMessage) -> None:
+        successful_calls.append(message.value)
+
+    async def bad_handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("handler failed")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="partial")))
+    registry.register_handler(good_handler)
+    registry.register_handler(bad_handler)
+
+    # With retry strategy, partial failure should still cause retry
+    await worker.run(limit=1)
+
+    assert successful_calls == ["partial"]
+    # The message was retried due to the bad handler
+    assert len(transport.sent) == 2
 
 
 def test_worker_stop_sets_stop_event(worker: Worker) -> None:
