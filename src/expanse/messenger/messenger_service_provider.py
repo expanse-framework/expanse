@@ -8,9 +8,9 @@ from expanse.contracts.messenger.asynchronous.message_bus import (
 from expanse.contracts.messenger.synchronous.message_bus import (
     MessageBus as SyncMessageBusContract,
 )
-from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
+from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support.service_provider import ServiceProvider
 
 

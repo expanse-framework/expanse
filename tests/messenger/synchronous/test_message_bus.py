@@ -7,12 +7,12 @@ import pytest
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.messenger.asynchronous.message_bus import MessageBus as AsyncMessageBus
-from expanse.messenger.asynchronous.transport_manager import TransportManager
-from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.synchronous.message_bus import MessageBus
+from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.transport_manager import TransportManager
 
 
 @pytest.fixture()

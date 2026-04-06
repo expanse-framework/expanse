@@ -3,9 +3,9 @@ from dataclasses import dataclass
 import pytest
 
 from expanse.container.container import Container
-from expanse.messenger.asynchronous.transports.sync.transport import SyncTransport
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
+from expanse.messenger.transports.sync.transport import SyncTransport
 
 
 @dataclass

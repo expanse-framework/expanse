@@ -2,7 +2,6 @@ import asyncio
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
@@ -21,6 +20,7 @@ from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
+from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support.asynchronous.pipeline import Pipeline
 from expanse.types.messenger import MessageHandler
 

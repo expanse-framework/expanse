@@ -3,13 +3,13 @@ import json
 from collections.abc import AsyncIterator
 
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
-from expanse.messenger.asynchronous.transports.database.connection import Connection
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
+from expanse.messenger.transports.database.connection import Connection
 
 
 class DatabaseTransport:

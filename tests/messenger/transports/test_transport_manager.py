@@ -5,13 +5,13 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.messenger.asynchronous.transport_manager import TransportManager
-from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
-from expanse.messenger.asynchronous.transports.sync.transport import SyncTransport
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
+from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.sync.transport import SyncTransport
+from expanse.messenger.transports.transport_manager import TransportManager
 
 
 @dataclass

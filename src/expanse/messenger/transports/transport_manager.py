@@ -3,12 +3,12 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.transport import Transport
-from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
-from expanse.messenger.asynchronous.transports.sync.transport import SyncTransport
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
+from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.sync.transport import SyncTransport
 
 
 class TransportManager:
@@ -71,10 +71,8 @@ class TransportManager:
 
     async def _create_database_transport(self, config: dict[str, Any]) -> Transport:
         from expanse.database.database_manager import AsyncDatabaseManager
-        from expanse.messenger.asynchronous.transports.database.transport import (
-            DatabaseTransport,
-        )
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
+        from expanse.messenger.transports.database.transport import DatabaseTransport
 
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),

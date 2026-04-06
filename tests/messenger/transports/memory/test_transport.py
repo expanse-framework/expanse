@@ -4,10 +4,10 @@ from dataclasses import dataclass
 
 import pytest
 
-from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
+from expanse.messenger.transports.memory.transport import MemoryTransport
 
 
 @dataclass

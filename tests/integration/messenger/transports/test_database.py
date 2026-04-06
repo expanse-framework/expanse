@@ -7,13 +7,11 @@ import pytest
 from sqlalchemy import text
 
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
-from expanse.messenger.asynchronous.transports.database.transport import (
-    DatabaseTransport,
-)
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
+from expanse.messenger.transports.database.transport import DatabaseTransport
 from tests.integration.messenger.fixtures.messages import DatabaseMessage
 
 

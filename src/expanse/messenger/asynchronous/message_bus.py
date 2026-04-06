@@ -4,9 +4,9 @@ from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
-from expanse.messenger.asynchronous.transport_manager import TransportManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
+from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support.asynchronous.pipeline import Pipeline
 from expanse.types.messenger import Message
 
