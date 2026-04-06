@@ -1,5 +1,8 @@
+import asyncio
+
 from dataclasses import dataclass
 from typing import ClassVar
+from unittest.mock import patch
 
 import pytest
 
@@ -531,6 +534,47 @@ async def test_worker_multiple_handlers_partial_failure(
     assert successful_calls == ["partial"]
     # The message was retried due to the bad handler
     assert len(transport.sent) == 2
+
+
+async def test_worker_uses_custom_sleep_interval(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    """The worker should use the provided sleep interval (in ms) when no messages are available."""
+    sleep_calls: list[float] = []
+
+    async def capturing_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        # Stop the worker after the first sleep to avoid infinite polling
+        worker.stop()
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+    # Don't send any message so the worker will sleep
+
+    with patch.object(asyncio, "sleep", side_effect=capturing_sleep):
+        await worker.run(sleep=2000)
+
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == 2.0
+
+
+async def test_worker_uses_default_sleep_interval(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    sleep_calls: list[float] = []
+
+    async def capturing_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        worker.stop()
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    with patch.object(asyncio, "sleep", side_effect=capturing_sleep):
+        await worker.run()
+
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == 1.0
 
 
 def test_worker_stop_sets_stop_event(worker: Worker) -> None:

@@ -44,7 +44,10 @@ class Worker:
         self._stop_event: asyncio.Event = asyncio.Event()
 
     async def run(
-        self, transport_name: str | None = None, limit: int | None = None
+        self,
+        transport_name: str | None = None,
+        limit: int | None = None,
+        sleep: int = 1000,
     ) -> None:
         """
         Run the worker, processing messages from the bus until stopped.
@@ -66,7 +69,7 @@ class Worker:
 
             if envelope is None:
                 # No messages available — wait briefly before polling again.
-                await asyncio.sleep(1)
+                await asyncio.sleep(sleep / 1000)
 
                 continue
 
