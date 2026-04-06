@@ -155,7 +155,7 @@ async def test_worker_handles_messages(
     await worker.run(limit=1)
 
     assert called_values == [message.value]
-    assert await transport.receive() is None
+    assert [e async for e in transport.receive()] == []
 
 
 async def test_worker_sends_unrecoverable_failures_to_failure_transport(
@@ -252,7 +252,7 @@ async def test_worker_handles_self_handling_messages(
     await worker.run(limit=1)
 
     assert SelfHandlingJob.call_log == ["self-handled"]
-    assert await transport.receive() is None
+    assert [e async for e in transport.receive()] == []
 
 
 async def test_worker_self_handling_message_receives_injected_dependencies(

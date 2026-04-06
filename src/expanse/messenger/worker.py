@@ -65,64 +65,69 @@ class Worker:
                 self.stop()
                 continue
 
-            envelope = await transport.receive()
+            envelope_handled: bool = False
 
-            if envelope is None:
-                # No messages available — wait briefly before polling again.
-                await asyncio.sleep(sleep / 1000)
+            async for envelope in transport.receive():
+                envelope_handled = True
+                if handled_messages >= limit if limit is not None else False:
+                    self.stop()
+                    break
 
-                continue
+                handled_messages += 1
 
-            handled_messages += 1
+                try:
+                    envelope = await self._handle_envelope(envelope)
+                except Exception as e:
+                    if isinstance(e, MessageHandlingFailedError):
+                        envelope = e.envelope
 
-            try:
-                envelope = await self._handle_envelope(envelope)
-            except Exception as e:
-                if isinstance(e, MessageHandlingFailedError):
-                    envelope = e.envelope
+                        if any(
+                            isinstance(error, UnrecoverableMessageHandlingError)
+                            for error in e.errors.values()
+                        ):
+                            # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
+                            await self._send_to_failure_transport(
+                                e.envelope, transport_name=transport_name
+                            )
+                            await transport.reject(e.envelope)
 
-                    if any(
-                        isinstance(error, UnrecoverableMessageHandlingError)
-                        for error in e.errors.values()
+                            continue
+
+                    # If there were errors during message handling, we consider the message as not handled.
+                    # If the message can and should be retried we send it back to the same transport with the appropriate delay.
+                    # Otherwise, if a failure transport is configured, we send it to the failure transport for further analysis.
+                    retry_strategy = self._get_retry_strategy(transport_name)
+                    if retry_strategy is None or not retry_strategy.should_retry(
+                        envelope, exception=e
                     ):
-                        # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
                         await self._send_to_failure_transport(
-                            e.envelope, transport_name=transport_name
+                            envelope, transport_name=transport_name
                         )
-                        await transport.reject(e.envelope)
+                        await transport.reject(envelope)
 
                         continue
 
-                # If there were errors during message handling, we consider the message as not handled.
-                # If the message can and should be retried we send it back to the same transport with the appropriate delay.
-                # Otherwise, if a failure transport is configured, we send it to the failure transport for further analysis.
-                retry_strategy = self._get_retry_strategy(transport_name)
-                if retry_strategy is None or not retry_strategy.should_retry(
-                    envelope, exception=e
-                ):
-                    await self._send_to_failure_transport(
-                        envelope, transport_name=transport_name
+                    delay = retry_strategy.retry_delay(envelope, e)
+                    redelivery_stamp = envelope.stamp(RedeliveryStamp)
+                    retry_count = (
+                        redelivery_stamp.retry_count
+                        if redelivery_stamp is not None
+                        else 0
+                    ) + 1
+                    await transport.send(
+                        envelope.with_stamps(
+                            DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
+                        )
                     )
+
                     await transport.reject(envelope)
 
                     continue
 
-                delay = retry_strategy.retry_delay(envelope, e)
-                redelivery_stamp = envelope.stamp(RedeliveryStamp)
-                retry_count = (
-                    redelivery_stamp.retry_count if redelivery_stamp is not None else 0
-                ) + 1
-                await transport.send(
-                    envelope.with_stamps(
-                        DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
-                    )
-                )
+                await transport.acknowledge(envelope)
 
-                await transport.reject(envelope)
-
-                continue
-
-            await transport.acknowledge(envelope)
+            if not envelope_handled:
+                await asyncio.sleep(sleep / 1000)
 
     def stop(self) -> None:
         """

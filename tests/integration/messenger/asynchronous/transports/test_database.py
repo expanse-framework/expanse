@@ -69,9 +69,10 @@ async def test_transport_can_receive_a_message(
     message = DatabaseMessage(value="receive-me")
     await transport.send(Envelope.wrap(message))
 
-    received = await transport.receive()
+    envelopes = [e async for e in transport.receive()]
 
-    assert received is not None
+    assert len(envelopes) == 1
+    received = envelopes[0]
     assert isinstance(received.open(), DatabaseMessage)
     assert received.open().value == message.value  # type: ignore[union-attr]
 
@@ -97,9 +98,9 @@ async def test_transport_does_not_receive_delayed_messages(
     )
     await transport.send(delayed_envelope)
 
-    received = await transport.receive()
+    received = [e async for e in transport.receive()]
 
-    assert received is None
+    assert received == []
 
 
 @pytest.mark.usefixtures("setup_databases")
@@ -117,10 +118,10 @@ async def test_transport_can_acknowledge_a_message(
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="ack-me")))
 
-    received = await transport.receive()
-    assert received is not None
+    envelopes = [e async for e in transport.receive()]
+    assert len(envelopes) == 1
 
-    await transport.acknowledge(received)
+    await transport.acknowledge(envelopes[0])
 
     async with db.connection(name) as connection:
         row_count = (
@@ -145,10 +146,10 @@ async def test_transport_can_reject_a_message(
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="reject-me")))
 
-    received = await transport.receive()
-    assert received is not None
+    envelopes = [e async for e in transport.receive()]
+    assert len(envelopes) == 1
 
-    await transport.reject(received)
+    await transport.reject(envelopes[0])
 
     async with db.connection(name) as connection:
         row_count = (

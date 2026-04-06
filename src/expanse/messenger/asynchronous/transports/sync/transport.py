@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+
 from expanse.container.container import Container
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
@@ -17,8 +19,9 @@ class SyncTransport:
 
         return envelope
 
-    async def receive(self) -> Envelope | None:
+    async def receive(self) -> AsyncIterator[Envelope]:
         raise NotImplementedError("SyncTransport does not support receiving messages.")
+        yield  # pragma: no cover
 
     async def acknowledge(self, envelope: Envelope) -> None:
         raise NotImplementedError(

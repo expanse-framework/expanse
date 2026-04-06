@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Protocol
 
 from expanse.messenger.envelope import Envelope
@@ -12,10 +13,10 @@ class Transport(Protocol):
         """
         ...
 
-    def receive(self) -> Envelope | None:
+    def receive(self) -> Iterable[Envelope]:
         """
-        Receive an envelope from the transport.
-        :return: The received envelope, or None if no envelope is available.
+        Receive envelopes from the transport.
+        :return: An iterable of received envelopes.
         """
         ...
 

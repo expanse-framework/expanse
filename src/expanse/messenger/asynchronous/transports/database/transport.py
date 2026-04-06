@@ -1,5 +1,7 @@
 import json
 
+from collections.abc import AsyncIterator
+
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.asynchronous.transports.database.connection import Connection
 from expanse.messenger.envelope import Envelope
@@ -35,11 +37,11 @@ class DatabaseTransport:
 
         return envelope.with_stamps(TransportMessageIdStamp(message_row_id))
 
-    async def receive(self) -> Envelope | None:
+    async def receive(self) -> AsyncIterator[Envelope]:
         message_row = await self._connection.get()
 
         if message_row is None:
-            return None
+            return
 
         envelope = self._serializer.decode(
             {
@@ -48,7 +50,7 @@ class DatabaseTransport:
             }
         )
 
-        return envelope.with_stamps(TransportMessageIdStamp(message_row.id))
+        yield envelope.with_stamps(TransportMessageIdStamp(message_row.id))
 
     async def acknowledge(self, envelope: Envelope) -> None:
         message_id_stamp = envelope.stamp(TransportMessageIdStamp)

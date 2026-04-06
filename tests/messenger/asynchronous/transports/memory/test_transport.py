@@ -55,18 +55,18 @@ async def test_receive_returns_available_envelope() -> None:
     transport = make_transport()
     await transport.send(Envelope.wrap(FooMessage(value="hello")))
 
-    envelope = await transport.receive()
+    envelopes = [e async for e in transport.receive()]
 
-    assert envelope is not None
-    assert isinstance(envelope.open(), FooMessage)
+    assert len(envelopes) == 1
+    assert isinstance(envelopes[0].open(), FooMessage)
 
 
-async def test_receive_returns_none_when_queue_is_empty() -> None:
+async def test_receive_returns_no_envelopes_when_queue_is_empty() -> None:
     transport = make_transport()
 
-    envelope = await transport.receive()
+    envelopes = [e async for e in transport.receive()]
 
-    assert envelope is None
+    assert envelopes == []
 
 
 async def test_receive_skips_delayed_envelope() -> None:
@@ -76,9 +76,9 @@ async def test_receive_skips_delayed_envelope() -> None:
     )
     await transport.send(envelope)
 
-    result = await transport.receive()
+    result = [e async for e in transport.receive()]
 
-    assert result is None
+    assert result == []
 
 
 async def test_receive_returns_envelope_after_delay_expires() -> None:
@@ -90,25 +90,25 @@ async def test_receive_returns_envelope_after_delay_expires() -> None:
     )
     await transport.send(envelope)
 
-    assert await transport.receive() is None
+    assert [e async for e in transport.receive()] == []
 
     time.sleep(0.15)
 
-    result = await transport.receive()
-    assert result is not None
-    assert isinstance(result.open(), FooMessage)
+    result = [e async for e in transport.receive()]
+    assert len(result) == 1
+    assert isinstance(result[0].open(), FooMessage)
 
 
 async def test_acknowledge_removes_envelope_from_queue() -> None:
     transport = make_transport()
     await transport.send(Envelope.wrap(FooMessage(value="hello")))
 
-    received = await transport.receive()
-    assert received is not None
+    envelopes = [e async for e in transport.receive()]
+    assert len(envelopes) == 1
 
-    await transport.acknowledge(received)
+    await transport.acknowledge(envelopes[0])
 
-    assert await transport.receive() is None
+    assert [e async for e in transport.receive()] == []
 
 
 async def test_acknowledge_raises_when_no_transport_message_id_stamp() -> None:
@@ -123,12 +123,12 @@ async def test_reject_removes_envelope_from_queue() -> None:
     transport = make_transport()
     await transport.send(Envelope.wrap(FooMessage(value="hello")))
 
-    received = await transport.receive()
-    assert received is not None
+    envelopes = [e async for e in transport.receive()]
+    assert len(envelopes) == 1
 
-    await transport.reject(received)
+    await transport.reject(envelopes[0])
 
-    assert await transport.receive() is None
+    assert [e async for e in transport.receive()] == []
 
 
 async def test_reject_raises_when_no_transport_message_id_stamp() -> None:

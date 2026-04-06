@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
@@ -43,13 +44,13 @@ class MemoryTransport:
 
         return envelope
 
-    async def receive(self) -> Envelope | None:
-        for message_id, encoded_envelope in self._queue.items():
+    async def receive(self) -> AsyncIterator[Envelope]:
+        for message_id, encoded_envelope in list(self._queue.items()):
             if (
                 message_id not in self._available_at
                 or datetime.now(UTC) >= self._available_at[message_id]
             ):
-                return self._serializer.decode(encoded_envelope)
+                yield self._serializer.decode(encoded_envelope)
 
     async def acknowledge(self, envelope: Envelope) -> None:
         encoded_envelope = self._serializer.encode(envelope)

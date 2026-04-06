@@ -78,7 +78,8 @@ async def test_receive_raises_not_implemented() -> None:
     transport, _ = make_transport()
 
     with pytest.raises(NotImplementedError):
-        await transport.receive()
+        async for _ in transport.receive():
+            pass
 
 
 async def test_acknowledge_raises_not_implemented() -> None:
