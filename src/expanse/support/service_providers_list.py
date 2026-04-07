@@ -39,5 +39,6 @@ class ServiceProvidersList:
                 "expanse.session.session_service_provider.SessionServiceProvider",
                 "expanse.messenger.messenger_service_provider.MessengerServiceProvider",
                 "expanse.queue.queue_service_provider.QueueServiceProvider",
+                "expanse.redis.redis_service_provider.RedisServiceProvider",
             ]
         )

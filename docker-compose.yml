@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 services:
   mysql:
     image: mysql/mysql-server:8.0
@@ -26,4 +26,9 @@ services:
       MARIADB_ROOT_HOST: "%"
     ports:
       - "3307:3307"
+    restart: always
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
     restart: always
