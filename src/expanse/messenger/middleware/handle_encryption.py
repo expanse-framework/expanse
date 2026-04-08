@@ -51,7 +51,7 @@ class HandleEncryption:
         # We need to serialize the message before encrypting it.
         encoded_envelope = self._serializer.encode(envelope)
         payload = msgspec.json.encode(encoded_envelope).decode()
-        label = hashlib.sha256(encoded_envelope["body"]["type"].encode()).hexdigest()
+        label = hashlib.sha256(encoded_envelope["body"]["t"].encode()).hexdigest()
 
         encryptor = self._encryption.make(label=label.encode())
         encrypted_payload = encryptor.encrypt(payload)

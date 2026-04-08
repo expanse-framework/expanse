@@ -32,8 +32,9 @@ def test_serializer_supports_envelope_with_dataclass_message() -> None:
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
-        "data": '{"foo":"bar"}',
-        "type": "tests.messenger.test_serializer.Foo",
+        "d": '{"foo":"bar"}',
+        "t": "tests.messenger.test_serializer.Foo",
+        "s": "dataclass",
     }
 
     decoded_envelope = serializer.decode(encoded_envelope)
@@ -49,8 +50,9 @@ def test_serializer_supports_envelope_with_msgspec_message() -> None:
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
-        "data": '{"bar":"baz"}',
-        "type": "tests.messenger.test_serializer.Bar",
+        "d": '{"bar":"baz"}',
+        "t": "tests.messenger.test_serializer.Bar",
+        "s": "msgspec",
     }
 
     decoded_envelope = serializer.decode(encoded_envelope)
@@ -66,8 +68,9 @@ def test_serializer_supports_envelope_with_pydantic_message() -> None:
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
-        "data": '{"baz":"qux"}',
-        "type": "tests.messenger.test_serializer.Baz",
+        "d": '{"baz":"qux"}',
+        "t": "tests.messenger.test_serializer.Baz",
+        "s": "pydantic",
     }
 
     decoded_envelope = serializer.decode(encoded_envelope)
@@ -84,8 +87,9 @@ def test_serializer_serializes_envelope_with_stamps() -> None:
 
     assert encoded_envelope["headers"]["stamps"] == [
         {
-            "data": '{"value":"test"}',
-            "type": "tests.messenger.test_serializer.MyStamp",
+            "d": '{"value":"test"}',
+            "t": "tests.messenger.test_serializer.MyStamp",
+            "s": "msgspec",
         }
     ]
 

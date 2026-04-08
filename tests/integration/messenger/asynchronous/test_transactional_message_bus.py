@@ -115,7 +115,7 @@ async def test_messages_are_dispatched_after_transaction_is_committed(
         assert len(messages) == 1
         assert (
             messages[0].body
-            == '{"data": "{\\"content\\":\\"test message\\"}", "type": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage"}'
+            == '{"d": "{\\"content\\":\\"test message\\"}", "t": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage", "s": "dataclass"}'
         )
 
 
@@ -151,5 +151,5 @@ async def test_messages_are_cleared_after_transaction_is_rolled_back(
         assert len(messages) == 1
         assert (
             messages[0].body
-            == '{"data": "{\\"content\\":\\"message after rollback\\"}", "type": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage"}'
+            == '{"d": "{\\"content\\":\\"message after rollback\\"}", "t": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage", "s": "dataclass"}'
         )

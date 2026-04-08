@@ -5,6 +5,8 @@ from typing import Concatenate
 from typing import TypedDict
 from typing import TypeVar
 
+from expanse.types.serialization import Encoded
+
 
 Message = Any
 MessageT = TypeVar("MessageT")
@@ -12,11 +14,6 @@ type MessageHandler[MessageT] = (
     Callable[Concatenate[MessageT, ...], None]
     | Callable[Concatenate[MessageT, ...], Awaitable[None]]
 )
-
-
-class Encoded(TypedDict):
-    data: str
-    type: str
 
 
 class EncodedEnvelope(TypedDict):
