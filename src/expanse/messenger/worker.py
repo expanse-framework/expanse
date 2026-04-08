@@ -167,7 +167,12 @@ class Worker:
                     HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
                 )
             except Exception as e:
-                errors[f"{handler.__module__}.{handler.__qualname__}"] = e
+                if handler is not None and callable(handler):
+                    errors[
+                        f"{handler.__module__}.{handler.__qualname__}"
+                    ] = e
+                else:
+                    errors[f"{type(message).__module__}.{type(message).__qualname__}.handle"] = e
         else:
             handlers = self._registry.get_handlers(message.__class__)
 

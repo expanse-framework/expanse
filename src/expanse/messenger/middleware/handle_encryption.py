@@ -4,6 +4,7 @@ from collections.abc import Awaitable
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from typing import Any
 
 import msgspec
 
@@ -76,6 +77,7 @@ class HandleEncryption:
 
         decoded_envelope: EncodedEnvelope = msgspec.json.decode(decrypted_payload)
 
+        all_stamps: list[Any] = envelope.stamps()
         return self._serializer.decode(decoded_envelope).with_stamps(
-            *[s for s in envelope.stamps() if not isinstance(s, EncryptedStamp)]
+            *[s for s in all_stamps if not isinstance(s, EncryptedStamp)]
         )

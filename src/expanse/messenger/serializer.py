@@ -28,7 +28,8 @@ class Serializer:
         headers: dict[str, Any] = {}
 
         if envelope.is_stamped():
-            headers["stamps"] = [self._encode(stamp) for stamp in envelope.stamps()]
+            stamps: list[Stamp] = envelope.stamps()
+            headers["stamps"] = [self._encode(s) for s in stamps]
 
         return EncodedEnvelope(body=body, headers=headers)
 
