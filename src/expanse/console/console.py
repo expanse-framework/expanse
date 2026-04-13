@@ -458,7 +458,7 @@ class Console:
         formatter.set_style("c1", Style("cyan"))
         formatter.set_style("c2", Style("default", options=["bold"]))
         formatter.set_style("info", Style("blue"))
-        formatter.set_style("comment", Style("green"))
+        formatter.set_style("comment", Style("yellow"))
         formatter.set_style("warning", Style("yellow"))
         formatter.set_style("debug", Style("default", options=["dark"]))
         formatter.set_style("success", Style("green"))

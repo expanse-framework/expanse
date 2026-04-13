@@ -26,7 +26,7 @@ class FileStore(Store):
             return ""
 
         if (
-            self._path.joinpath(session_id).stat().st_mtime + self._lifetime * 60
+            int(self._path.joinpath(session_id).stat().st_mtime) + self._lifetime * 60
             <= time.time()
         ):
             return ""
@@ -51,7 +51,7 @@ class FileStore(Store):
         count = 0
 
         for path in self._path.glob("*"):
-            if path.stat().st_mtime + self._lifetime * 60 <= time.time():
+            if int(path.stat().st_mtime) + self._lifetime * 60 <= time.time():
                 path.unlink(missing_ok=True)
 
                 if path.suffix == ".lock":

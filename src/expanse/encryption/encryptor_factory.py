@@ -14,7 +14,7 @@ class EncryptorFactory:
     def __init__(self, app: Application) -> None:
         self._app = app
 
-    def make(self, compress: bool = True) -> "Encryptor":
+    def make(self, compress: bool = True, label: bytes | None = None) -> "Encryptor":
         from expanse.encryption.encryptor import Cipher
         from expanse.encryption.encryptor import Encryptor
         from expanse.encryption.key import Key
@@ -38,7 +38,7 @@ class EncryptorFactory:
 
         return Encryptor(
             key_chain,
-            KeyGenerator(self._normalize_key(salt)),
+            KeyGenerator(self._normalize_key(salt), label=label),
             Cipher(cipher),
             compress=compress,
         )

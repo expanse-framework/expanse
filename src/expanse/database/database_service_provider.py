@@ -38,14 +38,27 @@ class DatabaseServiceProvider(ServiceProvider):
         await self._container.on_resolved(Portal, self._register_command_path)
 
     async def _register_async(self) -> None:
-        self._container.singleton(AsyncDatabaseManager)
+        self._container.singleton(
+            AsyncDatabaseManager, self._create_async_database_manager
+        )
         self._container.scoped(AsyncSession, self._create_async_session)
         self._container.scoped(AsyncConnection, self._create_async_connection)
 
     async def _register_sync(self) -> None:
-        self._container.singleton(DatabaseManager)
+        self._container.singleton(DatabaseManager, self._create_sync_database_manager)
         self._container.scoped(Session, self._create_session)
         self._container.scoped(Connection, self._create_connection)
+
+    async def _create_async_database_manager(
+        self, app: Application
+    ) -> AsyncGenerator[AsyncDatabaseManager]:
+        from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+
+        db = AsyncDatabaseManager(app)
+
+        yield db
+
+        await db.dispose()
 
     async def _create_async_connection(
         self, db: AsyncDatabaseManager, name: str | None = None
@@ -69,6 +82,17 @@ class DatabaseServiceProvider(ServiceProvider):
         yield session
 
         await session.close()
+
+    def _create_sync_database_manager(
+        self, app: Application
+    ) -> Generator[DatabaseManager]:
+        from expanse.database.synchronous.database_manager import DatabaseManager
+
+        db = DatabaseManager(app)
+
+        yield db
+
+        db.dispose()
 
     def _create_connection(
         self, db: DatabaseManager, name: str | None = None

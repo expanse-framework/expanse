@@ -206,7 +206,8 @@ class Application:
 
         portal = await self._container.get(Portal)
 
-        return await portal.handle(input)
+        async with self._container:
+            return await portal.handle(input)
 
     def _bind_paths(self) -> None:
         assert self._base_path is not None
