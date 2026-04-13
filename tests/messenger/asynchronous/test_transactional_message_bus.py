@@ -42,7 +42,7 @@ class FakeAsyncMessageBus(MessageBusContract):
 
 @pytest.fixture()
 def engine() -> AsyncEngine:
-    return AsyncEngine(create_engine("sqlite:///:memory:"))
+    return AsyncEngine(create_engine("sqlite+aiosqlite:///:memory:"))
 
 
 @pytest.fixture()
