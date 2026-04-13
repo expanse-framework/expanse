@@ -99,3 +99,9 @@ class MessageHandlingFailedError(Exception):
             )
 
         super().__init__("".join(error_message))
+
+
+class TransportError(Exception):
+    """
+    Raised when a transport encounters an error while sending or receiving a message.
+    """

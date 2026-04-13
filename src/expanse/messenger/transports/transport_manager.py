@@ -58,6 +58,8 @@ class TransportManager:
                 return self._create_memory_transport(transport_config)
             case "database":
                 return await self._create_database_transport(transport_config)
+            case "redis":
+                return await self._create_redis_transport(transport_config)
             case _:
                 raise UnsupportedTransportDriverError(
                     f"Transport '{name}' has an unsupported driver '{transport_config['driver']}'."
@@ -77,4 +79,17 @@ class TransportManager:
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),
             await self._container.get(AsyncDatabaseManager),
+        )
+
+    async def _create_redis_transport(self, raw_config: dict[str, Any]) -> Transport:
+        from expanse.messenger.serializer import Serializer
+        from expanse.messenger.transports.redis.config import RedisTransportConfig
+        from expanse.messenger.transports.redis.transport import RedisTransport
+        from expanse.redis.asynchronous.redis_manager import RedisManager
+
+        config = RedisTransportConfig.model_validate(raw_config)
+        redis = await self._container.get(RedisManager)
+
+        return RedisTransport(
+            await redis.connection(config.connection), config, Serializer()
         )
