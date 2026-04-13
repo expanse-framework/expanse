@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture()
-def _mock_signal_handlers(mocker: MockerFixture) -> None:
+async def _mock_signal_handlers(mocker: MockerFixture) -> None:
     """Patch add/remove_signal_handler on the event loop class.
 
     The command tester runs in a non-main thread via anyio, which prevents
@@ -29,9 +29,7 @@ def _mock_signal_handlers(mocker: MockerFixture) -> None:
     command execute without errors while still allowing tests to inspect the
     calls via mocker's spy/patch.
     """
-    import asyncio
-
-    loop_cls = asyncio.get_event_loop().__class__
+    loop_cls = asyncio.get_running_loop().__class__
 
     mocker.patch.object(loop_cls, "add_signal_handler", return_value=None)
     mocker.patch.object(loop_cls, "remove_signal_handler", return_value=True)
@@ -173,7 +171,7 @@ async def test_command_registers_sigint_and_sigterm_handlers(
     ) -> None:
         registered[sig] = callback
 
-    loop_cls = asyncio.get_event_loop().__class__
+    loop_cls = asyncio.get_running_loop().__class__
     mocker.patch.object(loop_cls, "add_signal_handler", add_signal_handler)
     mocker.patch.object(loop_cls, "remove_signal_handler", return_value=True)
 
@@ -196,7 +194,7 @@ async def test_command_signal_handler_stops_worker(
     ) -> None:
         registered[sig] = callback
 
-    loop_cls = asyncio.get_event_loop().__class__
+    loop_cls = asyncio.get_running_loop().__class__
     mocker.patch.object(loop_cls, "add_signal_handler", add_signal_handler)
     mocker.patch.object(loop_cls, "remove_signal_handler", return_value=True)
 
@@ -228,7 +226,7 @@ async def test_command_signal_handler_removes_handlers_after_stop(
         removed_signals.append(sig)
         return True
 
-    loop_cls = asyncio.get_event_loop().__class__
+    loop_cls = asyncio.get_running_loop().__class__
     mocker.patch.object(loop_cls, "add_signal_handler", add_signal_handler)
     mocker.patch.object(loop_cls, "remove_signal_handler", remove_signal_handler)
 
