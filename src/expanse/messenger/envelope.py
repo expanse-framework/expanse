@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import overload
 
 from expanse.types.messenger import Message
 from expanse.types.messenger import Stamp
@@ -74,12 +75,15 @@ class Envelope:
         return self.__class__(
             self._message,
             stamps=[
-                s
-                for t, ls in self._stamps.items()
-                for s in ls
-                if t not in stamp_types
+                s for t, ls in self._stamps.items() for s in ls if t not in stamp_types
             ],
         )
+
+    @overload
+    def stamps(self, stamp_type: type[StampT]) -> list[StampT]: ...
+
+    @overload
+    def stamps(self, stamp_type: None = None) -> list[Stamp]: ...
 
     def stamps(self, stamp_type: type[StampT] | None = None) -> list[StampT]:
         """

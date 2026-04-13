@@ -33,7 +33,9 @@ class TransactionalMessageBus(MessageBusContract):
     """
 
     def __init__(
-        self, decorated_bus: MessageBusContract, session: Session | None = None
+        self,
+        decorated_bus: MessageBusContract,
+        session: Session | AsyncSession | None = None,
     ):
         self._decorated_bus: MessageBusContract = decorated_bus
         self._queued_messages: list[Message | Envelope] = []

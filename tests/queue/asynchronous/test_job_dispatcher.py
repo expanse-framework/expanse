@@ -7,12 +7,12 @@ import pytest
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.messenger.asynchronous.message_bus import MessageBus
-from expanse.messenger.asynchronous.transport_manager import TransportManager
-from expanse.messenger.asynchronous.transports.memory.transport import MemoryTransport
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.self_handling import SelfHandlingStamp
+from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.queue.asynchronous.job_dispatcher import AsyncJobDispatcher
 from expanse.queue.asynchronous.pending_job import AsyncPendingJob
 

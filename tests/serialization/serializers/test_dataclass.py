@@ -5,6 +5,7 @@ import msgspec
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.dataclass import DataclassSerializer
+from expanse.types.serialization import Encoded
 
 
 @dataclass
@@ -34,13 +35,15 @@ def test_encode_dataclass() -> None:
     encoded = serializer.encode(obj)
 
     assert encoded["d"] == '{"name":"Alice","age":30}'
-    assert encoded["t"] == "tests.serialization.serializers.test_dataclass.SimpleDataclass"
+    assert (
+        encoded["t"] == "tests.serialization.serializers.test_dataclass.SimpleDataclass"
+    )
     assert encoded["s"] == "dataclass"
 
 
 def test_decode_dataclass() -> None:
     serializer = DataclassSerializer()
-    encoded = {
+    encoded: Encoded = {
         "d": '{"name":"Alice","age":30}',
         "t": "tests.serialization.serializers.test_dataclass.SimpleDataclass",
         "s": "dataclass",

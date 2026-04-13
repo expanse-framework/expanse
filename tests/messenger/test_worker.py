@@ -420,7 +420,7 @@ async def test_worker_adds_handled_stamp_after_successful_handling(
         handled_envelopes.append(envelope)
         await original_acknowledge(envelope)
 
-    transport.acknowledge = capturing_acknowledge  # type: ignore[assignment]
+    transport.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
 
     await worker.run(limit=1)
 
@@ -451,7 +451,7 @@ async def test_worker_adds_handled_stamp_for_self_handling_messages(
         handled_envelopes.append(envelope)
         await original_acknowledge(envelope)
 
-    transport.acknowledge = capturing_acknowledge  # type: ignore[assignment]
+    transport.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
 
     await worker.run(limit=1)
 

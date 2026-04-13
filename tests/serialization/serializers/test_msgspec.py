@@ -5,6 +5,7 @@ import msgspec
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.msgspec import MsgSpecSerializer
+from expanse.types.serialization import Encoded
 
 
 class SimpleStruct(msgspec.Struct):
@@ -39,7 +40,7 @@ def test_encode_msgspec_struct() -> None:
 
 def test_decode_msgspec_struct() -> None:
     serializer = MsgSpecSerializer()
-    encoded = {
+    encoded: Encoded = {
         "d": '{"name":"Alice","age":30}',
         "t": "tests.serialization.serializers.test_msgspec.SimpleStruct",
         "s": "msgspec",

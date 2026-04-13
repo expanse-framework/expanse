@@ -8,7 +8,7 @@ from expanse.types.messenger import MessageT
 
 
 class Registry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._handlers: dict[type[Message], list[MessageHandler[Message]]] = (
             defaultdict(list)
         )

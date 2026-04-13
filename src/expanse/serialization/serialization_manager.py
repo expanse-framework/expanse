@@ -9,7 +9,7 @@ from expanse.serialization.serializers.serializer import Serializer
 
 
 class SerializationManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self._serializers: dict[str, Serializer[Any]] = {
             "msgspec": MsgSpecSerializer(),
             "dataclass": DataclassSerializer(),

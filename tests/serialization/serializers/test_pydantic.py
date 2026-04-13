@@ -5,6 +5,7 @@ import msgspec
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.pydantic import PydanticSerializer
+from expanse.types.serialization import Encoded
 
 
 class SimpleModel(BaseModel):
@@ -39,7 +40,7 @@ def test_encode_pydantic_model() -> None:
 
 def test_decode_pydantic_model() -> None:
     serializer = PydanticSerializer()
-    encoded = {
+    encoded: Encoded = {
         "d": '{"name":"Alice","age":30}',
         "t": "tests.serialization.serializers.test_pydantic.SimpleModel",
         "s": "pydantic",

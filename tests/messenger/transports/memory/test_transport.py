@@ -36,8 +36,14 @@ async def test_send_increments_message_id() -> None:
     first = await transport.send(Envelope.wrap(FooMessage(value="first")))
     second = await transport.send(Envelope.wrap(FooMessage(value="second")))
 
-    assert first.stamp(TransportMessageIdStamp).id == 1  # type: ignore[union-attr]
-    assert second.stamp(TransportMessageIdStamp).id == 2  # type: ignore[union-attr]
+    first_stamp = first.stamp(TransportMessageIdStamp)
+    second_stamp = second.stamp(TransportMessageIdStamp)
+
+    assert first_stamp is not None
+    assert second_stamp is not None
+
+    assert first_stamp.id == 1
+    assert second_stamp.id == 2
 
 
 async def test_sent_returns_decoded_envelopes() -> None:
@@ -47,8 +53,10 @@ async def test_sent_returns_decoded_envelopes() -> None:
     sent = transport.sent
 
     assert len(sent) == 1
-    assert isinstance(sent[0].open(), FooMessage)
-    assert sent[0].open().value == "hello"  # type: ignore[union-attr]
+
+    message = sent[0].open()
+    assert isinstance(message, FooMessage)
+    assert message.value == "hello"
 
 
 async def test_receive_returns_available_envelope() -> None:

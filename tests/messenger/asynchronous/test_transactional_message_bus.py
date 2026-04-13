@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import asyncio
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
+from expanse.database._utils import create_engine
+from expanse.database.asynchronous.engine import AsyncEngine
+from expanse.database.asynchronous.session import AsyncSession
 from expanse.messenger.asynchronous.transactional_message_bus import (
     TransactionalMessageBus,
 )
@@ -20,6 +20,8 @@ from expanse.messenger.envelope import Envelope
 
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from expanse.types.messenger import Message
 
 
@@ -39,24 +41,26 @@ class FakeAsyncMessageBus(MessageBusContract):
 
 
 @pytest.fixture()
-def engine():
-    return create_engine("sqlite:///:memory:")
+def engine() -> AsyncEngine:
+    return AsyncEngine(create_engine("sqlite:///:memory:"))
 
 
 @pytest.fixture()
-def session(engine) -> Session:
-    with Session(engine) as session:
+def session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, class_=AsyncSession)
+
+
+@pytest.fixture()
+async def session(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession]:
+    async with session_factory() as session:
         yield session
 
 
 @pytest.fixture()
 def fake_bus() -> FakeAsyncMessageBus:
     return FakeAsyncMessageBus()
-
-
-async def _commit_in_thread(session: Session) -> None:
-    """Run session.commit() in a thread to allow async_to_sync to work."""
-    await asyncio.to_thread(session.commit)
 
 
 async def test_dispatch_without_session_dispatches_immediately(
@@ -73,7 +77,7 @@ async def test_dispatch_without_session_dispatches_immediately(
 
 
 async def test_dispatch_with_session_queues_messages(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
@@ -85,7 +89,7 @@ async def test_dispatch_with_session_queues_messages(
 
 
 async def test_queued_messages_dispatched_on_commit(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
@@ -96,7 +100,7 @@ async def test_queued_messages_dispatched_on_commit(
 
     assert len(fake_bus.dispatched) == 0
 
-    await _commit_in_thread(session)
+    await session.commit()
 
     assert len(fake_bus.dispatched) == 2
     assert fake_bus.dispatched[0].open() == msg1
@@ -104,10 +108,10 @@ async def test_queued_messages_dispatched_on_commit(
 
 
 async def test_queued_messages_cleared_on_rollback(
-    fake_bus: FakeAsyncMessageBus, engine
+    fake_bus: FakeAsyncMessageBus, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    with Session(engine) as session:
-        session.begin()
+    async with session_factory() as session:
+        await session.begin()
 
         bus = TransactionalMessageBus(fake_bus, session=session)
 
@@ -115,19 +119,19 @@ async def test_queued_messages_cleared_on_rollback(
 
         assert len(fake_bus.dispatched) == 0
 
-        session.rollback()
+        await session.rollback()
 
         assert len(fake_bus.dispatched) == 0
         assert len(bus._queued_messages) == 0
 
 
 async def test_messages_after_commit_are_still_queued(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
     await bus.dispatch(MyMessage(foo="first"))
-    await _commit_in_thread(session)
+    await session.commit()
 
     assert len(fake_bus.dispatched) == 1
 
@@ -135,13 +139,13 @@ async def test_messages_after_commit_are_still_queued(
 
     assert len(fake_bus.dispatched) == 1
 
-    await _commit_in_thread(session)
+    await session.commit()
 
     assert len(fake_bus.dispatched) == 2
 
 
 async def test_attach_session_after_creation(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus)
 
@@ -154,12 +158,12 @@ async def test_attach_session_after_creation(
     await bus.dispatch(MyMessage(foo="queued"))
     assert len(fake_bus.dispatched) == 1
 
-    await _commit_in_thread(session)
+    await session.commit()
     assert len(fake_bus.dispatched) == 2
 
 
 async def test_dispatch_returns_envelope(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
@@ -171,7 +175,7 @@ async def test_dispatch_returns_envelope(
 
 
 async def test_dispatch_with_envelope_input(
-    fake_bus: FakeAsyncMessageBus, session: Session
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
@@ -181,7 +185,7 @@ async def test_dispatch_with_envelope_input(
 
     assert result is input_envelope
 
-    await _commit_in_thread(session)
+    await session.commit()
 
     assert len(fake_bus.dispatched) == 1
     assert fake_bus.dispatched[0].open() == message

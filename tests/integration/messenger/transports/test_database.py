@@ -72,7 +72,7 @@ async def test_transport_can_receive_a_message(
     assert len(envelopes) == 1
     received = envelopes[0]
     assert isinstance(received.open(), DatabaseMessage)
-    assert received.open().value == message.value  # type: ignore[union-attr]
+    assert received.open().value == message.value
 
     stamp = received.stamp(TransportMessageIdStamp)
     assert stamp is not None
