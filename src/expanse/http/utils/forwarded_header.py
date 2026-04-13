@@ -101,17 +101,18 @@ class ForwardedHeader:
                             name = "for_"
 
                         match name:
-                            case "by" | "for_":
-                                if name not in elems:
-                                    elems[name] = []
-
-                                elems[name].append(
+                            case "by":
+                                elems.setdefault("by", []).append(
+                                    Node(ip_address(value), int(port) if port else None)
+                                )
+                            case "for_":
+                                elems.setdefault("for_", []).append(
                                     Node(ip_address(value), int(port) if port else None)
                                 )
                             case "host":
-                                elems[name] = value + (f":{port}" if port else "")
+                                elems["host"] = value + (f":{port}" if port else "")
                             case "proto":
-                                elems[name] = value.lower()
+                                elems["proto"] = value.lower()
                             case _:
                                 raise InvalidForwardedHeaderError(
                                     f'Invalid directive "{name}" found in the Forwarded header'
