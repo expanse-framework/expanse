@@ -189,8 +189,6 @@ async def test_command_signal_handler_stops_worker(
     mock_worker: AsyncMock,
     mocker: MockerFixture,
 ) -> None:
-    import asyncio.unix_events
-
     registered: dict[int, Callable[..., object]] = {}
 
     def add_signal_handler(
@@ -218,8 +216,6 @@ async def test_command_signal_handler_removes_handlers_after_stop(
     mock_worker: AsyncMock,
     mocker: MockerFixture,
 ) -> None:
-    import asyncio.unix_events
-
     registered: dict[int, Callable[..., object]] = {}
     removed_signals: list[int] = []
 
