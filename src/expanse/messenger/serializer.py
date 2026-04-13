@@ -1,3 +1,4 @@
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
 
@@ -5,10 +6,15 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import MessageEncodingFailedError
 from expanse.serialization.serialization_manager import SerializationManager
-from expanse.serialization.serializers.serializer import Serializer as BaseSerializer
 from expanse.types.messenger import Encoded
 from expanse.types.messenger import EncodedEnvelope
 from expanse.types.messenger import Stamp
+
+
+if TYPE_CHECKING:
+    from expanse.serialization.serializers.serializer import (
+        Serializer as BaseSerializer,
+    )
 
 
 T = TypeVar("T")

@@ -1,11 +1,15 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import msgspec
 
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.msgspec import MsgSpecSerializer
-from expanse.types.serialization import Encoded
+
+
+if TYPE_CHECKING:
+    from expanse.types.serialization import Encoded
 
 
 class SimpleStruct(msgspec.Struct):

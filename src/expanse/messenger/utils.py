@@ -2,14 +2,18 @@ import importlib
 import inspect
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypedDict
 from typing import TypeVar
 from typing import get_type_hints
 
 from expanse.messenger.exceptions import InvalidHandlerError
-from expanse.types import Message
 from expanse.types.messenger import MessageHandler
+
+
+if TYPE_CHECKING:
+    from expanse.types import Message
 
 
 T = TypeVar("T")
