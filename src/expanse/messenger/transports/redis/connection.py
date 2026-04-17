@@ -23,6 +23,7 @@ class Connection:
         self._config: RedisTransportConfig = config
         self._queue: str = f"{self._config.stream}__queue"
         self._last_pending_message_id: str | None = None
+        self._next_claim: float = 0.0
 
     async def add(self, body: str, headers: dict[str, Any], delay: int = 0) -> str:
         """
@@ -76,7 +77,7 @@ class Connection:
                 yield message
                 retrieved += 1
 
-        if retrieved < count:
+        if retrieved < count and self._next_claim <= time.time():
             await self._claim_old_pending_messages()
 
             async for message in self._get_pending_messages():
@@ -185,21 +186,25 @@ class Connection:
                 self._config.consumer,
                 streams={self._config.stream: self._last_pending_message_id},
                 count=1,
-                block=1000,
             )
 
-            if not messages:
+            if not messages or not messages[0][1]:
+                self._last_pending_message_id = None
                 return
 
-            for _stream, entries in messages:
-                for message_id, fields in entries:
-                    self._last_pending_message_id = message_id
-                    yield {"id": message_id, "data": fields["message"]}
+            for message_id, data in messages[0][1]:
+                self._last_pending_message_id = message_id
+                yield {"id": message_id, "data": data["message"]}
 
     async def _claim_old_pending_messages(self) -> None:
         try:
             pending = await self._connection.xpending_range(
-                self._config.stream, self._config.group, "-", "+", 1
+                self._config.stream,
+                self._config.group,
+                "-",
+                "+",
+                1,
+                idle=self._config.idle_time * 1000,
             )
         except Exception as e:
             raise TransportError(
@@ -207,6 +212,20 @@ class Connection:
             )
 
         if not pending:
+            self._next_claim = time.time() + self._config.claim_interval
+            return
+
+        message = pending[0]
+        if message["consumer"] == self._config.consumer:
+            # If the message is already being processed by this consumer,
+            # we skip it to avoid claiming a message that is currently being processed.
+            self._last_pending_message_id = message["message_id"]
+            return
+
+        if message["time_since_delivered"] < self._config.idle_time * 1000:
+            # If the message has not been idle for long enough,
+            # we skip it to avoid claiming a message that is still being processed by another consumer.
+            self._next_claim = time.time() + self._config.claim_interval
             return
 
         try:

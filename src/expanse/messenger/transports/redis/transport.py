@@ -35,7 +35,7 @@ class RedisTransport:
 
         return envelope.with_stamps(TransportMessageIdStamp(id))
 
-    async def receive(self) -> AsyncIterator[Envelope | None]:
+    async def receive(self) -> AsyncIterator[Envelope]:
         async for message in self._connection.get():
             data = json.loads(message["data"])
 
