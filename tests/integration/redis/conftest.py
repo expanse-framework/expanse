@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from expanse.configuration.config import Config
+from expanse.core.application import Application
 from expanse.redis.asynchronous.redis_manager import RedisManager
 
 
@@ -12,7 +13,10 @@ pytestmark = pytest.mark.redis
 
 
 @pytest.fixture(autouse=True)
-async def setup_redis() -> AsyncGenerator[None]:
+async def setup_redis(app: Application) -> AsyncGenerator[None]:
+    from expanse.redis.redis_service_provider import RedisServiceProvider
+
+    await RedisServiceProvider(app.container).register()
 
     yield
 
