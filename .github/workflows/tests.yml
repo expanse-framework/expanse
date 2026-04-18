@@ -36,6 +36,15 @@ jobs:
           POSTGRES_DB: "expanse"
         ports:
           - "5432:5432"
+      redis:
+        image: redis:7.2-alpine
+        ports:
+        - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -104,4 +113,4 @@ jobs:
         run: uv sync --group lint
 
       - name: Run tests
-        run: uv run pytest -m "not db"
+        run: uv run pytest -m "not db and not redis"
