@@ -1,8 +1,8 @@
-from __future__ import annotations
-
 import os
 
 import pytest
+
+from pytest_mock import MockerFixture
 
 from expanse.configuration.config import Config
 from expanse.redis.asynchronous.redis_manager import RedisManager
@@ -71,6 +71,10 @@ def config() -> Config:
                             "base": 1,
                             "cap": 10,
                         },
+                    },
+                    "cluster": {
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/0",
+                        "cluster": True,
                     },
                 },
             }
@@ -161,3 +165,15 @@ async def test_close_closes_all_connections(config: Config) -> None:
     assert conn2.ping()
 
     await manager.close()
+
+
+async def test_connection_with_cluster(config: Config, mocker: MockerFixture) -> None:
+    from redis.asyncio import RedisCluster
+
+    mock = mocker.patch.object(RedisCluster, "from_url")
+
+    manager = RedisManager(config)
+
+    await manager.connection("cluster")
+
+    assert mock.called

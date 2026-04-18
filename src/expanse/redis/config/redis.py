@@ -33,5 +33,6 @@ class BackoffConfig(RootModel[ConstantBackoffConfig | GenericBackoffConfig]):
 
 class RedisConfig(BaseModel):
     url: AnyUrl
+    cluster: bool = False
     max_retries: int = 3
     backoff: BackoffConfig | None = BackoffConfig(root=GenericBackoffConfig())

@@ -58,6 +58,7 @@ class RedisManager:
 
         try:
             from redis import Redis
+            from redis import RedisCluster
         except ImportError:
             raise MissingRedisPackageError(
                 "The 'redis' package is required to use Redis connections. "
@@ -116,6 +117,14 @@ class RedisManager:
                             )
 
             retry = Retry(backoff=backoff, retries=config.max_retries)
+
+        if config.cluster:
+            return cast(
+                "Connection",
+                RedisCluster.from_url(
+                    str(config.url), retry=retry, decode_responses=True
+                ),
+            )
 
         return cast(
             "Connection",
