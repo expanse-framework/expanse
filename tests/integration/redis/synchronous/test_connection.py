@@ -16,6 +16,8 @@ from expanse.testing.client import TestClient
 if TYPE_CHECKING:
     from expanse.configuration.config import Config
 
+pytestmark = pytest.mark.redis
+
 
 def default_connection(connection: Connection) -> Response:
     connection.set("test_key", "test_value")

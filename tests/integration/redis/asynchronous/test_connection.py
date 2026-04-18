@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from expanse.configuration.config import Config
 
 
+pytestmark = pytest.mark.redis
+
+
 async def default_connection(connection: Connection) -> Response:
     await connection.set("test_key", "test_value")
     result = await connection.get("test_key")
