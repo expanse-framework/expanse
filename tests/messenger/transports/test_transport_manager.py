@@ -1,3 +1,5 @@
+import os
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +12,7 @@ from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.redis.transport import RedisTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 
@@ -24,7 +27,19 @@ def make_manager(
 ) -> TransportManager:
     container = Container()
     registry = Registry()
-    config = Config({"messenger": messenger_config or {}})
+    config = Config(
+        {
+            "messenger": messenger_config or {},
+            "redis": {
+                "connections": {
+                    "default": {
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/15"
+                    }
+                }
+            },
+        }
+    )
+    container.instance(Config, config)
 
     return TransportManager(container, config, registry)
 
@@ -104,6 +119,20 @@ async def test_transport_creates_sync_transport() -> None:
     assert isinstance(transport, SyncTransport)
 
 
+async def test_transport_creates_redis_transport() -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "sync": {"driver": "redis", "connection": "default"},
+            },
+        }
+    )
+
+    transport = await manager.transport("sync")
+
+    assert isinstance(transport, RedisTransport)
+
+
 async def test_get_default_transport_name_returns_configured_name() -> None:
     manager = make_manager({"transport": "my_transport"})
 
@@ -149,13 +178,13 @@ async def test_transport_raises_for_unsupported_driver() -> None:
     manager = make_manager(
         {
             "transports": {
-                "custom": {"driver": "redis"},
+                "custom": {"driver": "invalid"},
             },
         }
     )
 
     with pytest.raises(
-        UnsupportedTransportDriverError, match="unsupported driver 'redis'"
+        UnsupportedTransportDriverError, match="unsupported driver 'invalid'"
     ):
         await manager.transport("custom")
 

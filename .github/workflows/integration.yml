@@ -40,12 +40,12 @@ jobs:
       - name: Create keys
         run: |
           cd my-app
-          uv run python ./beam encryption key generate
+          uv run python ./beam encryption key generate -vvv
 
       - name: Execute migrations
         run: |
           cd my-app
-          uv run python ./beam db migrate
+          uv run python ./beam db migrate -vvv
 
       - name: Execute tests
         run: |
