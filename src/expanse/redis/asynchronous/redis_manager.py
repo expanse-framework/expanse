@@ -1,10 +1,14 @@
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import cast
 
 from expanse.configuration.config import Config
-from expanse.redis.asynchronous.connections.connection import Connection
 from expanse.redis.exceptions import MissingRedisPackageError
 from expanse.redis.exceptions import UnconfiguredConnectionError
+
+
+if TYPE_CHECKING:
+    from expanse.redis.asynchronous.connections.connection import Connection
 
 
 class RedisManager:
@@ -12,7 +16,7 @@ class RedisManager:
         self._config: Config = config
         self._connections: dict[str, Connection] = {}
 
-    async def connection(self, name: str | None = None) -> Connection:
+    async def connection(self, name: str | None = None) -> "Connection":
         """
         Get a Redis connection by name.
 
@@ -46,7 +50,7 @@ class RedisManager:
         for connection in self._connections.values():
             await connection.aclose()
 
-    async def _create_connection(self, raw_config: dict[str, Any]) -> Connection:
+    async def _create_connection(self, raw_config: dict[str, Any]) -> "Connection":
         from redis.asyncio import Redis
         from redis.asyncio.retry import Retry
         from redis.backoff import AbstractBackoff
