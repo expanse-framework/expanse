@@ -76,23 +76,14 @@ class Request:
 
     @cached_property
     def method(self) -> str:
-        """
-        HTTP method. Uppercase string.
-        """
         return self._scope["method"]
 
     @cached_property
     def content_type(self) -> ContentType:
-        """
-        The request's content-type
-        """
         return ContentType.from_string(self.headers.get("content-type", ""))
 
     @cached_property
     def content_length(self) -> int | None:
-        """
-        The request's content-length
-        """
         if self.headers.get("transfer-encoding", "") == "chunked":
             return None
 
@@ -130,11 +121,6 @@ class Request:
 
     @cached_property
     def date(self) -> datetime | None:
-        """
-        The sending time of the request.
-
-        NOTE: The datetime object is timezone-aware.
-        """
         value = self.headers.get("date", None)
         if value is None:
             return None
@@ -151,10 +137,6 @@ class Request:
 
     @cached_property
     def referrer(self) -> URL | None:
-        """
-        The `Referer` HTTP request header contains an absolute or partial address
-        of the page making the request.
-        """
         referrer = self.headers.get("referer", None)
         if referrer is None:
             return None
@@ -163,20 +145,11 @@ class Request:
 
     @cached_property
     def client(self) -> Address:
-        """
-        Client's IP and Port.
-
-        Note that this depends on the "client" value given by
-        the ASGI Server, and is not necessarily accurate.
-        """
         host, port = self._scope.get("client") or (None, None)
         return Address(host=host, port=port)
 
     @cached_property
     def query_params(self) -> QueryParams:
-        """
-        Query parameter. It is a multi-value mapping.
-        """
         return QueryParams(self._scope["query_string"])
 
     @cached_property
@@ -185,11 +158,6 @@ class Request:
 
     @cached_property
     def headers(self) -> HeaderBag:
-        """
-        Get the request headers as a dictionary.
-
-        The keys are normalized to lowercase.
-        """
         return HeaderBag(
             {
                 key.decode("latin-1").lower(): value.decode("latin-1")
@@ -468,13 +436,6 @@ class Request:
         return {**source, **self.query_params}.get(name, default)
 
     async def stream(self) -> AsyncIterator[bytes]:
-        """
-        Streaming read request body. e.g. `async for chunk in request.stream(): ...`
-
-        If you access `.stream()` then the byte chunks are provided
-        without storing the entire body to memory. Any subsequent
-        calls to `.body`, `.form`, or `.json` will raise an error.
-        """
         if "body" in self.__dict__ and self.__dict__["body"].done():
             yield await self.body
             yield b""
@@ -499,20 +460,19 @@ class Request:
 
     @cached_property
     async def body(self) -> bytes:
-        """
-        Read all the contents of the request body into the memory and return it.
-        """
         return b"".join([chunk async for chunk in self.stream()])
 
     @cached_property
     async def json(self) -> Any:
         """
-        Call `await self.body` and use `json.loads` parse it.
+        Parse the request body as JSON and return the resulting object.
 
-        If `content_type` is not equal to `application/json`,
-        an HTTPExcption exception will be thrown.
+        If the content type of the request is not JSON, a 415 Unsupported Media Type error will be raised.
+
+        :raise MalformedJSONError: If the JSON is malformed (mapped to a 400 Bad Request).
+        :raise UnsupportedContentTypeError: If the content type is not JSON (mapped to a 415 Unsupported Media Type).
         """
-        if self.content_type == "application/json":
+        if self.is_json():
             data = await self.body
             try:
                 return msgspec.json.decode(
@@ -533,14 +493,12 @@ class Request:
     @cached_property
     async def form(self) -> FormData:
         """
-        Parse the data in the form format and return it as a multi-value mapping.
+        Parse the request body as form data and return the resulting FormData object.
 
-        If `content_type` is equal to `multipart/form-data`, it will directly
-        perform streaming analysis, and subsequent calls to `self.body`
-        or `self.json` will raise errors.
+        If the content type of the request is not form data, a 415 Unsupported Media Type error will be raised.
 
-        If `content_type` is not equal to `multipart/form-data` or
-        `application/x-www-form-urlencoded`, an HTTPExcption exception will be thrown.
+        :raise MalformedMultipartError: If the multipart data is malformed (mapped to a 400 Bad Request).
+        :raise UnsupportedContentTypeError: If the content type is not form data (mapped to a 415 Unsupported Media Type).
         """
         if self.content_type == "multipart/form-data":
             charset = self.content_type.options.get("charset", "utf8")
@@ -559,17 +517,12 @@ class Request:
         )
 
     async def close(self) -> None:
-        """
-        Close all temporary files in the `self.form`.
-
-        This can always be called, regardless of whether you use form or not.
-        """
         if "form" in self.__dict__ and self.__dict__["form"].done():
             await (await self.form).aclose()
 
     async def is_disconnected(self) -> bool:
         """
-        The method used to determine whether the connection is interrupted.
+        Determine whether the client has disconnected.
         """
         if not self._is_disconnected:
             try:
@@ -686,9 +639,11 @@ class Request:
 
                         if header is TrustedHeader.X_FORWARDED_PORT:
                             forwarded_values = [
-                                value.split(":")[1]
-                                if ":" in value
-                                else ("443" if self.is_secure() else "80")
+                                (
+                                    value.split(":")[1]
+                                    if ":" in value
+                                    else ("443" if self.is_secure() else "80")
+                                )
                                 for value in forwarded_values
                             ]
 
