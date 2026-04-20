@@ -32,3 +32,10 @@ class UnsupportedContentTypeError(HTTPException):
 class MalformedMultipartError(HTTPException):
     def __init__(self, message: str | None = None) -> None:
         super().__init__(status_code=400, detail=message or "Malformed Multipart Data")
+
+
+class NoUploadFileFoundError(HTTPException):
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(
+            status_code=400, detail=message or "No upload file found in the request"
+        )
