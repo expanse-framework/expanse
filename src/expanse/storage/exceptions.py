@@ -20,3 +20,9 @@ class UnsupportedStorageDriverError(StorageError):
     """
     Raised when a storage driver that is not supported is requested.
     """
+
+
+class MissingStorageDriverError(StorageError):
+    """
+    Raised when a storage configuration is missing the required 'driver' field.
+    """

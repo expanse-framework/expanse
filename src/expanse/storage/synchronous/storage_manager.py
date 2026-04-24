@@ -4,13 +4,19 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import IO
+from typing import TYPE_CHECKING
 
 from expanse.configuration.config import Config
 from expanse.contracts.storage.synchronous.storage import Storage
 from expanse.core.application import Application
+from expanse.storage.exceptions import MissingStorageDriverError
 from expanse.storage.exceptions import NoDefaultStorageError
 from expanse.storage.exceptions import UnconfiguredStorageError
 from expanse.storage.exceptions import UnsupportedStorageDriverError
+
+
+if TYPE_CHECKING:
+    from obstore.store import S3Config
 
 
 class StorageManager(Storage):
@@ -97,10 +103,21 @@ class StorageManager(Storage):
 
     def _create_storage(self, raw_config: dict[str, str]) -> Storage:
         driver = raw_config.get("driver")
-        if driver == "local":
-            return self._create_local_storage(raw_config)
-        else:
-            raise UnsupportedStorageDriverError(f"Unsupported storage type: {driver}")
+
+        if driver is None:
+            raise MissingStorageDriverError(
+                "Storage driver is not specified in the configuration."
+            )
+
+        match driver:
+            case "local":
+                return self._create_local_storage(raw_config)
+            case "s3":
+                return self._create_s3_storage(raw_config)
+            case _:
+                raise UnsupportedStorageDriverError(
+                    f"Unsupported storage type: {driver}"
+                )
 
     def _create_local_storage(self, raw_config: dict[str, str]) -> Storage:
         from obstore.store import LocalStore
@@ -116,3 +133,27 @@ class StorageManager(Storage):
             root = self._app.base_path / root
 
         return ObStoreStorage(LocalStore(root, mkdir=True))
+
+    def _create_s3_storage(self, raw_config: dict[str, str]) -> Storage:
+        from obstore.store import S3Store
+
+        from expanse.storage.config.s3 import S3StorageConfig
+        from expanse.storage.synchronous.storages.storage import (
+            Storage as ObStoreStorage,
+        )
+
+        config = S3StorageConfig.model_validate(raw_config)
+
+        params: S3Config = {
+            "bucket": config.bucket,
+            "access_key_id": config.key,
+            "secret_access_key": config.secret,
+        }
+
+        if config.region is not None:
+            params["region"] = config.region
+
+        if config.endpoint is not None:
+            params["endpoint"] = config.endpoint
+
+        return ObStoreStorage(S3Store(**params))

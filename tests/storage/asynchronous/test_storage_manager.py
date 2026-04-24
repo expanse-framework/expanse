@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from obstore.store import S3Store
+
 from expanse.configuration.config import Config
 from expanse.storage.asynchronous.storage_manager import StorageManager
 from expanse.storage.asynchronous.storages.storage import Storage
@@ -31,6 +33,12 @@ def local_config(tmp_path: Path) -> Config:
                     "secondary": {
                         "driver": "local",
                         "root": str(secondary),
+                    },
+                    "s3": {
+                        "driver": "s3",
+                        "key": "test-key",
+                        "secret": "test-secret",
+                        "bucket": "test-bucket",
                     },
                 },
             }
@@ -69,6 +77,13 @@ def test_storage_manager_caches_named_storage_instances(
     second = manager.storage("secondary")
 
     assert first is second
+
+
+def test_storage_manager_can_create_s3_storage(manager: StorageManager) -> None:
+    storage = manager.storage("s3")
+
+    assert isinstance(storage, Storage)
+    assert isinstance(storage._store, S3Store)
 
 
 def test_storage_manager_raises_for_unknown_storage(
