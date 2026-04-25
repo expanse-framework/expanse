@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,9 +28,9 @@ class MessengerServiceProvider(ServiceProvider):
 
         self._container.singleton(Registry)
         self._container.singleton(Serializer)
+        self._container.singleton(RetryStrategyManager)
+        self._container.singleton(MiddlewareStack)
         self._container.scoped(TransportManager)
-        self._container.scoped(RetryStrategyManager)
-        self._container.scoped(MiddlewareStack)
         self._container.scoped(MessageBusContract, self._create_message_bus)
         self._container.scoped(SyncMessageBusContract, self._create_sync_message_bus)
 
@@ -57,13 +58,17 @@ class MessengerServiceProvider(ServiceProvider):
         transport_manager: TransportManager,
         container: Container,
         stack: MiddlewareStack,
-    ) -> MessageBusContract:
+    ) -> AsyncGenerator[MessageBusContract]:
         from expanse.messenger.asynchronous.message_bus import MessageBus
         from expanse.messenger.asynchronous.transactional_message_bus import (
             TransactionalMessageBus,
         )
 
-        return TransactionalMessageBus(MessageBus(transport_manager, container, stack))
+        bus = TransactionalMessageBus(MessageBus(transport_manager, container, stack))
+
+        yield bus
+
+        bus.close()
 
     async def _create_sync_message_bus(
         self,
@@ -81,6 +86,7 @@ class MessengerServiceProvider(ServiceProvider):
         bus: MessageBusContract,
         container: Container,
     ) -> None:
+        from expanse.database.session import AsyncSession
         from expanse.database.session import Session
         from expanse.messenger.asynchronous.transactional_message_bus import (
             TransactionalMessageBus,
@@ -92,12 +98,20 @@ class MessengerServiceProvider(ServiceProvider):
         if container.resolved(Session):
             bus.attach_session(await container.get(Session))
 
+        if container.resolved(AsyncSession):
+            bus.attach_session(await container.get(AsyncSession))
+
     async def _attach_resolved_session_to_transactional_bus(
-        self, session: "Session | AsyncSession", bus: MessageBusContract
+        self, session: "Session | AsyncSession", container: Container
     ) -> None:
         from expanse.messenger.asynchronous.transactional_message_bus import (
             TransactionalMessageBus,
         )
+
+        if not container.resolved(MessageBusContract):
+            return
+
+        bus = await container.get(MessageBusContract)
 
         if not isinstance(bus, TransactionalMessageBus):
             return

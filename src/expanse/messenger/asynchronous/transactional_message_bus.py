@@ -14,6 +14,7 @@ from expanse.contracts.messenger.asynchronous.message_bus import (
 )
 from expanse.database.asynchronous.session import AsyncSession
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import TransactionalMessageBusError
 
 
 if TYPE_CHECKING:
@@ -30,6 +31,8 @@ class TransactionalMessageBus(MessageBusContract):
     through the decorated bus.
 
     If the attached session is rolled back, the message queue is cleared without dispatching any messages.
+
+    Note that it properly handles nested transactions by creating a message queue for each transaction level.
     """
 
     def __init__(
@@ -38,53 +41,87 @@ class TransactionalMessageBus(MessageBusContract):
         session: Session | AsyncSession | None = None,
     ):
         self._decorated_bus: MessageBusContract = decorated_bus
-        self._queued_messages: list[Message | Envelope] = []
-        self._has_attached_session: bool = False
+        self._queued_messages: list[list[Envelope]] = []
+        self._session: Session | None = None
 
         if session is not None:
             self.attach_session(session)
 
     def attach_session(self, session: Session | AsyncSession) -> None:
-        self._has_attached_session = True
-
         if isinstance(session, AsyncSession):
             session = cast("Session", session.sync_session)
+
+        if self._session is not None and self._session is not session:
+            raise TransactionalMessageBusError(
+                "A session is already attached to the transactional message bus."
+                " Detach the current session before attaching a new one."
+            )
+
+        if self._session is session:
+            # Session is already attached, no need to re-attach.
+            return
+
+        self._session = session
+
+        if session.in_transaction():
+            self._queued_messages.append([])
+
+        event.listen(
+            session, "after_transaction_create", self._append_new_message_queue
+        )
+        event.listen(session, "after_transaction_end", self._pop_last_message_queue)
 
         # Register an after commit hook to dispatch messages after the transaction is committed.
         event.listen(session, "after_commit", self._dispatch_after_commit)
 
         # Register an after rollback hook to clear the message queue if the transaction is rolled back.
-        # after_soft_rollback only fires when a transaction is active, so we also
-        # wrap the session's rollback method to handle the case where rollback is
-        # called without an active transaction (autobegin hasn't started).
+        # after_soft_rollback only fires when a transaction is active.
         event.listen(session, "after_soft_rollback", self._clear_queue_after_rollback)
 
-        original_rollback = session.rollback
+    def detach_session(self) -> None:
+        if self._session is None:
+            return
 
-        def _rollback_with_queue_clear() -> None:
-            self._queued_messages.clear()
-            original_rollback()
+        event.remove(
+            self._session, "after_transaction_create", self._append_new_message_queue
+        )
+        event.remove(
+            self._session, "after_transaction_end", self._pop_last_message_queue
+        )
+        event.remove(self._session, "after_commit", self._dispatch_after_commit)
+        event.remove(
+            self._session, "after_soft_rollback", self._clear_queue_after_rollback
+        )
 
-        session.rollback = _rollback_with_queue_clear  # type: ignore[method-assign]
+        self._session = None
 
     @override
     async def dispatch(self, message: Message | Envelope) -> Envelope:
-        if not self._has_attached_session:
-            # If no session is currently attached, dispatch the message directly through the decorated bus.
+        if not self._queued_messages:
+            # If no transaction is currently active, dispatch the message directly through the decorated bus.
             return await self._decorated_bus.dispatch(message)
 
         envelope = Envelope.wrap(message)
 
-        self._queued_messages.append(envelope)
+        self._queued_messages[-1].append(envelope)
 
         return envelope
 
     def _dispatch_after_commit(self, session: Session) -> None:
-        messages = self._queued_messages.copy()
+        if not self._queued_messages:
+            return
 
-        self._queued_messages.clear()
+        current_queue = self._queued_messages[-1]
 
-        for message in messages:
+        # When a nested transaction is committed, merge its message queue with the parent transaction's queue instead of dispatching messages immediately.
+        if len(self._queued_messages) > 1:
+            parent_queue = self._queued_messages[-2]
+
+            parent_queue.extend(current_queue)
+            current_queue.clear()
+            return
+
+        for message in current_queue:
             try:
                 await_only(self._decorated_bus.dispatch(message))
             except MissingGreenlet:
@@ -92,7 +129,39 @@ class TransactionalMessageBus(MessageBusContract):
                 # Schedule the coroutine on the captured event loop.
                 async_to_sync(self._decorated_bus.dispatch)(message)
 
+    def has_attached_session(self) -> bool:
+        return self._session is not None
+
+    def close(self) -> None:
+        self.detach_session()
+
     def _clear_queue_after_rollback(
         self, session: Session, previous_transaction: SessionTransaction
     ) -> None:
-        self._queued_messages.clear()
+        if not self._queued_messages:
+            return
+
+        # If the main transaction is the one being rolled back, clear all queues.
+        if not previous_transaction.parent:
+            self._queued_messages.clear()
+
+            return
+
+        # If it's a nested transaction, only clear the last queue.
+        self._queued_messages[-1].pop()
+
+    def _append_new_message_queue(
+        self, session: Session, transaction: SessionTransaction
+    ) -> None:
+        self._queued_messages.append([])
+
+    def _pop_last_message_queue(
+        self, session: Session, transaction: SessionTransaction
+    ) -> None:
+        if not self._queued_messages:
+            return
+
+        # If the transaction has ended and there are no more active transactions,
+        # clear this transaction's queue. If there were still messages in the queue,
+        # they will be discarded since it means the transaction was never committed.
+        self._queued_messages.pop()
