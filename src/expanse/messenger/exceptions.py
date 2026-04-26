@@ -105,3 +105,9 @@ class TransportError(Exception):
     """
     Raised when a transport encounters an error while sending or receiving a message.
     """
+
+
+class MessageBusError(Exception): ...
+
+
+class TransactionalMessageBusError(MessageBusError): ...

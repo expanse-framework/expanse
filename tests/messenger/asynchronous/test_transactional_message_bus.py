@@ -76,7 +76,7 @@ async def test_dispatch_without_session_dispatches_immediately(
     assert envelope.open() == message
 
 
-async def test_dispatch_with_session_queues_messages(
+async def test_dispatch_with_out_of_transaction_session_dispatches_immediately(
     fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
@@ -84,8 +84,21 @@ async def test_dispatch_with_session_queues_messages(
     message = MyMessage(foo="bar")
     envelope = await bus.dispatch(message)
 
-    assert len(fake_bus.dispatched) == 0
+    assert len(fake_bus.dispatched) == 1
     assert envelope.open() == message
+
+
+async def test_dispatch_with_in_transaction_session_queues_messages(
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
+) -> None:
+    bus = TransactionalMessageBus(fake_bus, session=session)
+
+    message = MyMessage(foo="bar")
+    async with session.begin():
+        envelope = await bus.dispatch(message)
+
+        assert len(fake_bus.dispatched) == 0
+        assert envelope.open() == message
 
 
 async def test_queued_messages_dispatched_on_commit(
@@ -95,24 +108,24 @@ async def test_queued_messages_dispatched_on_commit(
 
     msg1 = MyMessage(foo="first")
     msg2 = MyMessage(foo="second")
-    await bus.dispatch(msg1)
-    await bus.dispatch(msg2)
 
-    assert len(fake_bus.dispatched) == 0
+    async with session.begin():
+        await bus.dispatch(msg1)
+        await bus.dispatch(msg2)
 
-    await session.commit()
+        assert len(fake_bus.dispatched) == 0
 
-    assert len(fake_bus.dispatched) == 2
-    assert fake_bus.dispatched[0].open() == msg1
-    assert fake_bus.dispatched[1].open() == msg2
+        await session.commit()
+
+        assert len(fake_bus.dispatched) == 2
+        assert fake_bus.dispatched[0].open() == msg1
+        assert fake_bus.dispatched[1].open() == msg2
 
 
 async def test_queued_messages_cleared_on_rollback(
-    fake_bus: FakeAsyncMessageBus, session_factory: async_sessionmaker[AsyncSession]
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
-    async with session_factory() as session:
-        await session.begin()
-
+    async with session.begin():
         bus = TransactionalMessageBus(fake_bus, session=session)
 
         await bus.dispatch(MyMessage(foo="bar"))
@@ -125,21 +138,18 @@ async def test_queued_messages_cleared_on_rollback(
         assert len(bus._queued_messages) == 0
 
 
-async def test_messages_after_commit_are_still_queued(
+async def test_messages_after_session_transaction_ends_are_dispatched_at_once(
     fake_bus: FakeAsyncMessageBus, session: AsyncSession
 ) -> None:
     bus = TransactionalMessageBus(fake_bus, session=session)
 
-    await bus.dispatch(MyMessage(foo="first"))
-    await session.commit()
+    async with session.begin():
+        await bus.dispatch(MyMessage(foo="first"))
+        await session.commit()
 
-    assert len(fake_bus.dispatched) == 1
+        assert len(fake_bus.dispatched) == 1
 
     await bus.dispatch(MyMessage(foo="second"))
-
-    assert len(fake_bus.dispatched) == 1
-
-    await session.commit()
 
     assert len(fake_bus.dispatched) == 2
 
@@ -154,12 +164,13 @@ async def test_attach_session_after_creation(
     assert len(fake_bus.dispatched) == 1
 
     # Attach session, now messages are queued
-    bus.attach_session(session)
-    await bus.dispatch(MyMessage(foo="queued"))
-    assert len(fake_bus.dispatched) == 1
+    async with session.begin():
+        bus.attach_session(session)
+        await bus.dispatch(MyMessage(foo="queued"))
+        assert len(fake_bus.dispatched) == 1
 
-    await session.commit()
-    assert len(fake_bus.dispatched) == 2
+        await session.commit()
+        assert len(fake_bus.dispatched) == 2
 
 
 async def test_dispatch_returns_envelope(
@@ -189,3 +200,25 @@ async def test_dispatch_with_envelope_input(
 
     assert len(fake_bus.dispatched) == 1
     assert fake_bus.dispatched[0].open() == message
+
+
+async def test_bus_keeps_track_of_transactions(
+    fake_bus: FakeAsyncMessageBus, session: AsyncSession
+) -> None:
+    bus = TransactionalMessageBus(fake_bus, session=session)
+
+    async with session.begin():
+        await bus.dispatch(MyMessage(foo="first"))
+        assert len(fake_bus.dispatched) == 0
+
+        async with session.begin_nested() as nested:
+            await bus.dispatch(MyMessage(foo="second"))
+            await nested.commit()
+            assert len(fake_bus.dispatched) == 0
+
+        # After nested transaction ends, messages should still not be dispatched
+        # since the outer transaction is still active
+        assert len(fake_bus.dispatched) == 0
+
+        await session.commit()
+        assert len(fake_bus.dispatched) == 2

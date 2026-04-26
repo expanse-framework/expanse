@@ -29,6 +29,16 @@ async def route(session: AsyncSession, request: Request, bus: MessageBus) -> Res
     return Response("ok")
 
 
+@get("/test-transactional")
+async def transactional_route(
+    session: AsyncSession, request: Request, bus: MessageBus
+) -> Response:
+    await session.begin()
+    await bus.dispatch(TestMessage("test message"))
+
+    return Response("ok")
+
+
 @get("/test-commit")
 async def commit_route(
     session: AsyncSession, request: Request, bus: MessageBus
@@ -43,12 +53,47 @@ async def commit_route(
 async def rollback_route(
     session: AsyncSession, request: Request, bus: MessageBus
 ) -> Response:
-    await bus.dispatch(TestMessage("test message"))
-    await session.rollback()
-    await bus.dispatch(TestMessage("message after rollback"))
-    await session.commit()
+    async with session.begin():
+        await bus.dispatch(TestMessage("test message"))
+        await session.rollback()
+
+    async with session.begin():
+        await bus.dispatch(TestMessage("message after rollback"))
+        await session.commit()
 
     return Response("ok")
+
+
+@pytest.mark.usefixtures("setup_databases")
+async def test_messages_are_dispatched_if_no_transaction_is_active(
+    app: Application, router: Router, client: TestClient, command_tester: CommandTester
+) -> None:
+    app.config["messenger"] = {
+        "transport": "db",
+        "transports": {
+            "db": {
+                "driver": "database",
+                "connection": "sqlite",
+                "table_name": "messages",
+            }
+        },
+    }
+    command_tester.command("db migrate").run()
+
+    router.handler(route)
+
+    response = client.get("/test")
+
+    assert response.status_code == 200
+    assert response.text == "ok"
+
+    db = await app.container.get(AsyncDatabaseManager)
+
+    async with db.connection("sqlite") as connection:
+        result = await connection.execute("SELECT * FROM messages")
+        messages = result.fetchall()
+
+        assert len(messages) == 1
 
 
 @pytest.mark.usefixtures("setup_databases")
@@ -67,9 +112,9 @@ async def test_messages_are_not_dispatched_if_transaction_is_not_committed(
     }
     command_tester.command("db migrate").run()
 
-    router.handler(route)
+    router.handler(transactional_route)
 
-    response = client.get("/test")
+    response = client.get("/test-transactional")
 
     assert response.status_code == 200
     assert response.text == "ok"
