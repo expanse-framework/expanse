@@ -7,6 +7,11 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import IO
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from expanse.http.responses.streamed import StreamedResponse
 
 
 class Storage(ABC):
@@ -22,13 +27,13 @@ class Storage(ABC):
 
     @abstractmethod
     async def stream(
-        self, path: str, chunk_size: int = 10 * 1024 * 1024
+        self, path: str, chunk_size: int = 64 * 1024
     ) -> AsyncIterator[bytes]:
         """
         Retrieve the content of a file as a stream.
 
         :param path: The path to the file to stream.
-        :param chunk_size: The size of the chunks to read from the file. Defaults to 10MB.
+        :param chunk_size: The size of the chunks to read from the file. Defaults to 64KB.
 
         :return: An asynchronous iterator that yields the content of the file in chunks.
         """
@@ -120,4 +125,14 @@ class Storage(ABC):
         :param path: The path to the file to get the last modified time of.
 
         :return: The last modified time of the file as a Unix timestamp.
+        """
+
+    @abstractmethod
+    async def as_download(self, path: str) -> "StreamedResponse":
+        """
+        Get a file as a download response.
+
+        :param path: The path to the file to get as a download.
+
+        :return: A Response object that can be returned from an HTTP endpoint to trigger a file download.
         """

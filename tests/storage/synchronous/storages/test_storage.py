@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
+from typing import cast
 
 import pytest
 
@@ -11,6 +12,8 @@ from expanse.storage.synchronous.storages.storage import Storage
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from collections.abc import Iterable
     from pathlib import Path
 
 
@@ -141,3 +144,75 @@ def test_stream_with_small_chunk_size(store: Storage, tmp_path: Path) -> None:
         chunks += bytes(chunk)
 
     assert chunks == content
+
+
+def test_as_download_returns_a_file_response(store: Storage, tmp_path: Path) -> None:
+    from expanse.http.responses.file import FileResponse
+
+    (tmp_path / "report.csv").write_bytes(b"a,b,c\n1,2,3\n")
+
+    response = store.as_download("report.csv")
+
+    assert isinstance(response, FileResponse)
+
+
+def test_as_download_sets_filename_and_content_disposition(
+    store: Storage, tmp_path: Path
+) -> None:
+    from expanse.http.responses.file import FileResponse
+
+    (tmp_path / "report.csv").write_bytes(b"a,b,c\n")
+
+    response = store.as_download("report.csv")
+
+    assert isinstance(response, FileResponse)
+    assert response.filename == "report.csv"
+    assert response.content_disposition == "attachment"
+
+
+def test_as_download_metadata_includes_file_size(
+    store: Storage, tmp_path: Path
+) -> None:
+    from expanse.http.responses.file import FileResponse
+
+    content = b"hello from storage"
+    (tmp_path / "data.txt").write_bytes(content)
+
+    response = store.as_download("data.txt")
+
+    assert isinstance(response, FileResponse)
+    assert response.metadata.get("size") == len(content)
+
+
+def test_as_download_iterator_yields_full_content(
+    store: Storage, tmp_path: Path
+) -> None:
+    content = b"hello from storage"
+    (tmp_path / "data.txt").write_bytes(content)
+
+    response = store.as_download("data.txt")
+
+    collected = b""
+    it = cast("Callable[[], Iterable[bytes]]", response.iterator)
+    for chunk in it():
+        collected += chunk
+
+    assert collected == content
+
+
+def test_as_download_iterator_yields_multiple_chunks_for_large_file(
+    store: Storage, tmp_path: Path
+) -> None:
+    # Write a file larger than the 64KB chunk size used in as_download()
+    content = b"x" * (128 * 1024 + 1)
+    (tmp_path / "large.bin").write_bytes(content)
+
+    response = store.as_download("large.bin")
+
+    chunks: list[bytes] = []
+    it = cast("Callable[[], Iterable[bytes]]", response.iterator)
+    for chunk in it():
+        chunks.append(chunk)
+
+    assert len(chunks) > 1, "large file should be streamed in multiple chunks"
+    assert b"".join(chunks) == content

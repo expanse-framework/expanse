@@ -1,10 +1,15 @@
 from collections.abc import Buffer
+from collections.abc import Generator
 from collections.abc import Iterable
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import IO
 from typing import TYPE_CHECKING
+from typing import cast
+
+from expanse.http.responses.file import FileResponse
+from expanse.http.responses.streamed import StreamedResponse
 
 
 if TYPE_CHECKING:
@@ -22,7 +27,7 @@ class Storage(StorageContract):
 
         return result.buffer().to_bytes()
 
-    def stream(self, path: str, chunk_size: int = 10 * 1024 * 1024) -> Iterator[bytes]:
+    def stream(self, path: str, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
         result = self._store.get(path)
 
         return result.stream(chunk_size)
@@ -64,3 +69,27 @@ class Storage(StorageContract):
         metadata = self._store.head(path)
 
         return metadata["last_modified"]
+
+    def metadata(self, path: str) -> dict[str, int | datetime | str]:
+        metadata = self._store.head(path)
+
+        return {
+            "size": metadata["size"],
+            "last_modified": metadata["last_modified"],
+            "etag": metadata["e_tag"] or "",
+        }
+
+    def as_download(self, path: str) -> StreamedResponse:
+        from expanse.http.responses.file import Metadata
+
+        def _stream() -> Generator[bytes]:
+            yield from self.stream(path)
+
+        response = FileResponse(
+            _stream,
+            filename=Path(path).name,
+            content_disposition="attachment",
+        )
+        response.metadata = cast("Metadata", self.metadata(path))
+
+        return response

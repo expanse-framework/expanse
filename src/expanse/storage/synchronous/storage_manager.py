@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from expanse.configuration.config import Config
 from expanse.contracts.storage.synchronous.storage import Storage
 from expanse.core.application import Application
+from expanse.http.responses.streamed import StreamedResponse
 from expanse.storage.exceptions import MissingStorageDriverError
 from expanse.storage.exceptions import NoDefaultStorageError
 from expanse.storage.exceptions import UnconfiguredStorageError
@@ -100,6 +101,9 @@ class StorageManager(Storage):
 
     def last_modified(self, path: str) -> datetime:
         return self.storage().last_modified(path)
+
+    def as_download(self, path) -> StreamedResponse:
+        return self.storage().as_download(path)
 
     def _create_storage(self, raw_config: dict[str, str]) -> Storage:
         driver = raw_config.get("driver")
