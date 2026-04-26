@@ -7,6 +7,11 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import IO
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from expanse.http.responses.streamed import StreamedResponse
 
 
 class Storage(ABC):
@@ -120,4 +125,14 @@ class Storage(ABC):
         :param path: The path to the file to get the last modified time of.
 
         :return: The last modified time of the file as a Unix timestamp.
+        """
+
+    @abstractmethod
+    async def as_download(self, path: str) -> "StreamedResponse":
+        """
+        Get a file as a download response.
+
+        :param path: The path to the file to get as a download.
+
+        :return: A Response object that can be returned from an HTTP endpoint to trigger a file download.
         """

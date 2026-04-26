@@ -52,3 +52,31 @@ def test_storage_can_be_injected_by_name(
 
     assert not tmp_path.joinpath("test.txt").exists()
     assert tmp_path.joinpath("named/test.txt").exists()
+
+
+def test_as_download_returns_attachment_response(
+    app: Application, router: Router, client: TestClient, tmp_path: Path
+) -> None:
+    app.config["storage"] = {
+        "storage": "default",
+        "storages": {
+            "default": {"driver": "local", "root": tmp_path},
+        },
+    }
+
+    content = b"col1,col2\n1,2\n"
+    (tmp_path / "report.csv").write_bytes(content)
+
+    async def handler(storage: Storage) -> Response:
+        return await storage.as_download("report.csv")
+
+    router.get("/download", handler)
+
+    response = client.get("/download")
+
+    assert response.status_code == 200
+    assert response.content == content
+    assert (
+        response.headers["content-disposition"] == 'attachment; filename="report.csv"'
+    )
+    assert response.headers["content-length"] == str(len(content))

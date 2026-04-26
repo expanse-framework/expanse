@@ -147,3 +147,72 @@ async def test_stream_with_small_chunk_size(store: Storage, tmp_path: Path) -> N
         chunks += bytes(chunk)
 
     assert chunks == content
+
+
+async def test_as_download_returns_a_file_response(
+    store: Storage, tmp_path: Path
+) -> None:
+    from expanse.http.responses.file import FileResponse
+
+    (tmp_path / "report.csv").write_bytes(b"a,b,c\n1,2,3\n")
+
+    response = await store.as_download("report.csv")
+
+    assert isinstance(response, FileResponse)
+
+
+async def test_as_download_sets_filename_and_content_disposition(
+    store: Storage, tmp_path: Path
+) -> None:
+    from expanse.http.responses.file import FileResponse
+
+    (tmp_path / "report.csv").write_bytes(b"a,b,c\n")
+
+    response = await store.as_download("report.csv")
+
+    assert isinstance(response, FileResponse)
+    assert response.filename == "report.csv"
+    assert response.content_disposition == "attachment"
+
+
+async def test_as_download_metadata_includes_file_size(
+    store: Storage, tmp_path: Path
+) -> None:
+    content = b"hello from storage"
+    (tmp_path / "data.txt").write_bytes(content)
+
+    response = await store.as_download("data.txt")
+
+    assert response.metadata.get("size") == len(content)
+
+
+async def test_as_download_iterator_yields_full_content(
+    store: Storage, tmp_path: Path
+) -> None:
+    content = b"hello from storage"
+    (tmp_path / "data.txt").write_bytes(content)
+
+    response = await store.as_download("data.txt")
+
+    collected = b""
+    async for chunk in response.iterator():
+        collected += bytes(chunk)
+
+    assert collected == content
+
+
+async def test_as_download_iterator_yields_multiple_chunks_for_large_file(
+    store: Storage, tmp_path: Path
+) -> None:
+    # Write a file larger than the 64KB chunk size used in as_download()
+    content = b"x" * (128 * 1024 + 1)
+    (tmp_path / "large.bin").write_bytes(content)
+
+    response = await store.as_download("large.bin")
+
+    chunks: list[bytes] = []
+    async for chunk in response.iterator():
+        chunks.append(bytes(chunk))
+
+    assert len(chunks) > 1, "large file should be streamed in multiple chunks"
+    assert b"".join(chunks) == content

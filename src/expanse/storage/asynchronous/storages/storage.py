@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from collections.abc import AsyncIterator
 from collections.abc import Buffer
 from collections.abc import Iterable
@@ -6,8 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import IO
 from typing import TYPE_CHECKING
+from typing import cast
 
 from expanse.contracts.storage.asynchronous.storage import Storage as StorageContract
+from expanse.http.responses.file import FileResponse
+from expanse.http.responses.streamed import StreamedResponse
 
 
 if TYPE_CHECKING:
@@ -73,3 +77,31 @@ class Storage(StorageContract):
         metadata = await self._store.head_async(path)
 
         return metadata["last_modified"]
+
+    async def metadata(self, path: str) -> dict[str, int | datetime | str]:
+        metadata = await self._store.head_async(path)
+
+        return {
+            "size": metadata["size"],
+            "last_modified": metadata["last_modified"],
+            "etag": metadata["e_tag"],
+        }
+
+    async def as_download(self, path: str) -> StreamedResponse:
+        from expanse.http.responses.file import Metadata
+
+        store = self._store
+
+        async def _stream() -> AsyncGenerator[bytes]:
+            result = await store.get_async(path)
+            async for chunk in result.stream(64 * 1024):
+                yield chunk
+
+        response = FileResponse(
+            _stream,
+            filename=Path(path).name,
+            content_disposition="attachment",
+        )
+        response.metadata = cast("Metadata", await self.metadata(path))
+
+        return response

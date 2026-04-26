@@ -1,9 +1,13 @@
 import os
 
 from collections.abc import AsyncIterable
+from collections.abc import Callable
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from typing import NotRequired
+from typing import TypedDict
 from urllib.parse import quote
 
 import pendulum
@@ -13,8 +17,14 @@ from anyio import AsyncFile
 from expanse.container.container import Container
 from expanse.http.request import Request
 from expanse.http.responses.streamed import StreamedResponse
+from expanse.http.responses.streamed import StreamType
 from expanse.types import Receive
 from expanse.types import Send
+
+
+class Metadata(TypedDict, total=False):
+    size: NotRequired[int]
+    last_modified: NotRequired[datetime]
 
 
 class FileResponse(StreamedResponse):
@@ -23,13 +33,18 @@ class FileResponse(StreamedResponse):
         "content_disposition",
         "content_type",
         "filename",
+        "metadata",
         "path",
-        "stat",
     )
 
     def __init__(
         self,
-        path: str | os.PathLike[str],
+        path: (
+            str
+            | os.PathLike[str]
+            | StreamType[bytes | str]
+            | Callable[[], StreamType[bytes | str]]
+        ),
         *,
         chunk_size: int = 1024 * 1024,
         filename: str | None = None,
@@ -39,14 +54,18 @@ class FileResponse(StreamedResponse):
         headers: Mapping[str, str] | None = None,
         encoding: str = "utf-8",
     ) -> None:
-        self.path: Path = Path(path)
+        self.path: (
+            Path | StreamType[bytes | str] | Callable[[], StreamType[bytes | str]]
+        ) = Path(path) if isinstance(path, (str, os.PathLike)) else path
         self.chunk_size: int = chunk_size
-        self.filename: str = filename or self.path.name
+        self.filename: str = filename or (
+            self.path.name if isinstance(self.path, Path) else "file"
+        )
         self.content_disposition: Literal["attachment", "inline"] = content_disposition
-        self.stat: os.stat_result | None = None
+        self.metadata: Metadata = {}
 
         super().__init__(
-            self.create_iterator(),
+            self.create_iterator() if isinstance(self.path, Path) else self.path,
             status_code=status_code,
             headers=headers,
             content_type=content_type,
@@ -54,6 +73,8 @@ class FileResponse(StreamedResponse):
         )
 
     async def create_iterator(self) -> AsyncIterable[bytes]:
+        assert isinstance(self.path, Path), "Path must be a pathlib.Path instance"
+
         async with AsyncFile(self.path.open("rb")) as file:
             while chunk := await file.read(self.chunk_size):
                 yield chunk
@@ -72,15 +93,31 @@ class FileResponse(StreamedResponse):
             if encoding is not None:
                 self.headers["Content-Encoding"] = encoding
 
-        stat = self.stat or os.stat(self.path)
-
-        self.headers.set("Content-Length", str(stat.st_size))
-        self.headers.set(
-            "Last-Modified",
-            pendulum.from_timestamp(stat.st_mtime).format(
-                "ddd, DD MMM YYYY HH:mm:ss [GMT]"
-            ),
+        size: int | None = self.metadata.get("size") or (
+            os.stat(self.path).st_size if isinstance(self.path, Path) else None
         )
+        last_modified: pendulum.DateTime | None = None
+
+        if "last_modified" in self.metadata:
+            if isinstance(self.metadata["last_modified"], datetime):
+                last_modified = pendulum.instance(self.metadata["last_modified"])
+            else:
+                last_modified = pendulum.from_timestamp(self.metadata["last_modified"])
+        elif isinstance(self.path, Path):
+            last_modified = pendulum.from_timestamp(os.stat(self.path).st_mtime)
+
+        if size is not None:
+            self.headers.set("Content-Length", str(size))
+        if last_modified is not None:
+            self.headers.set(
+                "Last-Modified",
+                last_modified.format("ddd, DD MMM YYYY HH:mm:ss [GMT]"),
+            )
+        else:
+            self.headers.set(
+                "Last-Modified",
+                pendulum.now().format("ddd, DD MMM YYYY HH:mm:ss [GMT]"),
+            )
 
         filename = quote(self.filename)
 
@@ -103,11 +140,14 @@ class FileResponse(StreamedResponse):
         if self.chunk_size < int(self.headers["Content-Length"]):
             return await super().send_body(send, receive)
 
-        async with AsyncFile(self.path.open("rb")) as f:
-            return await send(
-                {
-                    "type": "http.response.body",
-                    "body": await f.read(),
-                    "more_body": False,
-                }
-            )
+        if isinstance(self.path, Path):
+            async with AsyncFile(self.path.open("rb")) as f:
+                return await send(
+                    {
+                        "type": "http.response.body",
+                        "body": await f.read(),
+                        "more_body": False,
+                    }
+                )
+        else:
+            return await super().send_body(send, receive)

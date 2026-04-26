@@ -19,6 +19,8 @@ from expanse.storage.exceptions import UnsupportedStorageDriverError
 if TYPE_CHECKING:
     from obstore.store import S3Config
 
+    from expanse.http.responses.response import Response
+
 
 class StorageManager(Storage):
     def __init__(self, app: Application, config: Config) -> None:
@@ -103,6 +105,9 @@ class StorageManager(Storage):
 
     async def last_modified(self, path: str) -> datetime:
         return await self.storage().last_modified(path)
+
+    async def as_download(self, path: str) -> "Response":
+        return await self.storage().as_download(path)
 
     def _create_storage(self, raw_config: dict[str, str]) -> Storage:
         driver = raw_config.get("driver")
