@@ -89,7 +89,7 @@ class Route:
     @property
     def param_names(self) -> set[str]:
         if self._param_names is None:
-            self._param_names = set(re.findall(r"{\*?([^:]*)(?::.*)?}", self.path))
+            self._param_names = set(re.findall(r"{\*?([^:]*?)(?::.*)?}", self.path))
 
         return self._param_names
 

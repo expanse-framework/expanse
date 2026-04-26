@@ -112,7 +112,7 @@ class Finder(RouteCollection):
                 if param.startswith("*"):
                     param = param[1:]
 
-                    token = token[1:]
+                    token = token.replace("*", "")
 
                     catch_all = True
 
