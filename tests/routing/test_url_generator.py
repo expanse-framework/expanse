@@ -79,3 +79,14 @@ def test_generator_can_generate_route_urls_with_catch_all_and_different_regexes(
 
     with pytest.raises(InvalidURLParameter):
         url.to_route("catch_all_2", {"path": "documents/report.pdf"})
+
+
+def test_generator_can_generate_route_urls_with_simple_param_and_catch_all(
+    router: Router, url: URLGenerator
+) -> None:
+    router.get("/foo/{name}/{*path}", lambda: "", name="foo")
+
+    assert (
+        url.to_route("foo", {"name": "john", "path": "documents/report.pdf"})
+        == "/foo/john/documents/report.pdf"
+    )

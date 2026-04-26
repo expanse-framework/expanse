@@ -79,3 +79,15 @@ def test_static_routes_are_differentiated_base_on_parameters_type(
     response = client.get("/foo/bar/baz")
     assert response.status_code == 200
     assert response.json() == "bar"
+
+
+def test_routes_with_single_parameter_and_catch_all_parameter(
+    client: TestClient, router: Registrar
+) -> None:
+    router.get(
+        r"/foo/{name}/{*path}", lambda name, path: json({"name": name, "path": path})
+    )
+
+    response = client.get("/foo/bar/baz/boom")
+    assert response.status_code == 200
+    assert response.json() == {"name": "bar", "path": "baz/boom"}
