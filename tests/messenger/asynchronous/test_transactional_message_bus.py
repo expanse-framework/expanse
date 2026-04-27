@@ -216,6 +216,11 @@ async def test_bus_keeps_track_of_transactions(
             await nested.commit()
             assert len(fake_bus.dispatched) == 0
 
+        async with session.begin_nested() as nested2:
+            await bus.dispatch(MyMessage(foo="third"))
+            await bus.dispatch(MyMessage(foo="fourth"))
+            await nested2.rollback()
+
         # After nested transaction ends, messages should still not be dispatched
         # since the outer transaction is still active
         assert len(fake_bus.dispatched) == 0

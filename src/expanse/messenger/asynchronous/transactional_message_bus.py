@@ -74,10 +74,6 @@ class TransactionalMessageBus(MessageBusContract):
         # Register an after commit hook to dispatch messages after the transaction is committed.
         event.listen(session, "after_commit", self._dispatch_after_commit)
 
-        # Register an after rollback hook to clear the message queue if the transaction is rolled back.
-        # after_soft_rollback only fires when a transaction is active.
-        event.listen(session, "after_soft_rollback", self._clear_queue_after_rollback)
-
     def detach_session(self) -> None:
         if self._session is None:
             return
@@ -89,9 +85,6 @@ class TransactionalMessageBus(MessageBusContract):
             self._session, "after_transaction_end", self._pop_last_message_queue
         )
         event.remove(self._session, "after_commit", self._dispatch_after_commit)
-        event.remove(
-            self._session, "after_soft_rollback", self._clear_queue_after_rollback
-        )
 
         self._session = None
 
@@ -129,26 +122,13 @@ class TransactionalMessageBus(MessageBusContract):
                 # Schedule the coroutine on the captured event loop.
                 async_to_sync(self._decorated_bus.dispatch)(message)
 
+        current_queue.clear()
+
     def has_attached_session(self) -> bool:
         return self._session is not None
 
     def close(self) -> None:
         self.detach_session()
-
-    def _clear_queue_after_rollback(
-        self, session: Session, previous_transaction: SessionTransaction
-    ) -> None:
-        if not self._queued_messages:
-            return
-
-        # If the main transaction is the one being rolled back, clear all queues.
-        if not previous_transaction.parent:
-            self._queued_messages.clear()
-
-            return
-
-        # If it's a nested transaction, only clear the last queue.
-        self._queued_messages[-1].pop()
 
     def _append_new_message_queue(
         self, session: Session, transaction: SessionTransaction
@@ -159,9 +139,11 @@ class TransactionalMessageBus(MessageBusContract):
         self, session: Session, transaction: SessionTransaction
     ) -> None:
         if not self._queued_messages:
+            self._last_message_queue = None
             return
 
         # If the transaction has ended and there are no more active transactions,
         # clear this transaction's queue. If there were still messages in the queue,
-        # they will be discarded since it means the transaction was never committed.
+        # they will be discarded since it means the transaction was never committed
+        # or rolled back.
         self._queued_messages.pop()
