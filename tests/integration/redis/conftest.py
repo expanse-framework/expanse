@@ -16,6 +16,15 @@ pytestmark = pytest.mark.redis
 async def setup_redis(app: Application) -> AsyncGenerator[None]:
     from expanse.redis.redis_service_provider import RedisServiceProvider
 
+    app.config["redis"] = {
+        "connection": "default",
+        "connections": {
+            "default": {
+                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/0"
+            }
+        },
+    }
+
     await RedisServiceProvider(app.container).register()
 
     yield

@@ -19,21 +19,21 @@ def config() -> Config:
                 "connection": "default",
                 "connections": {
                     "default": {
-                        "url": "redis://localhost:6379/0",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/0",
                     },
                     "no_backoff": {
-                        "url": "redis://localhost:6379/1",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/1",
                         "backoff": None,
                     },
                     "constant_backoff": {
-                        "url": "redis://localhost:6379/2",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/2",
                         "backoff": {
                             "strategy": "constant",
                             "backoff": 1,
                         },
                     },
                     "exponential_backoff": {
-                        "url": "redis://localhost:6379/3",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/3",
                         "backoff": {
                             "strategy": "exponential",
                             "base": 1,
@@ -41,7 +41,7 @@ def config() -> Config:
                         },
                     },
                     "full_jitter_backoff": {
-                        "url": "redis://localhost:6379/4",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/4",
                         "backoff": {
                             "strategy": "full_jitter",
                             "base": 1,
@@ -49,7 +49,7 @@ def config() -> Config:
                         },
                     },
                     "equal_jitter_backoff": {
-                        "url": "redis://localhost:6379/5",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/5",
                         "backoff": {
                             "strategy": "equal_jitter",
                             "base": 1,
@@ -57,7 +57,7 @@ def config() -> Config:
                         },
                     },
                     "decorrelated_jitter_backoff": {
-                        "url": "redis://localhost:6379/6",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/6",
                         "backoff": {
                             "strategy": "decorrelated_jitter",
                             "base": 1,
@@ -65,7 +65,7 @@ def config() -> Config:
                         },
                     },
                     "exponential_with_jitter_backoff": {
-                        "url": "redis://localhost:6379/7",
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/7",
                         "backoff": {
                             "strategy": "exponential_with_jitter",
                             "base": 1,
