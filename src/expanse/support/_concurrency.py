@@ -67,7 +67,7 @@ def warn_about_implicit_async_safe_status(
         )
 
 
-async def run_in_threadpool(
+async def run_in_threadpool[**P, T](
     func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
 ) -> T:
     if kwargs:  # pragma: no cover
