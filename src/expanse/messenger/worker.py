@@ -2,6 +2,9 @@ import asyncio
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
+    KeepAliveTransport,
+)
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
@@ -42,6 +45,7 @@ class Worker:
         self._container: Container = container
         self._registry: Registry = registry
         self._stop_event: asyncio.Event = asyncio.Event()
+        self._keep_alives: dict[int, tuple[str, Envelope]] = {}
 
     async def run(
         self,
@@ -69,11 +73,16 @@ class Worker:
 
             async for envelope in transport.receive():
                 envelope_handled = True
+
                 if handled_messages >= limit if limit is not None else False:
                     self.stop()
                     break
 
                 handled_messages += 1
+
+                keep_alive_id = (transport_name, envelope)
+                if isinstance(transport, KeepAliveTransport):
+                    self._keep_alives[id(envelope.open())] = keep_alive_id
 
                 try:
                     envelope = await self._handle_envelope(envelope)
@@ -91,6 +100,8 @@ class Worker:
                             )
                             await transport.reject(e.envelope)
 
+                            self._keep_alives.pop(id(envelope.open()), None)
+
                             continue
 
                     # If there were errors during message handling, we consider the message as not handled.
@@ -104,6 +115,8 @@ class Worker:
                             envelope, transport_name=transport_name
                         )
                         await transport.reject(envelope)
+
+                        self._keep_alives.pop(id(envelope.open()), None)
 
                         continue
 
@@ -122,9 +135,13 @@ class Worker:
 
                     await transport.reject(envelope)
 
+                    self._keep_alives.pop(id(envelope.open()), None)
+
                     continue
 
                 await transport.acknowledge(envelope)
+
+                self._keep_alives.pop(id(envelope.open()), None)
 
             if not envelope_handled:
                 await asyncio.sleep(sleep / 1000)
@@ -134,6 +151,20 @@ class Worker:
         Stop the worker gracefully.
         """
         self._stop_event.set()
+
+    async def keep_alive(self, duration: int | None = None) -> None:
+        """
+        Keep the worker alive until stopped.
+        """
+        for transport_name, envelope in self._keep_alives.values():
+            transport = await self._transport_manager.transport(transport_name)
+
+            if not isinstance(transport, KeepAliveTransport):
+                raise RuntimeError(
+                    f"Transport '{transport_name}' does not support keep-alive functionality."
+                )
+
+            await transport.keep_alive(envelope, duration)
 
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
         # Build the middleware pipeline and process the envelope through it.

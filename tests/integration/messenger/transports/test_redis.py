@@ -10,6 +10,7 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import TransportError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
@@ -254,3 +255,81 @@ async def test_only_expired_delayed_messages_are_moved_to_the_stream(
     received = [e async for e in redis_transport.receive()]
     assert len(received) == 1
     assert received[0].open().value == "soon"
+
+
+async def test_transport_keep_alive_prevents_message_from_being_claimed(
+    redis_connection: RedisConnection,
+) -> None:
+    """keep_alive resets the idle clock so another consumer cannot steal the message."""
+    consumer_a = RedisTransport(
+        redis_connection,
+        RedisTransportConfig(
+            stream=STREAM,
+            group="test_group",
+            consumer="consumer_a",
+        ),
+        Serializer(),
+    )
+    # consumer_b claims messages idle for ≥100 ms; claim_interval=0 so it always tries
+    consumer_b = RedisTransport(
+        redis_connection,
+        RedisTransportConfig(
+            stream=STREAM,
+            group="test_group",
+            consumer="consumer_b",
+            idle_time=100,  # ms
+            claim_interval=0,
+        ),
+        Serializer(),
+    )
+
+    await consumer_a.send(Envelope.wrap(RedisMessage(value="alive")))
+
+    # consumer_a receives but does NOT acknowledge — message stays pending
+    first_batch = [e async for e in consumer_a.receive()]
+    assert len(first_batch) == 1
+
+    # Let the message go idle past consumer_b's threshold
+    await asyncio.sleep(0.15)
+
+    # Refresh the idle clock so consumer_b cannot claim it
+    await consumer_a.keep_alive(first_batch[0])
+
+    # consumer_b's receive: idle clock was reset to 0 ms < 100 ms → no claim → no message
+    second_batch = [e async for e in consumer_b.receive()]
+    assert second_batch == []
+
+
+async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
+    redis_connection: RedisConnection,
+) -> None:
+    transport = RedisTransport(
+        redis_connection,
+        RedisTransportConfig(
+            stream=STREAM,
+            group="test_group",
+            consumer="test_consumer",
+            idle_time=60,
+        ),
+        Serializer(),
+    )
+
+    await transport.send(Envelope.wrap(RedisMessage(value="too-long")))
+    envelopes = [e async for e in transport.receive()]
+    assert len(envelopes) == 1
+
+    with pytest.raises(TransportError, match="idle time"):
+        await transport.keep_alive(envelopes[0], duration=120)
+
+
+async def test_transport_keep_alive_is_noop_for_envelope_without_message_id_stamp(
+    redis_transport: RedisTransport,
+) -> None:
+    await redis_transport.send(Envelope.wrap(RedisMessage(value="present")))
+
+    bare_envelope = Envelope.wrap(RedisMessage(value="no-stamp"))
+    await redis_transport.keep_alive(bare_envelope)  # must not raise
+
+    # The message sent earlier is still in the stream — keep_alive had no side-effect
+    received = [e async for e in redis_transport.receive()]
+    assert len(received) == 1

@@ -4,6 +4,9 @@ from datetime import datetime
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from expanse.contracts.messenger.asynchronous.transport import (
+    Transport as TransportContract,
+)
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.serializer import Serializer
@@ -15,7 +18,7 @@ if TYPE_CHECKING:
     from expanse.types.messenger import EncodedEnvelope
 
 
-class MemoryTransport:
+class MemoryTransport(TransportContract):
     def __init__(self, serializer: SerializerContract | None = None) -> None:
         self._serializer = serializer or Serializer()
         self._current_id: int = 0

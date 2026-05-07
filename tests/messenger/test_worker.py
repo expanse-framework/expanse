@@ -1,6 +1,8 @@
 import asyncio
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Any
 from typing import ClassVar
 from unittest.mock import patch
 
@@ -8,6 +10,9 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
+    KeepAliveTransport,
+)
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
@@ -21,9 +26,45 @@ from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
+from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
+
+
+class FakeKeepAliveTransport(KeepAliveTransport):
+    def __init__(self) -> None:
+        self._queue: list[Envelope] = []
+        self.sent: list[Envelope] = []
+        self.acknowledged: list[Envelope] = []
+        self.rejected: list[Envelope] = []
+        self.keep_alive_calls: list[tuple[Envelope, int | None]] = []
+        self._next_id: int = 1
+
+    def enqueue(self, envelope: Envelope) -> Envelope:
+        stamped = envelope.with_stamps(TransportMessageIdStamp(id=self._next_id))
+        self._next_id += 1
+        self._queue.append(stamped)
+        return stamped
+
+    async def send(self, envelope: Envelope) -> Envelope:
+        stamped = envelope.with_stamps(TransportMessageIdStamp(id=self._next_id))
+        self._next_id += 1
+        self.sent.append(stamped)
+        return stamped
+
+    async def receive(self) -> AsyncIterator[Envelope]:  # type: ignore[override]
+        while self._queue:
+            yield self._queue.pop(0)
+
+    async def acknowledge(self, envelope: Envelope) -> None:
+        self.acknowledged.append(envelope)
+
+    async def reject(self, envelope: Envelope) -> None:
+        self.rejected.append(envelope)
+
+    async def keep_alive(self, envelope: Envelope, duration: int | None = None) -> None:
+        self.keep_alive_calls.append((envelope, duration))
 
 
 @dataclass
@@ -583,3 +624,214 @@ def test_worker_stop_sets_stop_event(worker: Worker) -> None:
     worker.stop()
 
     assert worker._stop_event.is_set()
+
+
+# --- Keep-alive tests ---
+
+
+def _make_keep_alive_worker(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+    fake_transport: FakeKeepAliveTransport,
+    *,
+    with_retry: bool = False,
+) -> tuple[Worker, TransportManager]:
+    transports_config: dict[str, Any] = {
+        "keep_alive": {"driver": "memory"},
+        "failed": {"driver": "memory"},
+    }
+    retry_strategies: dict[str, Any] = {}
+    if with_retry:
+        transports_config["keep_alive"]["retry_strategy"] = "default"
+        retry_strategies["default"] = {
+            "type": "multiplier",
+            "max_retries": 3,
+            "delay": 10,
+            "multiplier": 2,
+            "jitter": 0.0,
+        }
+
+    cfg = Config(
+        {
+            "messenger": {
+                "transport": "keep_alive",
+                "failure_transport": "failed",
+                "transports": transports_config,
+                "retry_strategies": retry_strategies,
+            }
+        }
+    )
+    tm = TransportManager(container, cfg, registry)
+    tm._transports["keep_alive"] = fake_transport
+    worker = Worker(
+        tm,
+        RetryStrategyManager(cfg),
+        cfg,
+        middleware_stack,
+        container,
+        registry,
+    )
+    return worker, tm
+
+
+async def test_worker_tracks_keep_alives_for_keep_alive_transport(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+
+    captured: dict[int, tuple[str, Envelope]] = {}
+
+    async def handler(message: WorkerMessage) -> None:
+        captured.update(worker._keep_alives)
+
+    envelope = fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="tracked")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert len(captured) == 1
+    key = id(envelope.open())
+    assert key in captured
+    assert captured[key][0] == "keep_alive"
+
+
+async def test_worker_clears_keep_alives_after_successful_handling(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+
+    async def handler(_message: WorkerMessage) -> None:
+        pass
+
+    fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="ok")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert worker._keep_alives == {}
+
+
+async def test_worker_clears_keep_alives_after_retry(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport, with_retry=True
+    )
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("transient")
+
+    fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="retry")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert worker._keep_alives == {}
+
+
+async def test_worker_clears_keep_alives_after_unrecoverable_failure(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise UnrecoverableMessageHandlingError("bad")
+
+    fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="unrecoverable")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert worker._keep_alives == {}
+
+
+async def test_worker_clears_keep_alives_after_rejection_without_retry(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    # No retry strategy configured → failure goes straight to failure transport
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport, with_retry=False
+    )
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("no retry configured")
+
+    fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="no-retry")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert worker._keep_alives == {}
+
+
+async def test_worker_does_not_track_keep_alives_for_regular_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    async def handler(_message: WorkerMessage) -> None:
+        pass
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+    assert not isinstance(transport, KeepAliveTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="plain")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert worker._keep_alives == {}
+
+
+async def test_worker_keep_alive_calls_transport_keep_alive(
+    worker: Worker, transport_manager: TransportManager
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    transport_manager._transports["keep_alive"] = fake_transport
+
+    envelope = Envelope.wrap(WorkerMessage(value="alive")).with_stamps(
+        TransportMessageIdStamp(id=42)
+    )
+    worker._keep_alives[id(envelope.open())] = ("keep_alive", envelope)
+
+    await worker.keep_alive()
+
+    assert len(fake_transport.keep_alive_calls) == 1
+    assert fake_transport.keep_alive_calls[0] == (envelope, None)
+
+
+async def test_worker_keep_alive_passes_duration_to_transport(
+    worker: Worker, transport_manager: TransportManager
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    transport_manager._transports["keep_alive"] = fake_transport
+
+    envelope = Envelope.wrap(WorkerMessage(value="duration")).with_stamps(
+        TransportMessageIdStamp(id=7)
+    )
+    worker._keep_alives[id(envelope.open())] = ("keep_alive", envelope)
+
+    await worker.keep_alive(duration=30)
+
+    assert fake_transport.keep_alive_calls[0] == (envelope, 30)

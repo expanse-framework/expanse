@@ -41,12 +41,30 @@ class MessengerConsumeCommand(Command):
             flag=False,
             default=1,
         ),
+        option(
+            "keep-alive",
+            None,
+            description="Whether to keep the worker alive by sending periodic keep-alive signals to the transport. This is useful to ensure transports do not redeliver messages while they are being processed.",
+            flag=False,
+            value_required=False,
+        ),
     ]
 
     async def handle(self, worker: Worker) -> None:
         transport_name: str | None = self.argument("transport")
 
         loop = asyncio.get_running_loop()
+        has_keep_alive = self._io.input.parameter_option("--keep-alive") is not False
+
+        if has_keep_alive:
+            keep_alive_interval = int(self.option("keep-alive") or 5)
+        else:
+            keep_alive_interval = 0
+
+        async def _keep_alive() -> None:
+            await worker.keep_alive()
+
+            signal.alarm(keep_alive_interval)
 
         def _shutdown() -> None:
             worker.stop()
@@ -56,8 +74,17 @@ class MessengerConsumeCommand(Command):
             loop.remove_signal_handler(signal.SIGINT)
             loop.remove_signal_handler(signal.SIGTERM)
 
+            if keep_alive_interval > 0:
+                loop.remove_signal_handler(signal.SIGALRM)
+
         loop.add_signal_handler(signal.SIGINT, _shutdown)
         loop.add_signal_handler(signal.SIGTERM, _shutdown)
+
+        if keep_alive_interval > 0:
+            loop.add_signal_handler(
+                signal.SIGALRM, lambda: asyncio.create_task(_keep_alive())
+            )
+            signal.alarm(keep_alive_interval)
 
         stop_conditions: list[str] = []
         if self.option("limit") is not None:
