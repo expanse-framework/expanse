@@ -62,12 +62,14 @@ class QueryParams(MultiMapping[str, str]):
 
     def __init__(
         self,
-        raw: MultiMapping[str, str]
-        | Mapping[str, str]
-        | Iterable[tuple[str, str]]
-        | str
-        | bytes
-        | None = None,
+        raw: (
+            MultiMapping[str, str]
+            | Mapping[str, str]
+            | Iterable[tuple[str, str]]
+            | str
+            | bytes
+            | None
+        ) = None,
     ) -> None:
         if isinstance(raw, str):
             super().__init__(parse_qsl(raw, keep_blank_values=True))
@@ -94,10 +96,12 @@ class CookieJar(MultiMapping[str, Cookie]):
 
     def __init__(
         self,
-        raw: MultiMapping[str, Cookie]
-        | Mapping[str, Cookie]
-        | Iterable[tuple[str, Cookie]]
-        | None = None,
+        raw: (
+            MultiMapping[str, Cookie]
+            | Mapping[str, Cookie]
+            | Iterable[tuple[str, Cookie]]
+            | None
+        ) = None,
     ) -> None:
         super().__init__(raw or {})
 
@@ -107,11 +111,7 @@ class Address(NamedTuple):
     port: int | None
 
 
-class UploadFile:
-    """
-    An uploaded file included as part of the request data.
-    """
-
+class RawUploadFile:
     __slots__ = ("content_type", "file", "filename", "headers")
 
     spool_max_size: int = 1024 * 1024
@@ -120,7 +120,9 @@ class UploadFile:
         self.filename: str = filename
         self.headers: HeaderBag = headers
         self.content_type: str = headers.get("content-type", "")
-        self.file = SpooledTemporaryFile(max_size=self.spool_max_size, mode="w+b")  # noqa: SIM115
+        self.file = SpooledTemporaryFile(  # noqa: SIM115
+            max_size=self.spool_max_size, mode="w+b"
+        )
 
     @property
     def in_memory(self) -> bool:
@@ -188,7 +190,7 @@ class UploadFile:
         await run_in_threadpool(self.save, filepath)
 
 
-class FormData(MultiMapping[str, str | UploadFile]):
+class FormData(MultiMapping[str, str | RawUploadFile]):
     """
     An immutable MultiMapping, containing both file uploads and text input.
     """
@@ -197,10 +199,10 @@ class FormData(MultiMapping[str, str | UploadFile]):
 
     def close(self) -> None:
         for _, value in self.multi_items():
-            if isinstance(value, UploadFile):
+            if isinstance(value, RawUploadFile):
                 value.close()
 
     async def aclose(self) -> None:
         for _, value in self.multi_items():
-            if isinstance(value, UploadFile):
+            if isinstance(value, RawUploadFile):
                 await value.aclose()

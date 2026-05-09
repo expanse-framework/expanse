@@ -23,7 +23,7 @@ from expanse.http._datastructures import Address
 from expanse.http._datastructures import ContentType
 from expanse.http._datastructures import FormData
 from expanse.http._datastructures import QueryParams
-from expanse.http._datastructures import UploadFile
+from expanse.http._datastructures import RawUploadFile
 from expanse.http.accept_header import AcceptHeader
 from expanse.http.exceptions import ClientDisconnectedError
 from expanse.http.exceptions import ConflictingForwardedHeadersError
@@ -486,7 +486,7 @@ class Request:
     async def _parse_multipart(self, boundary: bytes, charset: str) -> FormData:
         return FormData(
             await parse_async_stream(
-                self.stream(), boundary, charset, file_factory=UploadFile
+                self.stream(), boundary, charset, file_factory=RawUploadFile
             )
         )
 
