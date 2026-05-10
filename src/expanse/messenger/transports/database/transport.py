@@ -2,6 +2,9 @@ import json
 
 from collections.abc import AsyncIterator
 
+from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
+    KeepAliveTransport as KeepAliveTransportContract,
+)
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
@@ -12,7 +15,7 @@ from expanse.messenger.transports.database.config import DatabaseTransportConfig
 from expanse.messenger.transports.database.connection import Connection
 
 
-class DatabaseTransport:
+class DatabaseTransport(KeepAliveTransportContract):
     def __init__(
         self,
         config: DatabaseTransportConfig,
@@ -79,3 +82,13 @@ class DatabaseTransport:
             )
 
         await self._connection.reject(message_id_stamp.id)
+
+    async def keep_alive(self, envelope: Envelope, duration: int | None = None) -> None:
+        message_id_stamp = envelope.stamp(TransportMessageIdStamp)
+        if message_id_stamp is None:
+            return
+
+        await self._connection.keep_alive(message_id_stamp.id, duration)
+
+    async def close(self) -> None:
+        pass

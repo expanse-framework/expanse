@@ -9,6 +9,7 @@ class PendingJob:
         from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 
         self._job: Envelope = Envelope.wrap(job, stamps=[SelfHandlingStamp()])
+        self._dispatched: bool = False
 
     def delay(self, seconds: int) -> Self:
         """
@@ -21,5 +22,19 @@ class PendingJob:
         from expanse.messenger.stamps.delay import DelayStamp
 
         self._job = self._job.with_stamps(DelayStamp(seconds * 1000))
+
+        return self
+
+    def on_transport(self, transport: str) -> Self:
+        """
+        Set the transport to dispatch the job on.
+
+        :param transport: The name of the transport.
+
+        :return: The PendingJob instance for chaining.
+        """
+        from expanse.messenger.stamps.transport import TransportStamp
+
+        self._job = self._job.with_stamps(TransportStamp(transport))
 
         return self

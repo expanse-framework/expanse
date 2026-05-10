@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
@@ -10,6 +11,7 @@ from expanse.contracts.messenger.synchronous.message_bus import (
     MessageBus as SyncMessageBusContract,
 )
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
+from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support.service_provider import ServiceProvider
@@ -30,7 +32,7 @@ class MessengerServiceProvider(ServiceProvider):
         self._container.singleton(Serializer)
         self._container.singleton(RetryStrategyManager)
         self._container.singleton(MiddlewareStack)
-        self._container.scoped(TransportManager)
+        self._container.scoped(TransportManager, self._create_transport_manager)
         self._container.scoped(MessageBusContract, self._create_message_bus)
         self._container.scoped(SyncMessageBusContract, self._create_sync_message_bus)
 
@@ -52,6 +54,15 @@ class MessengerServiceProvider(ServiceProvider):
         await self._container.on_resolved(
             AsyncSession, self._attach_resolved_session_to_transactional_bus
         )
+
+    async def _create_transport_manager(
+        self, container: Container, config: Config, registry: Registry
+    ) -> AsyncGenerator[TransportManager, None]:
+        manager = TransportManager(container, config, registry)
+
+        yield manager
+
+        await manager.close()
 
     async def _create_message_bus(
         self,

@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from sqlalchemy import table
 
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+from expanse.messenger.exceptions import TransportError
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
 
 
@@ -111,6 +112,22 @@ class Connection:
         async with self._db.connection(self._config.connection) as connection:
             await connection.execute(
                 self._table.delete().where(self._table.c.id == message_id)
+            )
+            await connection.commit()
+
+    async def keep_alive(self, message_id: int, duration: int | None = None) -> None:
+        if duration is not None and self._config.redelivery_timeout < duration:
+            raise TransportError(
+                f"Cannot keep message alive for {duration} seconds, as it exceeds the redelivery timeout of {self._config.redelivery_timeout} seconds"
+            )
+
+        async with self._db.connection(self._config.connection) as connection:
+            now = datetime.now(UTC)
+
+            await connection.execute(
+                self._table.update()
+                .where(self._table.c.id == message_id)
+                .values(delivered_at=now)
             )
             await connection.commit()
 

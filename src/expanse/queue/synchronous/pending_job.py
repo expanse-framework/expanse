@@ -18,4 +18,6 @@ class PendingJob(BasePendingJob):
         """
         Dispatch the job to the appropriate queue for execution.
         """
+        self._dispatched = True
+
         self._dispatcher._bus.dispatch(self._job)

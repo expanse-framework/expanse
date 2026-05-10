@@ -1,3 +1,5 @@
+import asyncio
+
 from typing import Any
 
 from expanse.configuration.config import Config
@@ -38,6 +40,11 @@ class TransportManager:
             raise NoDefaultTransportError("No default transport configured.")
 
         return default_transport
+
+    async def close(self) -> None:
+        tasks = [transport.close() for transport in self._transports.values()]
+
+        await asyncio.gather(*tasks)
 
     async def _create_transport(self, name: str) -> Transport:
         transports: dict[str, Any] = self._config.get("messenger.transports", {})

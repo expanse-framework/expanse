@@ -123,6 +123,29 @@ class Connection:
             else:
                 raise
 
+    async def keep_alive(self, message_id: str, duration: int | None = None) -> None:
+        if duration is not None and self._config.idle_time < duration:
+            raise TransportError(
+                f"Cannot keep message alive for {duration} seconds, as it exceeds the idle time of {self._config.idle_time} seconds"
+            )
+
+        try:
+            await self._connection.xclaim(
+                self._config.stream,
+                self._config.group,
+                self._config.consumer,
+                min_idle_time=0,
+                message_ids=[message_id],
+                justid=True,
+            )
+        except Exception as e:
+            raise TransportError(
+                f"Failed to keep message with ID {message_id} alive: {e}"
+            )
+
+    async def close(self) -> None:
+        await self._connection.close()
+
     async def _handle_delayed_messages(self) -> None:
         now = time.time() * 1000
         message_count = await self._connection.zcount(self._queue, 0, now) or 0

@@ -1,11 +1,12 @@
 from collections.abc import AsyncIterator
 
 from expanse.container.container import Container
+from expanse.contracts.messenger.asynchronous.transport import Transport
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
 
 
-class SyncTransport:
+class SyncTransport(Transport):
     def __init__(self, container: Container, registry: Registry) -> None:
         self._container: Container = container
         self._registry: Registry = registry
@@ -30,3 +31,6 @@ class SyncTransport:
 
     async def reject(self, envelope: Envelope) -> None:
         raise NotImplementedError("SyncTransport does not support rejecting messages.")
+
+    async def close(self) -> None:
+        pass
