@@ -13,10 +13,8 @@ from expanse.contracts.debug.exception_handler import (
     ExceptionHandler as ExceptionHandlerContract,
 )
 from expanse.core.application_builder import ApplicationBuilder
-from expanse.core.bootstrap.boot_providers import BootProviders
 from expanse.core.bootstrap.load_configuration import LoadConfiguration
 from expanse.core.bootstrap.load_environment_variables import LoadEnvironmentVariables
-from expanse.core.bootstrap.register_providers import RegisterProviders
 from expanse.exceptions.handler import ExceptionHandler
 from expanse.support._utils import string_to_class
 
@@ -38,8 +36,6 @@ class Application:
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,
-        RegisterProviders,
-        BootProviders,
     ]
 
     def __init__(

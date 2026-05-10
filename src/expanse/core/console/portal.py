@@ -18,11 +18,9 @@ from expanse.console.commands.command import Command
 from expanse.console.console import Console as ConsoleApplication
 from expanse.contracts.debug.exception_handler import ExceptionHandler
 from expanse.core.application import Application
-from expanse.core.bootstrap.boot_providers import BootProviders
 from expanse.core.bootstrap.bootstrapper import Bootstrapper
 from expanse.core.bootstrap.load_configuration import LoadConfiguration
 from expanse.core.bootstrap.load_environment_variables import LoadEnvironmentVariables
-from expanse.core.bootstrap.register_providers import RegisterProviders
 from expanse.support._utils import string_to_class
 
 
@@ -30,8 +28,6 @@ class Portal:
     _bootstrappers: ClassVar[list[type[Bootstrapper]]] = [
         LoadEnvironmentVariables,
         LoadConfiguration,
-        RegisterProviders,
-        BootProviders,
     ]
 
     def __init__(self, app: Application) -> None:
@@ -86,6 +82,8 @@ class Portal:
     async def bootstrap(self) -> None:
         if not self._app.has_been_bootstrapped():
             await self._app.bootstrap_with(self._bootstrappers)
+
+        await self._app.boot()
 
         if not self._commands_loaded:
             await self._discover_commands()

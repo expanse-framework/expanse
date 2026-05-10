@@ -7,6 +7,7 @@ import pytest
 
 from expanse.core.application import Application
 from expanse.http.middleware.trust_hosts import TrustHosts
+from expanse.support.service_providers_list import ServiceProvidersList
 from expanse.testing.client import TestClient
 
 
@@ -28,7 +29,10 @@ async def unbootstrapped_app(root: Path) -> Application:
         stack.use([TrustHosts])
 
     application = (
-        Application.configure(root).with_middleware(configure_middleware).create()
+        Application.configure(root)
+        .with_middleware(configure_middleware)
+        .with_providers(ServiceProvidersList.default())
+        .create()
     )
 
     return application

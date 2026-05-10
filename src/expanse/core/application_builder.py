@@ -6,6 +6,8 @@ from typing import Self
 
 from expanse.container.container import Container
 from expanse.core.http.middleware.middleware_stack import MiddlewareStack
+from expanse.support._utils import string_to_class
+from expanse.support.service_providers_list import ServiceProvidersList
 
 
 if TYPE_CHECKING:
@@ -16,6 +18,7 @@ if TYPE_CHECKING:
     from expanse.core.application import Application
     from expanse.core.console.portal import Portal as ConsolePortal
     from expanse.core.http.portal import Portal as HTTPPortal
+    from expanse.support.service_provider import ServiceProvider
 
 
 class ApplicationBuilder:
@@ -29,6 +32,7 @@ class ApplicationBuilder:
             Callable[[HTTPPortal], Awaitable[None]] | None
         ) = None
         self._configure_portals: Callable[[Container], None] | None = None
+        self._providers: list[str] = []
 
     def with_portals(self) -> Self:
         def configure_portals(container: Container) -> None:
@@ -78,6 +82,14 @@ class ApplicationBuilder:
 
         return self
 
+    def with_providers(self, providers: list[str] | ServiceProvidersList) -> Self:
+        if isinstance(providers, ServiceProvidersList):
+            providers = providers.to_list()
+
+        self._providers.extend(providers)
+
+        return self
+
     def create(self) -> Application:
         from expanse.core.application import Application
 
@@ -108,5 +120,15 @@ class ApplicationBuilder:
                 await container.on_resolved(Portal, self._configure_middleware_stack)
 
             app.bootstrapping(_configure_middleware)
+
+        if self._providers:
+
+            async def _register_providers(container: Container) -> None:
+                for provider in self._providers:
+                    provider_class: type[ServiceProvider] = string_to_class(provider)
+
+                    await app.register(provider_class(container))
+
+            app.bootstrapping(_register_providers)
 
         return app
