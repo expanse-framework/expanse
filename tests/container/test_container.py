@@ -87,6 +87,11 @@ class Bar:
         return str(uuid.uuid4())
 
 
+class MyGeneric[T]:
+    def __init__(self, value: T | None = None) -> None:
+        self.value: T | None = value
+
+
 async def test_singleton_returns_same_instance() -> None:
     """
     Singletons should return the same instance.
@@ -313,3 +318,13 @@ async def test_resolve_class_without_init() -> None:
     container = Container()
 
     assert isinstance(await container.get(NoInit), NoInit)
+
+
+async def test_resolve_generic() -> None:
+    container = Container()
+    container.singleton(MyGeneric[int])
+
+    result = await container.get(MyGeneric[int])
+
+    assert isinstance(result, MyGeneric)
+    assert result.value is None
