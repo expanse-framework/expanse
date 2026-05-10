@@ -10,6 +10,7 @@ from expanse.messenger.asynchronous.message_bus import MessageBus
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
+from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 
@@ -27,6 +28,7 @@ def config() -> Config:
                 "transport": "memory",
                 "transports": {
                     "memory": {"driver": "memory"},
+                    "memory2": {"driver": "memory"},
                 },
             }
         }
@@ -117,3 +119,24 @@ async def test_dispatching_messages_calls_middleware(
     after_stamp = envelope.stamp(AfterStamp)
     assert after_stamp is not None, "Expected the envelope to have the MyStamp stamp"
     assert after_stamp.value == "after"
+
+
+async def test_adding_transport_stamp_routes_message_to_correct_transport(
+    bus: MessageBus, transport_manager: TransportManager
+) -> None:
+    message = Envelope.wrap(MyMessage(foo="qux"), stamps=[TransportStamp("memory2")])
+    await bus.dispatch(message)
+
+    transport = await transport_manager.transport("memory2")
+    assert isinstance(transport, MemoryTransport), (
+        "Expected transport to be a MemoryTransport"
+    )
+
+    sent_envelopes = transport.sent
+    assert len(sent_envelopes) == 1, "Expected exactly one envelope to be sent"
+
+    other_transport = await transport_manager.transport("memory")
+    assert isinstance(other_transport, MemoryTransport)
+    assert len(other_transport.sent) == 0, (
+        "Expected no envelopes to be sent to the default memory transport"
+    )

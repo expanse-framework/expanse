@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.self_handling import SelfHandlingStamp
+from expanse.messenger.stamps.transport import TransportStamp
 from expanse.queue.pending_job import PendingJob
 
 
@@ -76,3 +77,15 @@ def test_delay_can_be_chained() -> None:
     stamp = result._job.stamp(DelayStamp)
     assert stamp is not None
     assert stamp.delay == 10 * 1000
+
+
+def test_on_transport_adds_transport_stamp() -> None:
+    job = MyJob(value="test")
+    pending = PendingJob(job)
+
+    pending.on_transport("custom_transport")
+
+    assert pending._job.has_stamp(TransportStamp)
+    stamp = pending._job.stamp(TransportStamp)
+    assert stamp is not None
+    assert stamp.name == "custom_transport"

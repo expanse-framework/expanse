@@ -6,6 +6,7 @@ from expanse.contracts.messenger.asynchronous.message_bus import (
 )
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
+from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support.asynchronous.pipeline import Pipeline
 from expanse.types.messenger import Message
@@ -30,7 +31,9 @@ class MessageBus(MessageBusContract):
         :param message: The message, or envelope, to dispatch.
         """
         envelope = Envelope.wrap(message)
-        transport = await self._transport_manager.transport()
+        transport_stamp = envelope.stamp(TransportStamp)
+        transport_name = transport_stamp.name if transport_stamp else None
+        transport = await self._transport_manager.transport(transport_name)
 
         pipeline = Pipeline[Envelope, Envelope]()
 

@@ -18,4 +18,6 @@ class AsyncPendingJob(PendingJob):
         """
         Dispatch the job to the appropriate queue for execution.
         """
+        self._dispatched = True
+
         await self._dispatcher._bus.dispatch(self._job)

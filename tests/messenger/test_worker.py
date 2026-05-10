@@ -54,7 +54,7 @@ class FakeKeepAliveTransport(KeepAliveTransport):
         self.sent.append(stamped)
         return stamped
 
-    async def receive(self) -> AsyncIterator[Envelope]:  # type: ignore[override]
+    async def receive(self) -> AsyncIterator[Envelope]:
         while self._queue:
             yield self._queue.pop(0)
 
