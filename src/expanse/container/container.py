@@ -153,10 +153,15 @@ class Container:
             else:
                 # What we are trying to build is a class,
                 # so we need to resolve the parameters of the __init__ method.
+
+                # For parameterized generics (e.g. MyGeneric[int]), concrete.__init__
+                # would resolve to _GenericAlias.__init__; introspect the origin instead.
+                concrete = get_origin(concrete) or concrete
+
                 function = concrete.__init__  # type: ignore[misc]
 
                 if isinstance(function, types.WrapperDescriptorType):
-                    # If the class doe not define an __init__ method
+                    # If the class does not define an __init__ method
                     # call it directly.
                     return concrete(*args), None
 
@@ -660,6 +665,13 @@ class Container:
 
             if not self._is_builtin(actual_type, _globals=_globals):
                 return type_
+
+        if isinstance(type_, TypeVar):
+            # Unbound type variables cannot be resolved; treat as primitive
+            # so the parameter's default value (if any) is used.
+            return None
+
+        type_ = get_origin(type_) or type_
 
         if self._is_builtin(type_, _globals=_globals):
             return None
