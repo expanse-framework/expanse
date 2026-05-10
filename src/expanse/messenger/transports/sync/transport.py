@@ -30,3 +30,6 @@ class SyncTransport:
 
     async def reject(self, envelope: Envelope) -> None:
         raise NotImplementedError("SyncTransport does not support rejecting messages.")
+
+    async def close(self) -> None:
+        pass

@@ -23,6 +23,8 @@ from expanse.redis.asynchronous.redis_manager import RedisManager
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from treat.mock import Mockery
+
     from expanse.redis.asynchronous.connections.connection import (
         Connection as RedisConnection,
     )
@@ -333,3 +335,10 @@ async def test_transport_keep_alive_is_noop_for_envelope_without_message_id_stam
     # The message sent earlier is still in the stream — keep_alive had no side-effect
     received = [e async for e in redis_transport.receive()]
     assert len(received) == 1
+
+
+async def test_transport_can_be_closed(
+    redis_transport: RedisTransport, redis_connection: RedisConnection, mockery: Mockery
+) -> None:
+    mockery.mock(redis_connection).should_receive("close").and_return(None)
+    await redis_transport.close()

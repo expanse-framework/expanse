@@ -143,6 +143,9 @@ class Connection:
                 f"Failed to keep message with ID {message_id} alive: {e}"
             )
 
+    async def close(self) -> None:
+        await self._connection.close()
+
     async def _handle_delayed_messages(self) -> None:
         now = time.time() * 1000
         message_count = await self._connection.zcount(self._queue, 0, now) or 0

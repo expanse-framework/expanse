@@ -40,6 +40,7 @@ class FakeKeepAliveTransport(KeepAliveTransport):
         self.rejected: list[Envelope] = []
         self.keep_alive_calls: list[tuple[Envelope, int | None]] = []
         self._next_id: int = 1
+        self.closed: bool = False
 
     def enqueue(self, envelope: Envelope) -> Envelope:
         stamped = envelope.with_stamps(TransportMessageIdStamp(id=self._next_id))
@@ -65,6 +66,9 @@ class FakeKeepAliveTransport(KeepAliveTransport):
 
     async def keep_alive(self, envelope: Envelope, duration: int | None = None) -> None:
         self.keep_alive_calls.append((envelope, duration))
+
+    async def close(self) -> None:
+        self.closed = True
 
 
 @dataclass
@@ -624,9 +628,6 @@ def test_worker_stop_sets_stop_event(worker: Worker) -> None:
     worker.stop()
 
     assert worker._stop_event.is_set()
-
-
-# --- Keep-alive tests ---
 
 
 def _make_keep_alive_worker(

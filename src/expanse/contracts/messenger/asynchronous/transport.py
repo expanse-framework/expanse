@@ -35,3 +35,9 @@ class Transport(ABC):
         Reject the given envelope, indicating that it could not be processed.
         :param envelope: The envelope to reject.
         """
+
+    @abstractmethod
+    async def close(self) -> None:
+        """
+        Close the transport and release any resources it holds.
+        """

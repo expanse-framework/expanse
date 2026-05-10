@@ -80,3 +80,10 @@ class MemoryTransport(TransportContract):
 
         self._queue.pop(message_id_stamp.id, None)
         self._available_at.pop(message_id_stamp.id, None)
+
+    async def close(self) -> None:
+        self._sent.clear()
+        self._acknowledged.clear()
+        self._rejected.clear()
+        self._available_at.clear()
+        self._queue.clear()

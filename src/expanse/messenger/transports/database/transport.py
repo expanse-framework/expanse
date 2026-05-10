@@ -89,3 +89,6 @@ class DatabaseTransport(KeepAliveTransportContract):
             return
 
         await self._connection.keep_alive(message_id_stamp.id, duration)
+
+    async def close(self) -> None:
+        pass
