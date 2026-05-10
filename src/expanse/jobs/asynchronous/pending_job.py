@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 
-from expanse.contracts.queue.job import Job
-from expanse.queue.pending_job import PendingJob
+from expanse.contracts.jobs.job import Job
+from expanse.jobs.pending_job import PendingJob
 
 
 if TYPE_CHECKING:
-    from expanse.queue.asynchronous.job_dispatcher import AsyncJobDispatcher
+    from expanse.jobs.asynchronous.job_dispatcher import AsyncJobDispatcher
 
 
 class AsyncPendingJob(PendingJob):

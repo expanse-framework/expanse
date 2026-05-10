@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from expanse.jobs.pending_job import PendingJob
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.transport import TransportStamp
-from expanse.queue.pending_job import PendingJob
 
 
 @dataclass
