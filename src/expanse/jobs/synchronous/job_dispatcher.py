@@ -1,11 +1,11 @@
-from expanse.contracts.messenger.asynchronous.message_bus import MessageBus
-from expanse.contracts.queue.job import Job
-from expanse.queue.asynchronous.pending_job import AsyncPendingJob
+from expanse.contracts.jobs.job import Job
+from expanse.contracts.messenger.synchronous.message_bus import MessageBus
+from expanse.jobs.synchronous.pending_job import PendingJob
 
 
-class AsyncJobDispatcher:
+class JobDispatcher:
     """
-    The AsyncJobDispatcher is responsible for dispatching jobs to the appropriate queue.
+    The JobDispatcher is responsible for dispatching jobs to the appropriate queue.
 
     This a small wrapper around the MessageBus to provide a simpler interface for job dispatching.
     """
@@ -13,15 +13,15 @@ class AsyncJobDispatcher:
     def __init__(self, bus: MessageBus) -> None:
         self._bus: MessageBus = bus
 
-    async def dispatch(self, job: Job) -> None:
+    def dispatch(self, job: Job) -> None:
         """
         Dispatch a job through the bus immediately.
 
         :param job: The job to dispatch.
         """
-        await self.prepare(job).dispatch()
+        self.prepare(job).dispatch()
 
-    def prepare(self, job: Job) -> AsyncPendingJob:
+    def prepare(self, job: Job) -> "PendingJob":
         """
         Prepare a job for dispatching.
 
@@ -29,7 +29,7 @@ class AsyncJobDispatcher:
 
         :return: A PendingDispatch instance used to configure the job before dispatching.
         """
-        return AsyncPendingJob(self, job)
+        return PendingJob(self, job)
 
 
-__all__ = ["AsyncJobDispatcher"]
+__all__ = ["JobDispatcher"]

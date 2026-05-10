@@ -1,6 +1,6 @@
 from typing import Self
 
-from expanse.contracts.queue.job import Job
+from expanse.contracts.jobs.job import Job
 from expanse.messenger.envelope import Envelope
 
 
