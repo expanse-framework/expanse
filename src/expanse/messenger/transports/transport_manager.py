@@ -1,10 +1,14 @@
 import asyncio
 
 from typing import Any
+from typing import override
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.transport import Transport
+from expanse.contracts.messenger.transports.transport_manager import (
+    TransportManager as TransportManagerContract,
+)
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
@@ -13,7 +17,7 @@ from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
 
 
-class TransportManager:
+class TransportManager(TransportManagerContract):
     def __init__(
         self, container: Container, config: Config, registry: Registry
     ) -> None:
@@ -22,6 +26,7 @@ class TransportManager:
         self._config: Config = config
         self._transports: dict[str, Transport] = {}
 
+    @override
     async def transport(self, name: str | None = None) -> Transport:
         if name is None:
             name = self.get_default_transport_name()

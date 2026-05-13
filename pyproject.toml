@@ -61,6 +61,9 @@ dev = ["pytest-mock>=3.14.0"]
 typing = ["types-pygments>=2.18.0.20240506"]
 lint = ["mypy>=1.11.2"]
 
+[project.entry-points."pytest11"]
+expanse = "expanse.testing.pytest.plugin"
+
 [tool.uv]
 default-groups = [
     "test",

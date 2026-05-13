@@ -58,9 +58,6 @@ class Worker:
         """
         self._stop_event.clear()
 
-        if transport_name is None:
-            transport_name = self._transport_manager.get_default_transport_name()
-
         transport = await self._transport_manager.transport(transport_name)
 
         handled_messages = 0

@@ -62,9 +62,6 @@ class Application:
         )
         self._bootstrapping_callbacks: list[Callable[[Container], Awaitable[None]]] = []
 
-        self._bind_paths()
-        self._register_base_bindings()
-
     @property
     def name(self) -> str:
         return self._config.get("app.name", "Expanse")
@@ -159,6 +156,8 @@ class Application:
         if self._has_been_bootstrapped:
             return self
 
+        self._bind_paths()
+        self._register_base_bindings()
         await self._register_base_service_providers()
 
         for bootstrapper_class in bootstrappers:
