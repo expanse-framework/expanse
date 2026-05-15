@@ -1,0 +1,75 @@
+from abc import ABC
+from abc import abstractmethod
+from typing import Any
+
+
+class Store(ABC):
+    @abstractmethod
+    def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
+        """
+        Set a value in the store.
+
+        :param key: The key to set.
+        :param value: The value to set.
+        :param ttl: The time-to-live (TTL) for the cache item in seconds. If None, the item will not expire.
+
+        :return: True if the item was successfully stored, False otherwise.
+        """
+
+    @abstractmethod
+    def set_many(self, items: dict[str, Any], ttl: int | None = None) -> bool:
+        """
+        Set multiple values in the store.
+
+        :param items: A dictionary of key-value pairs to set.
+        :param ttl: The time-to-live (TTL) for the cache items in seconds. If None, the items will not expire.
+
+        :return: True if the items were successfully stored, False otherwise.
+        """
+
+    @abstractmethod
+    def get(self, key: str) -> Any | None:
+        """
+        Get a value from the store.
+
+        :param key: The key to get.
+
+        :return: The value associated with the key, or None if the key does not exist.
+        """
+
+    @abstractmethod
+    def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+        """
+        Get multiple values from the store.
+
+        :param keys: The keys to get.
+        :return: A dictionary mapping each key to its associated value, or None if the key does not exist.
+        """
+
+    @abstractmethod
+    def has(self, key: str) -> bool:
+        """
+        Check if a key exists in the store.
+
+        :param key: The key to check.
+
+        :return: True if the key exists, False otherwise.
+        """
+
+    @abstractmethod
+    def delete(self, key: str) -> bool:
+        """
+        Delete a value from the store.
+
+        :param key: The key to delete.
+
+        :return: True if the key was successfully deleted, False otherwise.
+        """
+
+    @abstractmethod
+    def clear(self) -> bool:
+        """
+        Clear all values from the store.
+
+        :return: True if the store was successfully cleared, False otherwise.
+        """
