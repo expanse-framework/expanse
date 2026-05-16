@@ -4,14 +4,17 @@ from datetime import UTC
 from datetime import datetime
 from typing import Any
 from typing import overload
+from typing import override
 
+from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.store import Store
 
 
-class Cache:
+class Cache(CacheContract):
     def __init__(self, store: Store) -> None:
         self._store: Store = store
 
+    @override
     async def set(
         self,
         key: str,
@@ -40,6 +43,7 @@ class Cache:
 
         return await self._store.set(key, value, ttl)
 
+    @override
     async def set_many(
         self,
         items: dict[str, Any],
@@ -72,6 +76,7 @@ class Cache:
     @overload
     async def get(self, key: str, default: Any) -> Any: ...
 
+    @override
     async def get(self, key: str, default: Any | None = None) -> Any | None:
         """
         Retrieve an item from the cache.
@@ -88,6 +93,7 @@ class Cache:
 
         return value
 
+    @override
     async def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
         """
         Retrieve multiple items from the cache.
@@ -113,6 +119,7 @@ class Cache:
             for key, value in values.items()
         }
 
+    @override
     async def has(self, key: str) -> bool:
         """
         Check if a key exists in the cache.
@@ -123,6 +130,7 @@ class Cache:
         """
         return await self._store.has(key)
 
+    @override
     async def pop(self, key: str) -> Any | None:
         """
         Remove an item from the cache and return its value.
@@ -138,6 +146,7 @@ class Cache:
 
         return value
 
+    @override
     async def delete(self, key: str) -> bool:
         """
         Delete a key from the cache.
@@ -148,6 +157,7 @@ class Cache:
         """
         return await self._store.delete(key)
 
+    @override
     async def delete_many(self, keys: list[str]) -> bool:
         """
         Delete multiple keys from the cache.
@@ -162,6 +172,7 @@ class Cache:
 
         return all(results)
 
+    @override
     async def clear(self) -> bool:
         """
         Clear all items from the cache.
