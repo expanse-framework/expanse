@@ -1,20 +1,31 @@
-from datetime import datetime
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import overload
 from typing import override
+
+from asgiref.sync import async_to_sync
 
 from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.cache.synchronous.cache import Cache
-from expanse.configuration.config import Config
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
-from expanse.contracts.cache.synchronous.store import Store
+
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from expanse.configuration.config import Config
+    from expanse.container.container import Container
+    from expanse.contracts.cache.synchronous.store import Store
 
 
 class CacheManager(CacheContract):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, container: Container):
         self._config: Config = config
+        self._container: Container = container
         self._caches: dict[str, CacheContract] = {}
 
     def cache(self, name: str | None = None) -> CacheContract:
@@ -53,6 +64,9 @@ class CacheManager(CacheContract):
             case "memory":
                 return self._create_memory_store()
 
+            case "database":
+                return self._create_database_store(store_config)
+
             case _:
                 raise UnsupportedStoreDriverError(
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
@@ -62,6 +76,17 @@ class CacheManager(CacheContract):
         from expanse.cache.synchronous.stores.memory import MemoryStore
 
         return MemoryStore()
+
+    def _create_database_store(self, store_config: dict[str, Any]) -> Store:
+        from expanse.cache.config.database import DatabaseStoreConfig
+        from expanse.cache.synchronous.stores.database.store import DatabaseStore
+        from expanse.database.synchronous.database_manager import DatabaseManager
+
+        db = async_to_sync(self._container.get)(DatabaseManager)
+
+        config = DatabaseStoreConfig.model_validate(store_config)
+
+        return DatabaseStore(config, db)
 
     @override
     def set(

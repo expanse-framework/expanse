@@ -35,6 +35,7 @@ class ServiceProvidersList:
                 "expanse.database.database_service_provider.DatabaseServiceProvider",
                 "expanse.view.view_service_provider.ViewServiceProvider",
                 "expanse.static.static_service_provider.StaticServiceProvider",
+                "expanse.cache.cache_service_provider.CacheServiceProvider",
                 "expanse.encryption.encryption_service_provider.EncryptionServiceProvider",
                 "expanse.session.session_service_provider.SessionServiceProvider",
                 "expanse.messenger.messenger_service_provider.MessengerServiceProvider",

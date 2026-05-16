@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from expanse.cache.asynchronous.cache import Cache
@@ -8,6 +10,12 @@ from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.configuration.config import Config
+from expanse.container.container import Container
+from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+
+
+if TYPE_CHECKING:
+    from expanse.core.application import Application
 
 
 def make_config(store: str = "memory", stores: dict | None = None) -> Config:
@@ -23,7 +31,7 @@ def config() -> Config:
 
 @pytest.fixture()
 def manager(config: Config) -> CacheManager:
-    return CacheManager(config)
+    return CacheManager(config, Container())
 
 
 async def test_cache_returns_default_store(manager: CacheManager) -> None:
@@ -59,21 +67,21 @@ async def test_cache_returns_same_instance_for_default_and_named(
 async def test_get_default_store_name_returns_configured_default(
     config: Config,
 ) -> None:
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     assert manager.get_default_store_name() == "memory"
 
 
 async def test_get_default_store_name_raises_when_no_default_configured() -> None:
     config = Config({"cache": {"stores": {"memory": {"driver": "memory"}}}})
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     with pytest.raises(NoDefaultStoreError):
         manager.get_default_store_name()
 
 
 async def test_cache_raises_when_store_not_configured(config: Config) -> None:
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     with pytest.raises(UnconfiguredStoreError, match="'unknown'"):
         await manager.cache("unknown")
@@ -81,7 +89,7 @@ async def test_cache_raises_when_store_not_configured(config: Config) -> None:
 
 async def test_cache_raises_when_store_missing_driver(config: Config) -> None:
     config = make_config(stores={"bad": {}})
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     with pytest.raises(UnconfiguredStoreError, match="missing a driver"):
         await manager.cache("bad")
@@ -89,7 +97,7 @@ async def test_cache_raises_when_store_missing_driver(config: Config) -> None:
 
 async def test_cache_raises_for_unsupported_driver(config: Config) -> None:
     config = make_config(stores={"redis": {"driver": "redis"}})
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     with pytest.raises(UnsupportedStoreDriverError, match="redis"):
         await manager.cache("redis")
@@ -193,7 +201,7 @@ async def test_multiple_named_stores_are_independent() -> None:
             }
         }
     )
-    manager = CacheManager(config)
+    manager = CacheManager(config, Container())
 
     first = await manager.cache("first")
     second = await manager.cache("second")
@@ -201,3 +209,43 @@ async def test_multiple_named_stores_are_independent() -> None:
     await first.set("key", "from_first")
 
     assert await second.get("key") is None
+
+
+async def test_manager_can_create_database_store(app: Application) -> None:
+    app.config["database"] = {
+        "connection": "sqlite",
+        "connections": {
+            "sqlite": {
+                "driver": "sqlite",
+                "database": ":memory:",
+            }
+        },
+    }
+
+    app.config["cache"] = {
+        "store": "database",
+        "stores": {
+            "database": {
+                "driver": "database",
+                "connection": "sqlite",
+            }
+        },
+    }
+    db = await app.container.get(AsyncDatabaseManager)
+    async with db.connection("sqlite") as connection:
+        await connection.execute(
+            """
+            CREATE TABLE cache (
+                key TEXT PRIMARY KEY,
+                data BLOB NOT NULL,
+                expiration INTEGER
+            )
+            """
+        )
+        await connection.commit()
+
+    manager = CacheManager(app.config, app.container)
+
+    cache = await manager.cache()
+    assert await cache.set("key", "value") is True
+    assert await cache.get("key") == "value"

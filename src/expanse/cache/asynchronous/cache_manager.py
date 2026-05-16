@@ -8,13 +8,15 @@ from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.configuration.config import Config
+from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.store import Store
 
 
 class CacheManager(CacheContract):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, container: Container):
         self._config: Config = config
+        self._container: Container = container
         self._caches: dict[str, CacheContract] = {}
 
     async def cache(self, name: str | None = None) -> CacheContract:
@@ -53,6 +55,9 @@ class CacheManager(CacheContract):
             case "memory":
                 return self._create_memory_store()
 
+            case "database":
+                return await self._create_database_store(store_config)
+
             case _:
                 raise UnsupportedStoreDriverError(
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
@@ -65,6 +70,17 @@ class CacheManager(CacheContract):
         )
 
         return MemoryStore(SyncMemoryStore())
+
+    async def _create_database_store(self, store_config: dict[str, Any]) -> Store:
+        from expanse.cache.asynchronous.stores.database.store import DatabaseStore
+        from expanse.cache.config.database import DatabaseStoreConfig
+        from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+
+        config = DatabaseStoreConfig.model_validate(store_config)
+
+        db = await self._container.get(AsyncDatabaseManager)
+
+        return DatabaseStore(config, db)
 
     async def set(
         self,

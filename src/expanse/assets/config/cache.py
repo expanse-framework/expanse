@@ -12,7 +12,7 @@ class Config(BaseSettings):
     # Use the `CACHE_STORE` environment variable to set this value in your `.env` file.
     # For instance:
     # >>> CACHE_STORE=database
-    store: str = "memory"
+    store: str = "database"
 
     # Cache stores
     #
@@ -22,9 +22,16 @@ class Config(BaseSettings):
     # >>> CACHE_STORES__DATABASE__DRIVER=database
     # >>> CACHE_STORES__DATABASE__CONNECTION=default
     stores: dict[str, dict[str, Any]] = Field(
-        default_factory=lambda: {
-            "memory": {"driver": "memory"},
-        }
+        default_factory=lambda: dict[str, dict[str, Any]](
+            {
+                "memory": {"driver": "memory"},
+                "database": {
+                    "driver": "database",
+                    "connection": None,
+                    "table": "cache",
+                },
+            }
+        )
     )
 
     model_config = SettingsConfigDict(env_prefix="CACHE_", env_nested_delimiter="__")
