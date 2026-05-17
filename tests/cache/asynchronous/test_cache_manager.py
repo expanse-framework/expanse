@@ -15,6 +15,8 @@ from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from expanse.core.application import Application
 
 
@@ -247,5 +249,27 @@ async def test_manager_can_create_database_store(app: Application) -> None:
     manager = CacheManager(app.config, app.container)
 
     cache = await manager.cache()
-    assert await cache.set("key", "value") is True
+    assert await cache.set("key", "value")
+    assert await cache.get("key") == "value"
+
+
+async def test_manager_can_create_file_store(tmp_path: Path) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "file",
+                "stores": {
+                    "file": {
+                        "driver": "file",
+                        "path": str(tmp_path),
+                        "permissions": 0o755,
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(config, Container())
+
+    cache = await manager.cache()
+    assert await cache.set("key", "value")
     assert await cache.get("key") == "value"

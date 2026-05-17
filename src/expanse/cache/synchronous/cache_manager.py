@@ -67,6 +67,9 @@ class CacheManager(CacheContract):
             case "database":
                 return self._create_database_store(store_config)
 
+            case "file":
+                return self._create_file_store(store_config)
+
             case _:
                 raise UnsupportedStoreDriverError(
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
@@ -87,6 +90,14 @@ class CacheManager(CacheContract):
         config = DatabaseStoreConfig.model_validate(store_config)
 
         return DatabaseStore(config, db)
+
+    def _create_file_store(self, store_config: dict[str, Any]) -> Store:
+        from expanse.cache.config.file import FileStoreConfig
+        from expanse.cache.synchronous.stores.file.store import FileStore
+
+        config = FileStoreConfig.model_validate(store_config)
+
+        return FileStore(config.path, config.permissions)
 
     @override
     def set(
