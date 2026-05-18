@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from typing import TYPE_CHECKING
 
 import pytest
@@ -98,11 +100,11 @@ async def test_cache_raises_when_store_missing_driver(config: Config) -> None:
 
 
 async def test_cache_raises_for_unsupported_driver(config: Config) -> None:
-    config = make_config(stores={"redis": {"driver": "redis"}})
+    config = make_config(stores={"unknown": {"driver": "unknown"}})
     manager = CacheManager(config, Container())
 
-    with pytest.raises(UnsupportedStoreDriverError, match="redis"):
-        await manager.cache("redis")
+    with pytest.raises(UnsupportedStoreDriverError, match="unknown"):
+        await manager.cache("unknown")
 
 
 async def test_set_stores_value_in_default_store(manager: CacheManager) -> None:
@@ -269,6 +271,38 @@ async def test_manager_can_create_file_store(tmp_path: Path) -> None:
         }
     )
     manager = CacheManager(config, Container())
+
+    cache = await manager.cache()
+    assert await cache.set("key", "value")
+    assert await cache.get("key") == "value"
+
+
+async def test_manager_can_create_redis_store() -> None:
+    config = Config(
+        {
+            "redis": {
+                "connection": "default",
+                "connections": {
+                    "default": {
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/1"
+                    }
+                },
+            },
+            "cache": {
+                "store": "redis",
+                "stores": {
+                    "redis": {
+                        "driver": "redis",
+                        "connection": "default",
+                    }
+                },
+            },
+        }
+    )
+
+    container = Container()
+    container.instance(Config, config)
+    manager = CacheManager(config, container)
 
     cache = await manager.cache()
     assert await cache.set("key", "value")

@@ -61,6 +61,9 @@ class CacheManager(CacheContract):
             case "file":
                 return await self._create_file_store(store_config)
 
+            case "redis":
+                return await self._create_redis_store(store_config)
+
             case _:
                 raise UnsupportedStoreDriverError(
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
@@ -97,6 +100,17 @@ class CacheManager(CacheContract):
         sync_store = SyncFileStore(config.path, config.permissions)
 
         return FileStore(sync_store)
+
+    async def _create_redis_store(self, store_config: dict[str, Any]) -> Store:
+        from expanse.cache.asynchronous.stores.redis.store import RedisStore
+        from expanse.cache.config.redis import RedisStoreConfig
+        from expanse.redis.asynchronous.redis_manager import RedisManager
+
+        config = RedisStoreConfig.model_validate(store_config)
+
+        redis = await self._container.get(RedisManager)
+
+        return RedisStore(await redis.connection(config.connection))
 
     async def set(
         self,
