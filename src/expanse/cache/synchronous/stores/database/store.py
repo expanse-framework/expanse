@@ -21,6 +21,7 @@ from expanse.contracts.cache.synchronous.store import Store
 
 if TYPE_CHECKING:
     from expanse.cache.config.database import DatabaseStoreConfig
+    from expanse.contracts.lock.synchronous.lock import Lock
     from expanse.database.synchronous.database_manager import DatabaseManager
 
 
@@ -158,6 +159,27 @@ class DatabaseStore(Store):
             connection.commit()
 
         return True
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> Lock:
+        from expanse.cache.synchronous.locks.database_lock import DatabaseLock
+
+        connection = self._db.connection(self._config.connection)
+
+        return DatabaseLock(
+            connection=connection,
+            table_name=self._config.locks_table,
+            name=name,
+            ttl=ttl,
+            owner=owner,
+            refresh=refresh,
+        )
 
     def _postgres_upsert(self, values: list[dict[str, Any]]) -> None:
         from sqlalchemy.dialects.postgresql import insert

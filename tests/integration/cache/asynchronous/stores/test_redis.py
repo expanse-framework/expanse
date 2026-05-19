@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from expanse.core.application import Application
-    from expanse.redis.asynchronous.connections.connection import Connection
 
 
 pytestmark = pytest.mark.redis
@@ -30,7 +29,10 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
         "connections": {
             "default": {
                 "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/1"
-            }
+            },
+            "lock": {
+                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/2"
+            },
         },
     }
 
@@ -39,20 +41,20 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
     yield
 
     manager = await app.container.get(RedisManager)
-    connection = await manager.connection("default")
+    connection = manager.connection("default")
     await connection.flushdb()
 
 
 @pytest.fixture()
-async def connection(app: Application) -> Connection:
+async def redis(app: Application) -> RedisManager:
     manager = await app.container.get(RedisManager)
 
-    return await manager.connection("default")
+    return manager
 
 
 @pytest.fixture()
-async def store(connection: Connection) -> RedisStore:
-    return RedisStore(connection)
+async def store(redis: RedisManager) -> RedisStore:
+    return RedisStore(redis)
 
 
 async def test_set_stores_value(store: RedisStore) -> None:
@@ -85,9 +87,10 @@ async def test_set_with_ttl_stores_value(store: RedisStore) -> None:
 
 
 async def test_set_with_ttl_sets_expiration(
-    store: RedisStore, connection: Connection
+    store: RedisStore, redis: RedisManager
 ) -> None:
     await store.set("key", "value", ttl=60)
+    connection = redis.connection("default")
 
     ttl = await connection.ttl("key")
 
@@ -99,9 +102,10 @@ async def test_get_returns_none_for_missing_key(store: RedisStore) -> None:
 
 
 async def test_get_returns_none_for_expired_key(
-    store: RedisStore, connection: Connection
+    store: RedisStore, redis: RedisManager
 ) -> None:
     await store.set("key", "value")
+    connection = redis.connection("default")
     await connection.pexpire("key", 1)
     await asyncio.sleep(0.01)
 
@@ -118,12 +122,13 @@ async def test_set_many_stores_multiple_values(store: RedisStore) -> None:
 
 
 async def test_set_many_with_ttl_stores_values(
-    store: RedisStore, connection: Connection
+    store: RedisStore, redis: RedisManager
 ) -> None:
     result = await store.set_many({"x": 10, "y": 20}, ttl=60)
 
     assert result is True
 
+    connection = redis.connection("default")
     ttl_x = await connection.ttl("x")
     ttl_y = await connection.ttl("y")
 
@@ -164,9 +169,10 @@ async def test_has_returns_false_for_missing_key(store: RedisStore) -> None:
 
 
 async def test_has_returns_false_for_expired_key(
-    store: RedisStore, connection: Connection
+    store: RedisStore, redis: RedisManager
 ) -> None:
     await store.set("key", "value")
+    connection = redis.connection("default")
     await connection.pexpire("key", 1)
     await asyncio.sleep(0.01)
 
@@ -196,3 +202,25 @@ async def test_clear_removes_all_entries(store: RedisStore) -> None:
     assert result is True
     assert await store.get("a") is None
     assert await store.get("b") is None
+
+
+async def test_lock_acquire_and_release(store: RedisStore) -> None:
+    lock = store.lock("test-lock", ttl=10)
+
+    acquired = await lock.acquire(blocking=False)
+    assert acquired is True
+
+    released = await lock.release()
+    assert released is True
+
+
+async def test_lock_uses_lock_connection(redis: RedisManager) -> None:
+    store = RedisStore(redis, connection_name="default", lock_connection_name="lock")
+    lock = store.lock("test-lock")
+
+    async with lock:
+        connection = redis.connection("default")
+        assert await connection.get("lock:test-lock") is None
+
+        lock_connection = redis.connection("lock")
+        assert await lock_connection.get("lock:test-lock") == lock.owner

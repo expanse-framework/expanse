@@ -1,8 +1,13 @@
 from abc import ABC
 from abc import abstractmethod
 from datetime import datetime
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import overload
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.synchronous.lock import Lock
 
 
 class Cache(ABC):
@@ -114,4 +119,23 @@ class Cache(ABC):
     def clear(self) -> bool:
         """
         Clear all items from the cache.
+        """
+
+    @abstractmethod
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        """
+        Get a lock for the cache.
+
+        :param name: The name of the lock.
+        :param ttl: The time-to-live (TTL) for the lock in seconds.
+        :param owner: The owner of the lock. If None, the lock will be owned by the current process.
+        :param refresh: Whether to automatically refresh the lock's TTL while it is held.
+
+        :return: A Lock instance that can be used to acquire and release the lock.
         """

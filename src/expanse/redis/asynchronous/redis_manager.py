@@ -16,7 +16,7 @@ class RedisManager:
         self._config: Config = config
         self._connections: dict[str, Connection] = {}
 
-    async def connection(self, name: str | None = None) -> "Connection":
+    def connection(self, name: str | None = None) -> "Connection":
         """
         Get a Redis connection by name.
 
@@ -37,7 +37,7 @@ class RedisManager:
 
         connection_config = connections_configs[name]
 
-        connection = await self._create_connection(connection_config)
+        connection = self._create_connection(connection_config)
 
         self._connections[name] = connection
 
@@ -50,7 +50,7 @@ class RedisManager:
         for connection in self._connections.values():
             await connection.aclose()
 
-    async def _create_connection(self, raw_config: dict[str, Any]) -> "Connection":
+    def _create_connection(self, raw_config: dict[str, Any]) -> "Connection":
         from redis.asyncio import Redis
         from redis.asyncio.retry import Retry
         from redis.backoff import AbstractBackoff

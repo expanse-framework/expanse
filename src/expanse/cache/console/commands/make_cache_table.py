@@ -21,7 +21,14 @@ class MakeCacheTableCommand(Command):
             description="The name of the cache table.",
             flag=False,
             default="cache",
-        )
+        ),
+        option(
+            "with-locks-table",
+            description="Also create a migration for the locks table.",
+            flag=False,
+            default="cache_locks",
+            value_required=False,
+        ),
     ]
 
     async def handle(self, migrator: Migrator) -> int:
@@ -46,12 +53,33 @@ class MakeCacheTableCommand(Command):
                 index=True,
             )
 
+        if self._io.input.has_parameter_option("--with-locks-table"):
+            cache_locks_table = self.option("with-locks-table") or "cache_locks"
+        else:
+            cache_locks_table = None
+
+        if cache_locks_table:
+
+            class CacheLock(Model):
+                __tablename__ = cache_locks_table
+                key: Mapped[Annotated[str, column(String(), primary_key=True)]] = (
+                    column()
+                )
+                owner: Mapped[str] = column(String(), nullable=False)
+                expiration: Mapped[int] = column(
+                    Integer().with_variant(INTEGER(unsigned=True), "mysql"),
+                    nullable=True,
+                    index=True,
+                )
+
         migrator.config.attributes["include_name"] = self.include_name
         migrator.config.attributes["target_metadata"] = Model.metadata
 
-        migrator.make(
-            f"Create {self.option('table-name')} table", auto=True, io=self._io
-        )
+        migration_message = f"Create {self.option('table-name')} table"
+        if cache_locks_table:
+            migration_message += f" and {cache_locks_table} table"
+
+        migrator.make(migration_message, auto=True, io=self._io)
 
         return 0
 

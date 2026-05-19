@@ -30,6 +30,11 @@ class Config(BaseSettings):
                     "connection": None,
                     "table": "cache",
                 },
+                "redis": {
+                    "driver": "redis",
+                    "connection": "cache",
+                    "lock_connection": "default",
+                },
             }
         )
     )

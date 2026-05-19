@@ -1,12 +1,23 @@
+from __future__ import annotations
+
+import threading
+
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
 from expanse.contracts.cache.synchronous.store import Store
 
 
+if TYPE_CHECKING:
+    from expanse.contracts.lock.synchronous.lock import Lock
+
+
 class MemoryStore(Store):
     def __init__(self) -> None:
         self._store: dict[str, Any] = {}
+        self._locks: dict[str, dict[str, Any]] = {}
+        self._mutex: threading.Lock = threading.Lock()
 
     @override
     def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
@@ -46,3 +57,15 @@ class MemoryStore(Store):
         self._store.clear()
 
         return True
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> Lock:
+        from expanse.cache.synchronous.locks.memory_lock import MemoryLock
+
+        return MemoryLock(self._locks, self._mutex, name, ttl, owner, refresh)

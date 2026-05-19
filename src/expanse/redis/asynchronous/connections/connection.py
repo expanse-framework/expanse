@@ -7,6 +7,7 @@ from typing import Any
 from typing import Self
 
 from redis.commands.core import ACLCommands
+from redis.commands.core import AsyncScriptCommands
 from redis.commands.core import BasicKeyCommands
 from redis.commands.core import FunctionCommands
 from redis.commands.core import GeoCommands
@@ -16,7 +17,6 @@ from redis.commands.core import ListCommands
 from redis.commands.core import ManagementCommands
 from redis.commands.core import ModuleCommands
 from redis.commands.core import ScanCommands
-from redis.commands.core import ScriptCommands
 from redis.commands.core import SetCommands
 from redis.commands.core import SortedSetCommands
 from redis.commands.core import StreamCommands
@@ -40,7 +40,7 @@ class Connection(
     ManagementCommands,
     ModuleCommands,
     ScanCommands,
-    ScriptCommands,
+    AsyncScriptCommands,
     SetCommands,
     SortedSetCommands,
     StreamCommands,

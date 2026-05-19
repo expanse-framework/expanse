@@ -1,16 +1,39 @@
 import pickle
 
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import cast
 from typing import override
 
 from expanse.contracts.cache.synchronous.store import Store
 from expanse.redis.synchronous.connections.connection import Connection
+from expanse.redis.synchronous.redis_manager import RedisManager
+
+
+if TYPE_CHECKING:
+    from expanse.cache.synchronous.locks.redis_lock import RedisLock
 
 
 class RedisStore(Store):
-    def __init__(self, connection: Connection) -> None:
-        self._connection: Connection = connection
+    def __init__(
+        self,
+        redis: RedisManager,
+        connection_name: str | None = None,
+        lock_connection_name: str | None = None,
+    ) -> None:
+        self._redis: RedisManager = redis
+        self._connection_name: str | None = connection_name
+        self._lock_connection_name: str | None = lock_connection_name
+
+    @property
+    def _connection(self) -> Connection:
+        return self._redis.connection(self._connection_name)
+
+    @property
+    def _lock_connection(self) -> Connection:
+        return self._redis.connection(
+            self._lock_connection_name or self._connection_name
+        )
 
     def _serialize(self, value: Any) -> str:
         return pickle.dumps(value).hex()
@@ -63,3 +86,15 @@ class RedisStore(Store):
         self._connection.flushdb()
 
         return True
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "RedisLock":
+        from expanse.cache.synchronous.locks.redis_lock import RedisLock
+
+        return RedisLock(self._lock_connection, name, ttl, owner=owner, refresh=refresh)

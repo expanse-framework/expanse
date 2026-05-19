@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
 from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemoryStore
 from expanse.contracts.cache.asynchronous.store import Store
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.asynchronous.lock import Lock
 
 
 class MemoryStore(Store):
@@ -36,3 +41,15 @@ class MemoryStore(Store):
     @override
     async def clear(self) -> bool:
         return self._sync_store.clear()
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        from expanse.cache.asynchronous.locks.memory_lock import MemoryLock
+
+        return MemoryLock(self._sync_store, name, ttl, owner, refresh)

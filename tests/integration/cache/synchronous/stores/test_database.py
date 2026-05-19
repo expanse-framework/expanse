@@ -317,3 +317,15 @@ async def test_upsert_works_for_non_natively_supported_dialect(
     store.set("key", "updated")
 
     assert store.get("key") == "updated"
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+def test_lock_acquire_and_release(store: DatabaseStore) -> None:
+    lock = store.lock("test-lock", ttl=10)
+
+    acquired = lock.acquire(blocking=False)
+    assert acquired is True
+
+    released = lock.release()
+    assert released is True

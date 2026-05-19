@@ -36,8 +36,8 @@ def config() -> Config:
 
 
 @pytest.fixture()
-def manager(config: Config) -> CacheManager:
-    return CacheManager(config, Container())
+def manager(app: Application, config: Config) -> CacheManager:
+    return CacheManager(app, config, Container())
 
 
 def test_cache_returns_default_store(manager: CacheManager) -> None:
@@ -68,130 +68,50 @@ def test_cache_returns_same_instance_for_default_and_named(
     assert default_cache is named_cache
 
 
-def test_get_default_store_name_returns_configured_default(config: Config) -> None:
-    manager = CacheManager(config, Container())
+def test_get_default_store_name_returns_configured_default(
+    app: Application, config: Config
+) -> None:
+    manager = CacheManager(app, config, Container())
 
     assert manager.get_default_store_name() == "memory"
 
 
-def test_get_default_store_name_raises_when_no_default_configured() -> None:
+def test_get_default_store_name_raises_when_no_default_configured(
+    app: Application,
+) -> None:
     config = Config({"cache": {"stores": {"memory": {"driver": "memory"}}}})
-    manager = CacheManager(config, Container())
+    manager = CacheManager(app, config, Container())
 
     with pytest.raises(NoDefaultStoreError):
         manager.get_default_store_name()
 
 
-def test_cache_raises_when_store_not_configured(config: Config) -> None:
-    manager = CacheManager(config, Container())
+def test_cache_raises_when_store_not_configured(
+    app: Application, config: Config
+) -> None:
+    manager = CacheManager(app, config, Container())
 
     with pytest.raises(UnconfiguredStoreError, match="'unknown'"):
         manager.cache("unknown")
 
 
-def test_cache_raises_when_store_missing_driver() -> None:
+def test_cache_raises_when_store_missing_driver(app: Application) -> None:
     config = make_config(stores={"bad": {}})
-    manager = CacheManager(config, Container())
+    manager = CacheManager(app, config, Container())
 
     with pytest.raises(UnconfiguredStoreError, match="missing a driver"):
         manager.cache("bad")
 
 
-def test_cache_raises_for_unsupported_driver() -> None:
+def test_cache_raises_for_unsupported_driver(app: Application) -> None:
     config = make_config(stores={"unknown": {"driver": "unknown"}})
-    manager = CacheManager(config, Container())
+    manager = CacheManager(app, config, Container())
 
     with pytest.raises(UnsupportedStoreDriverError, match="unknown"):
         manager.cache("unknown")
 
 
-def test_set_stores_value_in_default_store(manager: CacheManager) -> None:
-    result = manager.set("key", "value")
-
-    assert result is True
-    assert manager.get("key") == "value"
-
-
-def test_set_many_stores_multiple_values(manager: CacheManager) -> None:
-    result = manager.set_many({"a": 1, "b": 2})
-
-    assert result is True
-    assert manager.get("a") == 1
-    assert manager.get("b") == 2
-
-
-def test_get_returns_none_for_missing_key(manager: CacheManager) -> None:
-    assert manager.get("missing") is None
-
-
-def test_get_returns_default_for_missing_key(manager: CacheManager) -> None:
-    assert manager.get("missing", "fallback") == "fallback"
-
-
-def test_get_many_returns_all_values(manager: CacheManager) -> None:
-    manager.set_many({"x": 10, "y": 20})
-
-    result = manager.get_many(["x", "y"])
-
-    assert result == {"x": 10, "y": 20}
-
-
-def test_has_returns_true_for_existing_key(manager: CacheManager) -> None:
-    manager.set("key", "value")
-
-    assert manager.has("key") is True
-
-
-def test_has_returns_false_for_missing_key(manager: CacheManager) -> None:
-    assert manager.has("missing") is False
-
-
-def test_pop_returns_value_and_removes_key(manager: CacheManager) -> None:
-    manager.set("key", "value")
-
-    result = manager.pop("key")
-
-    assert result == "value"
-    assert manager.has("key") is False
-
-
-def test_delete_removes_key(manager: CacheManager) -> None:
-    manager.set("key", "value")
-
-    result = manager.delete("key")
-
-    assert result is True
-    assert manager.get("key") is None
-
-
-def test_delete_many_removes_all_keys(manager: CacheManager) -> None:
-    manager.set_many({"a": 1, "b": 2})
-
-    result = manager.delete_many(["a", "b"])
-
-    assert result is True
-    assert manager.get("a") is None
-    assert manager.get("b") is None
-
-
-def test_clear_removes_all_keys(manager: CacheManager) -> None:
-    manager.set_many({"a": 1, "b": 2})
-
-    result = manager.clear()
-
-    assert result is True
-    assert manager.get("a") is None
-    assert manager.get("b") is None
-
-
-def test_operations_share_state_via_default_store(manager: CacheManager) -> None:
-    manager.set("key", "value")
-
-    cache = manager.cache()
-    assert cache.get("key") == "value"
-
-
-def test_multiple_named_stores_are_independent() -> None:
+def test_multiple_named_stores_are_independent(app: Application) -> None:
     config = Config(
         {
             "cache": {
@@ -203,7 +123,7 @@ def test_multiple_named_stores_are_independent() -> None:
             }
         }
     )
-    manager = CacheManager(config, Container())
+    manager = CacheManager(app, config, Container())
 
     first = manager.cache("first")
     second = manager.cache("second")
@@ -246,14 +166,14 @@ def test_manager_can_create_database_store(app: Application) -> None:
         )
         connection.commit()
 
-    manager = CacheManager(app.config, app.container)
+    manager = CacheManager(app, app.config, app.container)
 
     cache = manager.cache()
     assert cache.set("key", "value")
     assert cache.get("key") == "value"
 
 
-def test_manager_can_create_file_store(tmp_path: Path) -> None:
+def test_manager_can_create_file_store(app: Application, tmp_path: Path) -> None:
     config = Config(
         {
             "cache": {
@@ -268,14 +188,14 @@ def test_manager_can_create_file_store(tmp_path: Path) -> None:
             }
         }
     )
-    manager = CacheManager(config, Container())
+    manager = CacheManager(app, config, Container())
 
     cache = manager.cache()
     assert cache.set("key", "value")
     assert cache.get("key") == "value"
 
 
-def test_manager_can_create_redis_store() -> None:
+def test_manager_can_create_redis_store(app: Application) -> None:
     config = Config(
         {
             "redis": {
@@ -299,7 +219,7 @@ def test_manager_can_create_redis_store() -> None:
     )
     container = Container()
     container.instance(Config, config)
-    manager = CacheManager(config, container)
+    manager = CacheManager(app, config, container)
 
     cache = manager.cache()
     assert cache.set("key", "value")

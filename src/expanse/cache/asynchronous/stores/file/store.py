@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
 from expanse.cache.synchronous.stores.file.store import FileStore as SyncFileStore
 from expanse.contracts.cache.asynchronous.store import Store
 from expanse.support._concurrency import run_in_threadpool
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.asynchronous.lock import Lock
 
 
 class FileStore(Store):
@@ -37,3 +42,27 @@ class FileStore(Store):
     @override
     async def clear(self) -> bool:
         return await run_in_threadpool(self._sync_store.clear)
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        from expanse.cache.asynchronous.locks.file_lock import FileLock
+
+        lock_name = f"lock:{name}"
+        if self._sync_store._locks_path is not None:
+            lock_path = self._sync_store._locks_path.joinpath(
+                self._sync_store._path_for_key(name).relative_to(self._sync_store._path)
+            )
+        else:
+            lock_path = self._sync_store._path.joinpath(
+                self._sync_store._path_for_key(lock_name).relative_to(
+                    self._sync_store._path
+                )
+            )
+
+        return FileLock(lock_path, name, ttl, owner, refresh=refresh)

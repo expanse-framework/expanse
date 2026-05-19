@@ -2,12 +2,17 @@ import asyncio
 
 from datetime import UTC
 from datetime import datetime
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import overload
 from typing import override
 
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.store import Store
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.asynchronous.lock import Lock
 
 
 class Cache(CacheContract):
@@ -178,3 +183,23 @@ class Cache(CacheContract):
         Clear all items from the cache.
         """
         return await self._store.clear()
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        """
+        Get a lock for the cache.
+
+        :param name: The name of the lock.
+        :param ttl: The time-to-live (TTL) for the lock in seconds.
+        :param owner: The owner of the lock. If None, the lock will be owned by the current process.
+        :param refresh: Whether to automatically refresh the lock before it expires.
+
+        :return: A Lock instance for the specified name.
+        """
+        return self._store.lock(name, ttl, owner, refresh)

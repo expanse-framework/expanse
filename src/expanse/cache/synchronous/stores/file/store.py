@@ -14,11 +14,19 @@ from expanse.contracts.cache.synchronous.store import Store
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from expanse.contracts.lock.synchronous.lock import Lock
+
 
 class FileStore(Store):
-    def __init__(self, path: Path, permissions: int | None = None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        permissions: int | None = None,
+        locks_path: Path | None = None,
+    ) -> None:
         self._path: Path = path
         self._permissions: int | None = permissions
+        self._locks_path: Path | None = locks_path
 
         if not self._path.exists():
             self._path.mkdir(
@@ -96,6 +104,28 @@ class FileStore(Store):
                 path.unlink()
 
         return True
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> Lock:
+        from expanse.cache.synchronous.locks.file_lock import FileLock
+
+        lock_name = f"lock:{name}"
+        if self._locks_path is not None:
+            lock_path = (self._locks_path or self._path).joinpath(
+                self._path_for_key(name).relative_to(self._path)
+            )
+        else:
+            lock_path = self._path.joinpath(
+                self._path_for_key(lock_name).relative_to(self._path)
+            )
+
+        return FileLock(lock_path, name, ttl, owner, refresh=refresh)
 
     def _path_for_key(self, key: str, mkdir: bool = False) -> Path:
         hash = hashlib.sha1(key.encode()).hexdigest()

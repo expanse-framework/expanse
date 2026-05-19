@@ -47,6 +47,7 @@ async def setup_databases(
 
     for connection_name in config["database"]["connections"]:
         with db.connection(connection_name) as connection:
+            connection.execute("DROP TABLE IF EXISTS cache_locks")
             connection.execute("DROP TABLE IF EXISTS cache")
             connection.execute("DROP TABLE IF EXISTS alembic_version")
             connection.commit()
@@ -55,6 +56,7 @@ async def setup_databases(
 
     for connection_name in config["database"]["connections"]:
         with db.connection(connection_name) as connection:
+            connection.execute("DROP TABLE IF EXISTS cache_locks")
             connection.execute("DROP TABLE IF EXISTS cache")
             connection.execute("DROP TABLE IF EXISTS alembic_version")
             connection.commit()

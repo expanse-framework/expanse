@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import overload
-from typing import override
 
 from asgiref.sync import async_to_sync
 
@@ -11,19 +9,19 @@ from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.cache.synchronous.cache import Cache
-from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from expanse.configuration.config import Config
     from expanse.container.container import Container
+    from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
     from expanse.contracts.cache.synchronous.store import Store
+    from expanse.core.application import Application
 
 
-class CacheManager(CacheContract):
-    def __init__(self, config: Config, container: Container):
+class CacheManager:
+    def __init__(self, app: Application, config: Config, container: Container):
+        self._app: Application = app
         self._config: Config = config
         self._container: Container = container
         self._caches: dict[str, CacheContract] = {}
@@ -100,7 +98,15 @@ class CacheManager(CacheContract):
 
         config = FileStoreConfig.model_validate(store_config)
 
-        return FileStore(config.path, config.permissions)
+        path = config.path
+        if not path.is_absolute():
+            path = self._app.base_path.joinpath(path)
+
+        locks_path = config.locks_path
+        if locks_path is not None and not locks_path.is_absolute():
+            locks_path = self._app.base_path.joinpath(locks_path)
+
+        return FileStore(path, config.permissions, locks_path=locks_path)
 
     def _create_redis_store(self, store_config: dict[str, Any]) -> Store:
         from expanse.cache.config.redis import RedisStoreConfig
@@ -111,57 +117,4 @@ class CacheManager(CacheContract):
 
         redis = async_to_sync(self._container.get)(RedisManager)
 
-        return RedisStore(redis.connection(config.connection))
-
-    @override
-    def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: int | None = None,
-        until: datetime | None = None,
-    ) -> bool:
-        return self.cache().set(key, value, ttl, until)
-
-    @override
-    def set_many(
-        self,
-        items: dict[str, Any],
-        ttl: int | None = None,
-        until: datetime | None = None,
-    ) -> bool:
-        return self.cache().set_many(items, ttl, until)
-
-    @overload
-    def get(self, key: str) -> Any | None: ...
-
-    @overload
-    def get(self, key: str, default: Any) -> Any: ...
-
-    @override
-    def get(self, key: str, default: Any | None = None) -> Any | None:
-        return self.cache().get(key, default)
-
-    @override
-    def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
-        return self.cache().get_many(keys)
-
-    @override
-    def has(self, key: str) -> bool:
-        return self.cache().has(key)
-
-    @override
-    def pop(self, key: str) -> Any | None:
-        return self.cache().pop(key)
-
-    @override
-    def delete(self, key: str) -> bool:
-        return self.cache().delete(key)
-
-    @override
-    def delete_many(self, keys: list[str]) -> bool:
-        return self.cache().delete_many(keys)
-
-    @override
-    def clear(self) -> bool:
-        return self.cache().clear()
+        return RedisStore(redis, config.connection, config.lock_connection)

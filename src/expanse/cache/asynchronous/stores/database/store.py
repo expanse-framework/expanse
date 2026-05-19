@@ -1,6 +1,7 @@
 import pickle
 import time
 
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
@@ -16,6 +17,10 @@ from sqlalchemy import table
 from expanse.cache.config.database import DatabaseStoreConfig
 from expanse.contracts.cache.asynchronous.store import Store
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.asynchronous.lock import Lock
 
 
 class DatabaseStore(Store):
@@ -193,3 +198,24 @@ class DatabaseStore(Store):
         async with self._db.connection(self._config.connection) as connection:
             await connection.execute(upsert_stmt)
             await connection.commit()
+
+    @override
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        from expanse.cache.asynchronous.locks.database_lock import DatabaseLock
+
+        connection = self._db.connection(self._config.connection)
+
+        return DatabaseLock(
+            connection=connection,
+            table_name=self._config.locks_table,
+            name=name,
+            ttl=ttl,
+            owner=owner,
+            refresh=refresh,
+        )

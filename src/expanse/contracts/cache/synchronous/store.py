@@ -1,6 +1,11 @@
 from abc import ABC
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 from typing import Any
+
+
+if TYPE_CHECKING:
+    from expanse.contracts.lock.synchronous.lock import Lock
 
 
 class Store(ABC):
@@ -72,4 +77,23 @@ class Store(ABC):
         Clear all values from the store.
 
         :return: True if the store was successfully cleared, False otherwise.
+        """
+
+    @abstractmethod
+    def lock(
+        self,
+        name: str,
+        ttl: int | None = None,
+        owner: str | None = None,
+        refresh: bool = False,
+    ) -> "Lock":
+        """
+        Get a lock for the cache.
+
+        :param name: The name of the lock.
+        :param ttl: The time-to-live (TTL) for the lock in seconds.
+        :param owner: The owner of the lock. If None, the lock will be owned by the current process.
+        :param refresh: Whether to automatically refresh the lock before it expires.
+
+        :return: A Lock instance for the cache.
         """
