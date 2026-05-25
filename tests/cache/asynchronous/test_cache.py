@@ -7,18 +7,29 @@ from datetime import timedelta
 import pytest
 
 from expanse.cache.asynchronous.cache import Cache
+from expanse.cache.asynchronous.locker import Locker
 from expanse.cache.asynchronous.stores.memory import MemoryStore
 from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemoryStore
 
 
 @pytest.fixture()
-def store() -> MemoryStore:
-    return MemoryStore(SyncMemoryStore())
+def sync_store() -> SyncMemoryStore:
+    return SyncMemoryStore()
+
+
+@pytest.fixture()
+def store(sync_store: SyncMemoryStore) -> MemoryStore:
+    return MemoryStore(sync_store)
 
 
 @pytest.fixture()
 def cache(store: MemoryStore) -> Cache:
     return Cache(store)
+
+
+@pytest.fixture()
+def cache_with_locker(store: MemoryStore) -> Cache:
+    return Cache(store, locker=Locker(store))
 
 
 async def test_set_stores_value(cache: Cache) -> None:
@@ -246,3 +257,95 @@ async def test_clear_removes_all_keys(cache: Cache) -> None:
     assert result is True
     assert await cache.get("a") is None
     assert await cache.get("b") is None
+
+
+async def test_remember_stores_value_from_sync_callback(cache: Cache) -> None:
+    result = await cache.remember("key", lambda: "computed")
+
+    assert result == "computed"
+    assert await cache.get("key") == "computed"
+
+
+async def test_remember_stores_value_from_async_callback(cache: Cache) -> None:
+    async def callback() -> str:
+        return "computed"
+
+    result = await cache.remember("key", callback)
+
+    assert result == "computed"
+    assert await cache.get("key") == "computed"
+
+
+async def test_remember_returns_cached_value_without_calling_callback(
+    cache: Cache,
+) -> None:
+    await cache.set("key", "cached")
+    call_count = 0
+
+    def callback() -> str:
+        nonlocal call_count
+        call_count += 1
+        return "new"
+
+    result = await cache.remember("key", callback)
+
+    assert result == "cached"
+    assert call_count == 0
+
+
+async def test_remember_propagates_ttl(cache: Cache) -> None:
+    result = await cache.remember("key", lambda: "value", ttl=60)
+
+    assert result == "value"
+    assert await cache.get("key") == "value"
+
+
+async def test_remember_with_locker_stores_value(
+    cache_with_locker: Cache,
+) -> None:
+    result = await cache_with_locker.remember("key", lambda: "computed")
+
+    assert result == "computed"
+    assert await cache_with_locker.get("key") == "computed"
+
+
+async def test_remember_with_locker_prevents_stampede(
+    cache_with_locker: Cache,
+) -> None:
+    import asyncio
+
+    call_count = 0
+
+    async def slow_callback() -> str:
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0.02)
+        return "computed"
+
+    results = await asyncio.gather(
+        *[cache_with_locker.remember("key", slow_callback, ttl=60) for _ in range(5)]
+    )
+
+    assert all(r == "computed" for r in results)
+    assert call_count == 1
+
+
+async def test_remember_without_locker_does_not_prevent_stampede(
+    cache: Cache,
+) -> None:
+    import asyncio
+
+    call_count = 0
+
+    async def slow_callback() -> str:
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0.02)
+        return "computed"
+
+    results = await asyncio.gather(
+        *[cache.remember("key", slow_callback, ttl=60) for _ in range(5)]
+    )
+
+    assert all(r == "computed" for r in results)
+    assert call_count > 1

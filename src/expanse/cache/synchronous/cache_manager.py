@@ -5,6 +5,7 @@ from typing import Any
 
 from asgiref.sync import async_to_sync
 
+from expanse.cache.config.locker import LockerConfig
 from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
@@ -35,7 +36,28 @@ class CacheManager:
 
         store = self._create_store(name)
 
-        self._caches[name] = Cache(store)
+        from expanse.cache.synchronous.locker import Locker
+
+        raw_locker_config = self._config.get("cache.locker", None)
+        if raw_locker_config is not None:
+            locker_config = LockerConfig.model_validate(raw_locker_config)
+
+            try:
+                locker_store = self._create_store(locker_config.store)
+            except UnconfiguredStoreError:
+                raise UnconfiguredStoreError(
+                    f"Locker store '{locker_config.store}' is not configured."
+                )
+            except UnsupportedStoreDriverError:
+                raise UnsupportedStoreDriverError(
+                    f"Locker store '{locker_config.store}' has an unsupported driver."
+                )
+
+            locker = Locker(locker_store)
+        else:
+            locker = Locker(self._create_memory_store())
+
+        self._caches[name] = Cache(store, locker=locker)
 
         return self._caches[name]
 

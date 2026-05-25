@@ -4,6 +4,8 @@ from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import TypeVar
+from typing import cast
 from typing import overload
 from typing import override
 
@@ -11,13 +13,19 @@ from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from expanse.contracts.cache.synchronous.locker import Locker
     from expanse.contracts.cache.synchronous.store import Store
     from expanse.contracts.lock.synchronous.lock import Lock
 
+_T = TypeVar("_T")
+
 
 class Cache(CacheContract):
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, locker: Locker | None = None) -> None:
         self._store: Store = store
+        self._locker: Locker | None = locker
 
     @override
     def set(
@@ -115,6 +123,39 @@ class Cache(CacheContract):
         return dict(values.items())
 
     @override
+    def remember(
+        self,
+        key: str,
+        callback: Callable[..., _T],
+        ttl: int | None = None,
+    ) -> _T:
+        """
+        Store the result of a callback in the cache if the key does not already exist.
+
+        If a locker is configured for the cache, this method will acquire a lock for the key before checking
+        if it exists in the cache and executing the callback.
+        This ensures that only one thread can execute the callback and store
+        the result in the cache for a given key at a time, avoiding cache stampedes.
+
+        :param key: The key under which the value should be stored.
+        :param callback: The callback to generate the value to be stored.
+        :param ttl: The time-to-live (TTL) for the cache item in seconds.
+
+        :return: The value returned by the callback, either from the cache or freshly generated.
+        """
+        if self._locker is not None:
+            lock = self._locker.lock(
+                f"remember:{key}",
+                # Force a TTL on the lock to prevent deadlocks if the holding thread crashes.
+                ttl=30,
+            )
+
+            with lock:
+                return self._compute(key, callback, ttl)
+
+        return self._compute(key, callback, ttl)
+
+    @override
     def has(self, key: str) -> bool:
         """
         Check if a key exists in the cache.
@@ -189,3 +230,19 @@ class Cache(CacheContract):
         :return: A Lock instance for the specified name.
         """
         return self._store.lock(name, ttl, owner, refresh)
+
+    def _compute(
+        self,
+        key: str,
+        callback: Callable[..., _T],
+        ttl: int | None = None,
+    ) -> _T:
+        cached = self._store.get(key)
+        if cached is not None:
+            return cast("_T", cached)
+
+        value = callback()
+
+        self._store.set(key, value, ttl)
+
+        return value

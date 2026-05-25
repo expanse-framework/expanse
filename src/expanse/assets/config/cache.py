@@ -29,14 +29,27 @@ class Config(BaseSettings):
                     "driver": "database",
                     "connection": None,
                     "table": "cache",
+                    "locker": {"store": "memory"},
                 },
                 "redis": {
                     "driver": "redis",
                     "connection": "cache",
                     "lock_connection": "default",
+                    "locker": {"store": "memory"},
                 },
             }
         )
+    )
+
+    # Locker configuration
+    #
+    # The configuration for the locker that should be used by the cache stores to protect
+    # against cache stampedes.
+    # Use the `CACHE_LOCKER__STORE` environment variable to set this value in your `.env` file.
+    # For instance:
+    # >>> CACHE_LOCKER__STORE=memory
+    locker: dict[str, Any] = Field(
+        default_factory=lambda: dict[str, Any]({"store": "memory"})
     )
 
     model_config = SettingsConfigDict(env_prefix="CACHE_", env_nested_delimiter="__")

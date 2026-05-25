@@ -1,13 +1,19 @@
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Awaitable
+from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import TypeVar
 from typing import overload
 
 
 if TYPE_CHECKING:
     from expanse.contracts.lock.asynchronous.lock import Lock
+
+
+_T = TypeVar("_T")
 
 
 class Cache(ABC):
@@ -73,6 +79,28 @@ class Cache(ABC):
         :param default: The value to return for keys that do not exist in the cache.
 
         :return: A dictionary mapping each key to its associated value, or the default value if the key does not exist.
+        """
+
+    @abstractmethod
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., _T] | Callable[..., Awaitable[_T]],
+        ttl: int | None = None,
+    ) -> _T:
+        """
+        Store the result of a callback in the cache if the key does not already exist.
+
+        If a locker is configured for the cache, this method will acquire a lock for the key before checking
+        if it exists in the cache and executing the callback.
+        This ensures that only one process can execute the callback and store
+        the result in the cache for a given key at a time, avoiding cache stampedes.
+
+        :param key: The key under which the value should be stored.
+        :param callback: The callback to generate the value to be stored.
+        :param ttl: The time-to-live (TTL) for the cache item in seconds.
+
+        :return: The value returned by the callback, either from the cache or freshly generated.
         """
 
     @abstractmethod
