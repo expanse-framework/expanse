@@ -1,20 +1,18 @@
 from collections.abc import Callable
 from logging import LogRecord
 from pathlib import Path
-from typing import Annotated
 from typing import Literal
 
+from pydantic import BaseModel
 from pydantic import Field
 from pydantic import ImportString
-from pydantic import RootModel
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
 
 
-class BaseConfig(BaseSettings):
+class BaseConfig(BaseModel):
     enabled: bool = True
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    formatter: str | None = None
+    format: str | None = None
     processors: list[ImportString | Callable[[LogRecord], LogRecord]] = Field(
         default_factory=list
     )
@@ -48,10 +46,3 @@ class GroupConfig(BaseConfig):
             return v
 
         return [v.strip() for v in v.split(",")]
-
-
-class ChannelConfig(RootModel[StreamConfig | ConsoleConfig | FileConfig | GroupConfig]):
-    root: Annotated[
-        StreamConfig | ConsoleConfig | FileConfig | GroupConfig,
-        Field(discriminator="driver"),
-    ]

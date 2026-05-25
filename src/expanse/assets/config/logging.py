@@ -1,15 +1,11 @@
 from pathlib import Path
+from typing import Any
+from typing import Literal
 
 from pydantic import Field
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-
-from expanse.logging.config import ChannelConfig
-from expanse.logging.config import ConsoleConfig
-from expanse.logging.config import FileConfig
-from expanse.logging.config import GroupConfig
-from expanse.logging.config import StreamConfig
 
 
 class Config(BaseSettings):
@@ -24,16 +20,42 @@ class Config(BaseSettings):
     # They can all be defined with environment variables in you `.env` file.
     # For instance:
     # >>> LOG_CHANNELS__STREAM__DRIVER=stream
-    # >>> DB_CONNECTIONS__STREAM__STREAM=stdout
-    # >>> DB_CONNECTIONS__STREAM__LEVEL=INFO
-    channels: dict[str, ChannelConfig] = Field(
-        default_factory=lambda: {
-            "group": ChannelConfig(root=GroupConfig(channels=["console", "file"])),
-            "console": ChannelConfig(root=ConsoleConfig()),
-            "stream": ChannelConfig(root=StreamConfig(stream="stderr")),
-            "file": ChannelConfig(root=FileConfig(path=Path("log/app.log"))),
-        }
+    # >>> LOG_CHANNELS__STREAM__STREAM=stdout
+    # >>> LOG_CHANNELS__STREAM__LEVEL=INFO
+    channels: dict[str, dict[str, Any]] = Field(
+        default_factory=lambda: dict[str, dict[str, Any]](
+            {
+                "stream": {
+                    "driver": "stream",
+                    "stream": "stderr",
+                    "level": "INFO",
+                },
+                "file": {
+                    "driver": "file",
+                    "path": Path("storage/log/app.log"),
+                    "level": "INFO",
+                },
+                "console": {
+                    "driver": "console",
+                    "level": "DEBUG",
+                },
+                "group": {
+                    "driver": "group",
+                    "channels": ["stream", "file"],
+                    "level": "INFO",
+                },
+            }
+        )
     )
+
+    # Logging mode
+    #
+    # Whether the logging manager should operate in sync or async mode.
+    # In sync mode, log messages are processed synchronously,
+    # which can impact performance but ensures that logs are written immediately and sequentially.
+    # This can be useful when debugging.
+    # >>> LOG_SYNC=true
+    mode: Literal["sync", "async"] = "async"
 
     routing: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -41,7 +63,7 @@ class Config(BaseSettings):
 
     @field_validator("routing", mode="before")
     @classmethod
-    def decode_proxies(
+    def decode_channels(
         cls, v: dict[str, str] | dict[str, list[str]]
     ) -> dict[str, list[str]]:
         new_v: dict[str, list[str]] = {}

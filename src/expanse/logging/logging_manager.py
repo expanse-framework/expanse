@@ -7,15 +7,20 @@ from expanse.core.application import Application
 from expanse.logging.channel import GroupLogChannel
 from expanse.logging.channel import LogChannel
 from expanse.logging.channel import SimpleLogChannel
+from expanse.logging.channel import SyncLogChannel
 from expanse.logging.config import BaseConfig
-from expanse.logging.config import ChannelConfig
 from expanse.logging.config import ConsoleConfig
 from expanse.logging.config import FileConfig
 from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
+from expanse.logging.exceptions import LogChannelConfigurationError
+from expanse.logging.exceptions import UnconfiguredLogChannelError
+from expanse.logging.exceptions import UnsupportedLogChannelDriverError
 
 
 class LoggingManager:
+    DEFAULT_FORMAT = "%(asctime)s - %(levelname)s - %(message)s - %(name)s"
+
     def __init__(self, app: Application) -> None:
         self._app: Application = app
         self._channels: dict[str, LogChannel] = {}
@@ -29,9 +34,11 @@ class LoggingManager:
             return self._channels[channel_name]
 
         if channel_name not in self._config.get("channels", {}):
-            raise RuntimeError(f"Log channel '{channel_name}' is not defined.")
+            raise UnconfiguredLogChannelError(
+                f"Log channel '{channel_name}' is not defined."
+            )
 
-        config = ChannelConfig.model_validate(self._config["channels"][channel_name])
+        config = self._config["channels"][channel_name]
 
         channel = self._create_channel(config, channel_name)
 
@@ -72,7 +79,7 @@ class LoggingManager:
             return self._routing[logger_name]
 
         if logger_name not in self._config.get("routing", {}):
-            raise RuntimeError(
+            raise UnconfiguredLogChannelError(
                 f"Log routing for logger '{logger_name}' is not defined."
             )
 
@@ -82,19 +89,17 @@ class LoggingManager:
         minimum_level = logger.level
         configs = {}
         for channel_name in channel_names:
-            chanel_config = ChannelConfig.model_validate(
-                self._config["channels"][channel_name]
+            channel_config = BaseConfig.model_validate(
+                self._config["channels"][channel_name], extra="ignore"
             )
-            configs[channel_name] = chanel_config
-            minimum_level = min(
-                minimum_level, getattr(logging, chanel_config.root.level)
-            )
+            configs[channel_name] = self._config["channels"][channel_name]
+            minimum_level = min(minimum_level, getattr(logging, channel_config.level))
 
         logger.setLevel(minimum_level)
 
-        for channel_name, chanel_config in configs.items():
+        for channel_name, channel_config in configs.items():
             channel = self._create_channel(
-                chanel_config, channel_name, base_logger=logger
+                channel_config, channel_name, base_logger=logger
             )
             self._routing.setdefault(logger_name, []).append(channel)
 
@@ -102,25 +107,42 @@ class LoggingManager:
 
     def _create_channel(
         self,
-        config: ChannelConfig,
+        config: dict[str, Any],
         channel_name: str,
         base_logger: logging.Logger | None = None,
     ) -> LogChannel:
-        match config.root:
-            case StreamConfig():
+
+        driver = config.get("driver")
+
+        if driver is None:
+            raise LogChannelConfigurationError(
+                f"Log channel '{channel_name}' configuration must include a 'driver' field."
+            )
+
+        match driver:
+            case "stream":
+                channel_config = StreamConfig.model_validate(config)
                 channel = self._create_stream_channel(
-                    config.root, channel_name, base_logger=base_logger
+                    channel_config, channel_name, base_logger=base_logger
                 )
-            case ConsoleConfig():
+            case "console":
+                channel_config = ConsoleConfig.model_validate(config)
                 channel = self._create_console_channel(
-                    config.root, channel_name, base_logger=base_logger
+                    channel_config, channel_name, base_logger=base_logger
                 )
-            case FileConfig():
+            case "file":
+                channel_config = FileConfig.model_validate(config)
                 channel = self._create_file_channel(
-                    config.root, channel_name, base_logger=base_logger
+                    channel_config, channel_name, base_logger=base_logger
                 )
-            case GroupConfig():
-                channel = self._create_group_channel(config.root)
+            case "group":
+                channel_config = GroupConfig.model_validate(config)
+                channel = self._create_group_channel(channel_config)
+
+            case _:
+                raise UnsupportedLogChannelDriverError(
+                    f"Log channel '{channel_name}' has an unsupported driver '{driver}'."
+                )
 
         return channel
 
@@ -140,11 +162,15 @@ class LoggingManager:
             case "stderr":
                 handler = logging.StreamHandler(sys.stderr)
             case _:
-                raise ValueError(f"Invalid stream [{stream}]")
+                raise LogChannelConfigurationError(
+                    f"Invalid stream '{stream}' for channel '{channel_name}'."
+                )
 
-        handler.setFormatter(
-            logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
-        )
+        fmt = config.format or self.DEFAULT_FORMAT
+        handler.setFormatter(logging.Formatter(fmt=fmt))
+
+        if self._config.get("mode", "async") == "sync":
+            return SyncLogChannel(logger, [handler]).start()
 
         return SimpleLogChannel(logger, [handler]).start()
 
@@ -161,6 +187,9 @@ class LoggingManager:
         handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(ConsoleFormatter())
 
+        if self._config.get("mode", "async") == "sync":
+            return SyncLogChannel(logger, [handler]).start()
+
         return SimpleLogChannel(logger, [handler], preserve_exception_info=True).start()
 
     def _create_file_channel(
@@ -174,11 +203,15 @@ class LoggingManager:
         path = config.path
         if not path.is_absolute():
             path = self._app.base_path.joinpath(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
 
         handler = logging.FileHandler(path)
-        handler.setFormatter(
-            logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
-        )
+        fmt = config.format or self.DEFAULT_FORMAT
+        handler.setFormatter(logging.Formatter(fmt=fmt))
+        handler.setLevel(config.level)
+
+        if self._config.get("mode", "async") == "sync":
+            return SyncLogChannel(logger, [handler]).start()
 
         return SimpleLogChannel(logger, [handler]).start()
 
