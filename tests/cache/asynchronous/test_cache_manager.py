@@ -200,6 +200,7 @@ async def test_manager_can_create_file_store(app: Application, tmp_path: Path) -
     assert await cache.get("key") == "value"
 
 
+@pytest.mark.redis
 async def test_manager_can_create_redis_store(app: Application) -> None:
     config = Config(
         {
