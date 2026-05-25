@@ -10,7 +10,7 @@ services:
       - "3306:3306"
     restart: always
   postgres:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_PASSWORD: "password"
       POSTGRES_DB: "expanse"
