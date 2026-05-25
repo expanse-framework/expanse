@@ -28,7 +28,7 @@ services:
       - "3307:3307"
     restart: always
   redis:
-    image: redis:7.4-alpine
+    image: redis:8.6-alpine
     ports:
       - "6379:6379"
     restart: always
