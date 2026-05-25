@@ -55,7 +55,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Install dependencies
         run: uv sync --group lint
@@ -95,7 +95,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Setting up MySQL dependencies
         if: matrix.os == 'macOS'
