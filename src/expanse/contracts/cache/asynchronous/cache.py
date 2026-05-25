@@ -81,6 +81,22 @@ class Cache(ABC):
         :return: A dictionary mapping each key to its associated value, or the default value if the key does not exist.
         """
 
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., Awaitable[_T]],
+        ttl: int | None = None,
+    ) -> _T: ...
+
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., _T],
+        ttl: int | None = None,
+    ) -> _T: ...
+
     @abstractmethod
     async def remember(
         self,

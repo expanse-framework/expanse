@@ -34,7 +34,7 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
     yield
 
     manager = await app.container.get(RedisManager)
-    connection = await manager.connection("default")
+    connection = manager.connection("default")
     await connection.flushdb()
 
 
@@ -42,4 +42,4 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
 async def connection(app: Application) -> Connection:
     manager = await app.container.get(RedisManager)
 
-    return await manager.connection("default")
+    return manager.connection("default")

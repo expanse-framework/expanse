@@ -45,8 +45,8 @@ class RedisLock(Lock):
         super().__init__(f"lock:{name}", ttl, owner, refresh=refresh)
 
         self._connection: Connection = connection
-        self._release_script: Script = self._connection.register_script(_RELEASE_SCRIPT)
-        self._refresh_script: Script = self._connection.register_script(_REFRESH_SCRIPT)
+        self._release_script: Script = self._connection.register_script(_RELEASE_SCRIPT)  # type: ignore[misc]
+        self._refresh_script: Script = self._connection.register_script(_REFRESH_SCRIPT)  # type: ignore[misc]
 
     @override
     def get_current_owner(self) -> str | None:
@@ -67,7 +67,7 @@ class RedisLock(Lock):
     @override
     def _do_release(self, force: bool = False) -> bool:
         if force:
-            return cast("bool", self._connection.delete(self._name) > 0)
+            return cast("int", self._connection.delete(self._name)) > 0
 
         return (
             cast("int", self._release_script(keys=[self._name], args=[self._owner])) > 0

@@ -4,6 +4,7 @@ import asyncio
 import time
 
 from typing import TYPE_CHECKING
+from typing import Any
 
 import pytest
 
@@ -41,7 +42,7 @@ async def make_lock(
         lock_name: str = "test-lock",
         owner: str = "owner-1",
         ttl: int | None = 10,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> DatabaseLock:
         lock = DatabaseLock(
             connection=db.connection(name),
@@ -278,6 +279,7 @@ async def test_refresh_extends_expiration(
                 lock._table.select().where(lock._table.c.key == "test-lock")
             )
         ).first()
+    assert row is not None
     original_expiration = row[2]
 
     assert await lock.refresh(ttl=3600) is True
@@ -289,6 +291,7 @@ async def test_refresh_extends_expiration(
             )
         ).first()
 
+    assert row is not None
     assert row[2] > original_expiration
 
 
@@ -326,6 +329,7 @@ async def test_auto_refresh_keeps_lock_alive(
                 lock._table.select().where(lock._table.c.key == "test-lock")
             )
         ).first()
+    assert row is not None
     original_expiration = row[2]
 
     await asyncio.sleep(1.5)
@@ -337,6 +341,7 @@ async def test_auto_refresh_keeps_lock_alive(
             )
         ).first()
 
+    assert row is not None
     assert row[2] >= original_expiration
 
     await lock.release()

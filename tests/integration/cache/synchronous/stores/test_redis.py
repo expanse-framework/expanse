@@ -4,6 +4,7 @@ import os
 import time
 
 from typing import TYPE_CHECKING
+from typing import cast
 
 import pytest
 
@@ -90,7 +91,7 @@ def test_set_with_ttl_sets_expiration(store: RedisStore, redis: RedisManager) ->
     store.set("key", "value", ttl=60)
 
     connection = redis.connection("default")
-    ttl = connection.ttl("key")
+    ttl = cast("int", connection.ttl("key"))
 
     assert 0 < ttl <= 60
 
@@ -127,8 +128,8 @@ def test_set_many_with_ttl_stores_values(
     assert result is True
 
     connection = redis.connection("default")
-    ttl_x = connection.ttl("x")
-    ttl_y = connection.ttl("y")
+    ttl_x = cast("int", connection.ttl("x"))
+    ttl_y = cast("int", connection.ttl("y"))
 
     assert 0 < ttl_x <= 60
     assert 0 < ttl_y <= 60

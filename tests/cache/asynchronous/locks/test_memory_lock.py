@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from typing import TYPE_CHECKING
+from typing import Any
 
 from expanse.cache.asynchronous.locks.memory_lock import MemoryLock
 from expanse.cache.asynchronous.stores.memory import MemoryStore
@@ -18,7 +19,7 @@ def make_store() -> MemoryStore:
 
 
 def make_lock_factory(store: MemoryStore) -> Callable[..., MemoryLock]:
-    def factory(owner: str = "owner-1", **kwargs: object) -> MemoryLock:
+    def factory(owner: str = "owner-1", **kwargs: Any) -> MemoryLock:
         return MemoryLock(store._sync_store, "test-lock", owner=owner, **kwargs)
 
     return factory

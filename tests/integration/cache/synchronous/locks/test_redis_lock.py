@@ -4,6 +4,7 @@ import asyncio
 import time
 
 from typing import TYPE_CHECKING
+from typing import cast
 
 import pytest
 
@@ -74,7 +75,7 @@ def test_acquire_returns_false_on_timeout(connection: Connection) -> None:
 def test_acquire_sets_ttl_on_key(lock: RedisLock, connection: Connection) -> None:
     lock.acquire(blocking=False)
 
-    ttl = connection.ttl("lock:test-lock")
+    ttl = cast("int", connection.ttl("lock:test-lock"))
 
     assert 0 < ttl <= 10
 
@@ -135,7 +136,7 @@ def test_refresh_extends_ttl(lock: RedisLock, connection: Connection) -> None:
 
     assert lock.refresh(ttl=30) is True
 
-    ttl = connection.ttl("lock:test-lock")
+    ttl = cast("int", connection.ttl("lock:test-lock"))
     assert ttl > 2
 
 
@@ -159,7 +160,7 @@ def test_auto_refresh_keeps_lock_alive(connection: Connection) -> None:
     lock.acquire(blocking=False)
     time.sleep(1.5)
 
-    ttl = connection.ttl("lock:test-lock")
+    ttl = cast("int", connection.ttl("lock:test-lock"))
     assert ttl > 1
 
     lock.release()

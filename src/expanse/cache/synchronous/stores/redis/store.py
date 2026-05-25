@@ -57,7 +57,7 @@ class RedisStore(Store):
 
     @override
     def get(self, key: str) -> Any | None:
-        result = self._connection.get(key)
+        result = cast("str | None", self._connection.get(key))
 
         if result is None:
             return None
@@ -66,7 +66,7 @@ class RedisStore(Store):
 
     @override
     def get_many(self, keys: list[str]) -> dict[str, Any | None]:
-        results = self._connection.mget(keys)
+        results = cast("list[str | None]", self._connection.mget(keys))
 
         return {
             key: self._deserialize(result) if result is not None else None
@@ -75,11 +75,11 @@ class RedisStore(Store):
 
     @override
     def has(self, key: str) -> bool:
-        return self._connection.exists(key) > 0
+        return cast("int", self._connection.exists(key)) > 0
 
     @override
     def delete(self, key: str) -> bool:
-        return self._connection.delete(key) > 0
+        return cast("int", self._connection.delete(key)) > 0
 
     @override
     def clear(self) -> bool:

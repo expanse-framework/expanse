@@ -47,7 +47,7 @@ async def redis_connection() -> AsyncGenerator[RedisConnection]:
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection()
+        connection = manager.connection()
 
         # Clean up any leftover state from a previous run
         await connection.delete(STREAM)

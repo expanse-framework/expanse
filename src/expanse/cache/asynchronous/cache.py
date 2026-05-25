@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
+from typing import cast
 from typing import overload
 from typing import override
 
@@ -133,6 +134,22 @@ class Cache(CacheContract):
             )
             for key, value in values.items()
         }
+
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., Awaitable[_T]],
+        ttl: int | None = None,
+    ) -> _T: ...
+
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., _T],
+        ttl: int | None = None,
+    ) -> _T: ...
 
     @override
     async def remember(
@@ -263,16 +280,17 @@ class Cache(CacheContract):
 
         :return: The value returned by the callback.
         """
-        value = await self._store.get(key)
-        if value is not None:
-            return value
+        cached = await self._store.get(key)
+        if cached is not None:
+            return cast("_T", cached)
 
+        value: _T
         if inspect.iscoroutinefunction(callback):
-            value = await callback()
+            value = await cast("Callable[..., Awaitable[_T]]", callback)()
         elif not should_run_in_threadpool(callback):
-            value = callback()
+            value = cast("Callable[..., _T]", callback)()
         else:
-            value = await run_in_threadpool(callback)
+            value = await run_in_threadpool(cast("Callable[..., _T]", callback))
 
         await self._store.set(key, value, ttl)
 

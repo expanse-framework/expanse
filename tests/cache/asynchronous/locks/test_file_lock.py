@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from typing import TYPE_CHECKING
+from typing import Any
 
 import pytest
 
@@ -21,7 +22,7 @@ def lock_path(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def make_lock(lock_path: Path) -> Callable[..., FileLock]:
-    def factory(owner: str = "owner-1", **kwargs: object) -> FileLock:
+    def factory(owner: str = "owner-1", **kwargs: Any) -> FileLock:
         return FileLock(lock_path, "test-lock", owner=owner, **kwargs)
 
     return factory
