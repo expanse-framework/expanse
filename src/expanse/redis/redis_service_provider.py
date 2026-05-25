@@ -51,7 +51,7 @@ class RedisServiceProvider(ServiceProvider):
     async def _create_async_connection(
         self, manager: AsyncRedisManager, name: str | None = None
     ) -> AsyncGenerator["AsyncConnection", None]:
-        connection = await manager.connection(name)
+        connection = manager.connection(name)
 
         yield connection
 

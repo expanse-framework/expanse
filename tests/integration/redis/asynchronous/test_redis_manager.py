@@ -86,7 +86,7 @@ async def test_default_connection(config: Config) -> None:
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection()
+        connection = manager.connection()
 
         await connection.set("test_key", "test_value")
         result = await connection.get("test_key")
@@ -100,7 +100,7 @@ async def test_named_connection(config: Config) -> None:
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection("no_backoff")
+        connection = manager.connection("no_backoff")
 
         await connection.set("test_key", "test_value")
         result = await connection.get("test_key")
@@ -114,7 +114,7 @@ async def test_connection_with_no_backoff(config: Config) -> None:
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection("no_backoff")
+        connection = manager.connection("no_backoff")
 
         assert connection.ping()
     finally:
@@ -125,7 +125,7 @@ async def test_connection_with_constant_backoff(config: Config) -> None:
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection("constant_backoff")
+        connection = manager.connection("constant_backoff")
 
         assert connection.ping()
     finally:
@@ -148,7 +148,7 @@ async def test_connection_with_generic_backoff_strategies(
     manager = RedisManager(config)
 
     try:
-        connection = await manager.connection(connection_name)
+        connection = manager.connection(connection_name)
 
         assert connection.ping()
     finally:
@@ -158,8 +158,8 @@ async def test_connection_with_generic_backoff_strategies(
 async def test_close_closes_all_connections(config: Config) -> None:
     manager = RedisManager(config)
 
-    conn1 = await manager.connection("default")
-    conn2 = await manager.connection("no_backoff")
+    conn1 = manager.connection("default")
+    conn2 = manager.connection("no_backoff")
 
     assert conn1.ping()
     assert conn2.ping()
@@ -174,6 +174,6 @@ async def test_connection_with_cluster(config: Config, mocker: MockerFixture) ->
 
     manager = RedisManager(config)
 
-    await manager.connection("cluster")
+    manager.connection("cluster")
 
     assert mock.called

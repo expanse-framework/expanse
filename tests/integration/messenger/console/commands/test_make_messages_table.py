@@ -13,6 +13,7 @@ from expanse.testing.command_tester import CommandTester
 pytestmark = pytest.mark.db
 
 
+@pytest.mark.usefixtures("setup_databases")
 def test_command_creates_a_new_migration_file_with_necessary_operations(
     command_tester: CommandTester, app: Application, tmp_path: Path, mockery: Mockery
 ) -> None:
@@ -65,6 +66,7 @@ def test_command_creates_a_new_migration_file_with_necessary_operations(
     assert "op.drop_table('messages')" in content
 
 
+@pytest.mark.usefixtures("setup_databases")
 def test_command_creates_a_new_migration_for_custom_table_name(
     command_tester: CommandTester, app: Application, tmp_path: Path, mockery: Mockery
 ) -> None:

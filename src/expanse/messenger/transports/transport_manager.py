@@ -97,6 +97,4 @@ class TransportManager:
         config = RedisTransportConfig.model_validate(raw_config)
         redis = await self._container.get(RedisManager)
 
-        return RedisTransport(
-            await redis.connection(config.connection), config, Serializer()
-        )
+        return RedisTransport(redis.connection(config.connection), config, Serializer())

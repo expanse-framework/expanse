@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import inspect
 import re
@@ -151,3 +152,10 @@ class cached_property[T]:  # noqa: N801
                 result = asyncio.ensure_future(result)  # type: ignore[assignment]
             value = obj.__dict__[self.func.__name__] = result
         return value
+
+
+async def wait_for_event(event: asyncio.Event, timeout: float | None = None) -> bool:
+    with contextlib.suppress(asyncio.TimeoutError):
+        await asyncio.wait_for(event.wait(), timeout)
+
+    return event.is_set()

@@ -47,5 +47,5 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
     )
 
     for i in range(16):
-        connection = await manager.connection(f"connection-{i}")
+        connection = manager.connection(f"connection-{i}")
         await connection.flushdb()

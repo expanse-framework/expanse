@@ -53,7 +53,7 @@ async def test_connection_raises_for_unconfigured_name(config: Config) -> None:
     manager = RedisManager(config)
 
     with pytest.raises(UnconfiguredConnectionError, match="'nonexistent'"):
-        await manager.connection("nonexistent")
+        manager.connection("nonexistent")
 
 
 async def test_connection_caches_connections(config: Config) -> None:
@@ -65,8 +65,8 @@ async def test_connection_caches_connections(config: Config) -> None:
     ) as mock_create:
         mock_create.return_value = mock_connection
 
-        conn1 = await manager.connection("default")
-        conn2 = await manager.connection("default")
+        conn1 = manager.connection("default")
+        conn2 = manager.connection("default")
 
     assert conn1 is conn2
     mock_create.assert_called_once()
@@ -77,11 +77,11 @@ async def test_connection_uses_default_when_name_is_none(config: Config) -> None
     mock_connection = MagicMock()
 
     with patch.object(
-        manager, "_create_connection", new_callable=AsyncMock
+        manager, "_create_connection", new_callable=MagicMock
     ) as mock_create:
         mock_create.return_value = mock_connection
 
-        conn = await manager.connection()
+        conn = manager.connection()
 
     assert conn is mock_connection
     mock_create.assert_called_once_with({"url": "redis://localhost:6379/0"})
@@ -93,12 +93,12 @@ async def test_close_closes_all_connections(config: Config) -> None:
     mock_conn2 = AsyncMock()
 
     with patch.object(
-        manager, "_create_connection", new_callable=AsyncMock
+        manager, "_create_connection", new_callable=MagicMock
     ) as mock_create:
         mock_create.side_effect = [mock_conn1, mock_conn2]
 
-        await manager.connection("default")
-        await manager.connection("cache")
+        manager.connection("default")
+        manager.connection("cache")
 
     await manager.close()
 
