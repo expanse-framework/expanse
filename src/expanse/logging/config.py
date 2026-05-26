@@ -13,6 +13,7 @@ class BaseConfig(BaseModel):
     enabled: bool = True
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     format: str | None = None
+    structured: bool = False
     processors: list[ImportString | Callable[[LogRecord], LogRecord]] = Field(
         default_factory=list
     )

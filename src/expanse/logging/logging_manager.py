@@ -137,7 +137,9 @@ class LoggingManager:
                 )
             case "group":
                 channel_config = GroupConfig.model_validate(config)
-                channel = self._create_group_channel(channel_config)
+                channel = self._create_group_channel(
+                    channel_config, base_logger=base_logger
+                )
 
             case _:
                 raise UnsupportedLogChannelDriverError(
@@ -167,7 +169,14 @@ class LoggingManager:
                 )
 
         fmt = config.format or self.DEFAULT_FORMAT
-        handler.setFormatter(logging.Formatter(fmt=fmt))
+        if config.structured:
+            from expanse.logging.formatters.structured import StructuredFormatter
+
+            handler.setFormatter(StructuredFormatter(fmt=fmt))
+        else:
+            handler.setFormatter(logging.Formatter(fmt=fmt))
+
+        handler.setLevel(config.level)
 
         if self._config.get("mode", "async") == "sync":
             return SyncLogChannel(logger, [handler]).start()
@@ -180,12 +189,15 @@ class LoggingManager:
         channel_name: str,
         base_logger: logging.Logger | None = None,
     ) -> LogChannel:
+        from expanse.logging.filters.context import ContextFilter
         from expanse.logging.formatters.console import ConsoleFormatter
 
         logger = base_logger or self._create_base_logger(config, channel_name)
 
         handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(config.level)
         handler.setFormatter(ConsoleFormatter())
+        handler.addFilter(ContextFilter())
 
         if self._config.get("mode", "async") == "sync":
             return SyncLogChannel(logger, [handler]).start()
@@ -207,7 +219,13 @@ class LoggingManager:
 
         handler = logging.FileHandler(path)
         fmt = config.format or self.DEFAULT_FORMAT
-        handler.setFormatter(logging.Formatter(fmt=fmt))
+        if config.structured:
+            from expanse.logging.formatters.structured import StructuredFormatter
+
+            handler.setFormatter(StructuredFormatter(fmt=fmt))
+        else:
+            handler.setFormatter(logging.Formatter(fmt=fmt))
+
         handler.setLevel(config.level)
 
         if self._config.get("mode", "async") == "sync":
@@ -215,8 +233,20 @@ class LoggingManager:
 
         return SimpleLogChannel(logger, [handler]).start()
 
-    def _create_group_channel(self, config: GroupConfig) -> GroupLogChannel:
-        channels = [self.channel(channel_name) for channel_name in config.channels]
+    def _create_group_channel(
+        self, config: GroupConfig, base_logger: logging.Logger | None = None
+    ) -> GroupLogChannel:
+        if base_logger is not None:
+            channels = [
+                self._create_channel(
+                    self._config.get("channels", {}).get(channel_name, {}),
+                    channel_name,
+                    base_logger=base_logger,
+                )
+                for channel_name in config.channels
+            ]
+        else:
+            channels = [self.channel(channel_name) for channel_name in config.channels]
 
         return GroupLogChannel(channels)
 
