@@ -45,11 +45,10 @@ class Config(BaseSettings):
     #
     # The configuration for the locker that should be used by the cache stores to protect
     # against cache stampedes.
+    # IF not set, a default locker using an in-memory store will be used.
     # Use the `CACHE_LOCKER__STORE` environment variable to set this value in your `.env` file.
     # For instance:
     # >>> CACHE_LOCKER__STORE=memory
-    locker: dict[str, Any] = Field(
-        default_factory=lambda: dict[str, Any]({"store": "memory"})
-    )
+    locker: dict[str, Any] | None = None
 
     model_config = SettingsConfigDict(env_prefix="CACHE_", env_nested_delimiter="__")
