@@ -1,3 +1,4 @@
+import json
 import logging
 
 from collections.abc import Mapping
@@ -66,8 +67,14 @@ class ConsoleFormatter(logging.Formatter):
         self._bottom_left_marker = "└"
         self._bottom_right_marker = "┘"
         self._vertical_marker = "│"
+        from pygments.formatters.terminal import TerminalFormatter
+
+        self._syntax_formatter = TerminalFormatter()
 
     def format(self, record: logging.LogRecord) -> str:
+        from pygments import highlight
+        from pygments.lexers.json5 import Json5Lexer
+
         exception: BaseException | None = None
         if record.exc_info:
             exception = record.exc_info[1]
@@ -98,7 +105,12 @@ class ConsoleFormatter(logging.Formatter):
 
         extra = {k: v for k, v in record.__dict__.items() if k not in RESERVED_ATTRS}
         if extra:
-            lines.extend([f"  <options=bold>{k}</>: {v}" for k, v in extra.items()])
+            lines.extend(
+                [
+                    f"  <options=bold>{k}</>: {highlight(json.dumps(v, indent=2, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).replace('\n', '\n  ')}"
+                    for k, v in extra.items()
+                ]
+            )
 
         if exception and isinstance(exception, Exception):
             output = BufferedOutput(decorated=True)
