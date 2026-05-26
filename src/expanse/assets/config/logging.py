@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 from typing import Literal
@@ -54,23 +55,39 @@ class Config(BaseSettings):
     # In sync mode, log messages are processed synchronously,
     # which can impact performance but ensures that logs are written immediately and sequentially.
     # This can be useful when debugging.
-    # >>> LOG_SYNC=true
+    # >>> LOG_MODE=async
     mode: Literal["sync", "async"] = "async"
 
-    routing: dict[str, list[str]] = Field(default_factory=dict)
+    # Loggers routing
+    #
+    # Defines how loggers are routed to channels. The keys are logger names, and the values are lists of channel names.
+    # For instance:
+    # >>> LOG_ROUTING=app:stream,file;expanse:console
+    routing: str | dict[str, list[str]] = Field(default_factory=dict)
 
     model_config = SettingsConfigDict(env_prefix="LOG_", env_nested_delimiter="__")
 
     @field_validator("routing", mode="before")
     @classmethod
-    def decode_channels(
-        cls, v: dict[str, str] | dict[str, list[str]]
-    ) -> dict[str, list[str]]:
-        new_v: dict[str, list[str]] = {}
-        for key, value in v.items():
-            if isinstance(value, str):
-                new_v[key] = [v.strip() for v in value.split(",")]
-            else:
-                new_v[key] = value
+    def decode_routing(cls, v: str | dict[str, list[str]]) -> dict[str, list[str]]:
+        new_v: dict[str, list[str]] = defaultdict(list)
+        if isinstance(v, str):
+            v = v.strip()
+            lines = v.splitlines()
+            for line in lines:
+                if not line.strip():
+                    continue
 
-        return new_v
+                for logger_routing in line.split(";"):
+                    if not logger_routing.strip():
+                        continue
+
+                    logger_name, channel_names = logger_routing.split(":")
+                    new_v[logger_name.strip()].extend(
+                        channel_name.strip()
+                        for channel_name in channel_names.split(",")
+                    )
+
+            return new_v
+
+        return v
