@@ -1,3 +1,5 @@
+import logging
+
 from collections.abc import Callable
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
 
 _TError = TypeVar("_TError", bound=Exception)
 
+logger = logging.getLogger(__name__)
+
 
 class ExceptionHandler(ExceptionHandlerContract):
     def __init__(self, container: Container) -> None:
@@ -48,9 +52,6 @@ class ExceptionHandler(ExceptionHandlerContract):
         if self._raise_unhandled_exceptions:
             raise e
 
-        from expanse.logging.logger import Logger
-
-        logger = await self._container.get(Logger)
         logger.exception(e)
 
     async def should_report(self, e: Exception) -> bool:
