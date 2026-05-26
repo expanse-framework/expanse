@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import logging
 
 from collections.abc import Awaitable
 from collections.abc import Callable
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     from expanse.contracts.lock.asynchronous.lock import Lock
 
 _T = TypeVar("_T")
+
+logger = logging.getLogger(__name__)
 
 
 class Cache(CacheContract):
@@ -105,8 +108,14 @@ class Cache(CacheContract):
         value = await self._store.get(key)
 
         if value is None:
+            logger.debug(
+                "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
+            )
             return default
 
+        logger.debug(
+            "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
+        )
         return value
 
     @override
@@ -178,6 +187,9 @@ class Cache(CacheContract):
                 # We force a TTL on the lock to prevent deadlocks in case the process that acquired the lock
                 # crashes before releasing it.
                 ttl=30,
+            )
+            logger.debug(
+                "Attempting to acquire lock for remember operation (key: %s)", key
             )
 
             async with lock:
@@ -280,10 +292,13 @@ class Cache(CacheContract):
 
         :return: The value returned by the callback.
         """
-        cached = await self._store.get(key)
+        cached = await self.get(key)
         if cached is not None:
             return cast("_T", cached)
 
+        logger.debug(
+            "Computing cache value for key %s using callback %s", key, callback
+        )
         value: _T
         if inspect.iscoroutinefunction(callback):
             value = await cast("Callable[..., Awaitable[_T]]", callback)()
@@ -292,6 +307,7 @@ class Cache(CacheContract):
         else:
             value = await run_in_threadpool(cast("Callable[..., _T]", callback))
 
+        logger.debug("Computed value for key %s using callback %s", key, callback)
         await self._store.set(key, value, ttl)
 
         return value

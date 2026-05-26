@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 import threading
 
@@ -10,6 +11,10 @@ from time import time
 from typing import override
 
 from expanse.contracts.lock.synchronous.lock import Lock as LockContract
+
+
+logger = logging.getLogger(__name__)
+refresh_logger = logger.getChild("refresh")
 
 
 class Lock(LockContract, ABC):
@@ -52,16 +57,26 @@ class Lock(LockContract, ABC):
 
         while not self._do_acquire():
             if not blocking:
+                logger.warning("Failed to acquire lock '%s'", self._name)
+
                 return False
 
             now = time()
 
             if timeout is not None and now - start >= timeout:
+                logger.warning(
+                    "Failed to acquire lock '%s' after %d seconds", self._name, timeout
+                )
+
                 return False
 
             sleep(self._sleep_time)
 
+        logger.debug("Acquired lock '%s'", self._name)
+
         if self._refresh and self._ttl is not None:
+            refresh_logger.debug("Starting auto-refresh for lock '%s'", self._name)
+
             self._stop_refreshing.clear()
             self._refreshing_thread = threading.Thread(
                 target=self._auto_refresh, daemon=True
@@ -79,12 +94,28 @@ class Lock(LockContract, ABC):
 
         :return: True if the lock was released successfully, False otherwise.
         """
+        logger.debug("Releasing lock '%s'", self._name)
         if self._refreshing_thread is not None:
+            refresh_logger.debug("Stopping auto-refresh for lock '%s'", self._name)
             self._stop_refreshing.set()
             self._refreshing_thread = None
 
         if self.is_owned_by_current_process() or force:
-            return self._do_release(force=force)
+            result = self._do_release(force=force)
+            if result:
+                logger.debug("Released lock '%s'", self._name)
+            else:
+                logger.warning(
+                    "Failed to release lock '%s'. It may have already been released or expired.",
+                    self._name,
+                )
+
+            return result
+
+        logger.warning(
+            "Cannot release lock '%s' because it is owned by another process.",
+            self._name,
+        )
 
         return False
 
@@ -131,6 +162,3 @@ class Lock(LockContract, ABC):
 
         while not self._stop_refreshing.wait(timeout=interval):
             self.refresh(self._ttl)
-
-    def __del__(self) -> None:
-        self.release(force=True)
