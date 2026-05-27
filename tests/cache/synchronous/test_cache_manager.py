@@ -11,6 +11,7 @@ from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.cache.synchronous.cache import Cache
 from expanse.cache.synchronous.cache_manager import CacheManager
+from expanse.cache.synchronous.cache_stack import CacheStack
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.database.synchronous.database_manager import DatabaseManager
@@ -193,6 +194,117 @@ async def test_manager_can_create_file_store(app: Application, tmp_path: Path) -
     cache = await manager.cache()
     assert cache.set("key", "value")
     assert cache.get("key") == "value"
+
+
+async def test_cache_returns_cache_stack_when_l1_cache_configured(
+    app: Application,
+) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "tiered",
+                "stores": {
+                    "tiered": {
+                        "driver": "memory",
+                        "l1_cache": {"store": {"driver": "memory"}},
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(app, config, Container())
+
+    cache = await manager.cache()
+
+    assert isinstance(cache, CacheStack)
+
+
+async def test_cache_stack_is_functional(app: Application) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "tiered",
+                "stores": {
+                    "tiered": {
+                        "driver": "memory",
+                        "l1_cache": {"store": {"driver": "memory"}},
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(app, config, Container())
+
+    cache = await manager.cache()
+
+    assert cache.set("key", "value") is True
+    assert cache.get("key") == "value"
+
+
+async def test_cache_raises_when_l1_cache_missing_store_config(
+    app: Application,
+) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "tiered",
+                "stores": {
+                    "tiered": {
+                        "driver": "memory",
+                        "l1_cache": {"driver": "memory"},
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(app, config, Container())
+
+    with pytest.raises(UnconfiguredStoreError, match="missing a store configuration"):
+        await manager.cache()
+
+
+async def test_cache_raises_for_unsupported_l1_cache_driver(
+    app: Application,
+) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "tiered",
+                "stores": {
+                    "tiered": {
+                        "driver": "memory",
+                        "l1_cache": {"store": {"driver": "redis"}},
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(app, config, Container())
+
+    with pytest.raises(UnsupportedStoreDriverError, match="redis"):
+        await manager.cache()
+
+
+async def test_cache_stack_is_returned_as_singleton(app: Application) -> None:
+    config = Config(
+        {
+            "cache": {
+                "store": "tiered",
+                "stores": {
+                    "tiered": {
+                        "driver": "memory",
+                        "l1_cache": {"store": {"driver": "memory"}},
+                    }
+                },
+            }
+        }
+    )
+    manager = CacheManager(app, config, Container())
+
+    cache1 = await manager.cache()
+    cache2 = await manager.cache()
+
+    assert cache1 is cache2
 
 
 @pytest.mark.redis

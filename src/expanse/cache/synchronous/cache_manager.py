@@ -1,3 +1,5 @@
+import logging
+
 from typing import Any
 
 from expanse.cache.config.locker import LockerConfig
@@ -10,6 +12,9 @@ from expanse.container.container import Container
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.synchronous.store import Store
 from expanse.core.application import Application
+
+
+logger = logging.getLogger(__name__)
 
 
 class CacheManager:
@@ -26,6 +31,18 @@ class CacheManager:
         if name in self._caches:
             return self._caches[name]
 
+        self._caches[name] = await self._create_cache(name)
+
+        return self._caches[name]
+
+    def get_default_store_name(self) -> str:
+        default_store: str | None = self._config.get("cache.store")
+        if default_store is None:
+            raise NoDefaultStoreError("No default cache store configured.")
+
+        return default_store
+
+    async def _create_cache(self, name: str) -> CacheContract:
         store = await self._create_store(name)
 
         from expanse.cache.synchronous.locker import Locker
@@ -56,16 +73,36 @@ class CacheManager:
                 )
             )
 
-        self._caches[name] = Cache(store, locker=locker)
+        stores: dict[str, dict[str, Any]] = self._config.get("cache.stores", {})
+        store_config = stores[name]
+        l1_cache_config = store_config.get("l1_cache", None)
 
-        return self._caches[name]
+        if not l1_cache_config:
+            logger.debug(
+                "Creating single-level cache for store '%s' with driver '%s'.",
+                name,
+                store_config["driver"],
+            )
+            return Cache(store, locker=locker)
 
-    def get_default_store_name(self) -> str:
-        default_store: str | None = self._config.get("cache.store")
-        if default_store is None:
-            raise NoDefaultStoreError("No default cache store configured.")
+        l1_store_config = l1_cache_config.get("store", None)
+        if not l1_store_config:
+            raise UnconfiguredStoreError(
+                f"L1 cache configuration for store '{name}' is missing a store configuration."
+            )
 
-        return default_store
+        l1_store = self._create_l1_store(l1_store_config)
+
+        logger.debug(
+            "Creating two-level cache for store '%s' with driver '%s' and L1 cache driver '%s'.",
+            name,
+            store_config["driver"],
+            l1_store_config["driver"],
+        )
+
+        from expanse.cache.synchronous.cache_stack import CacheStack
+
+        return CacheStack(Cache(l1_store, locker=locker), Cache(store, locker=locker))
 
     async def _create_store(self, name: str) -> Store:
         stores: dict[str, dict[str, Any]] = self._config.get("cache.stores", {})
@@ -95,6 +132,19 @@ class CacheManager:
             case _:
                 raise UnsupportedStoreDriverError(
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
+                )
+
+    def _create_l1_store(self, l1_cache_config: dict[str, Any]) -> Store:
+        if "driver" not in l1_cache_config:
+            raise UnconfiguredStoreError("L1 cache configuration is missing a driver.")
+
+        match l1_cache_config["driver"]:
+            case "memory":
+                return self._create_memory_store(l1_cache_config)
+
+            case _:
+                raise UnsupportedStoreDriverError(
+                    f"Unsupported L1 cache store driver '{l1_cache_config['driver']}'."
                 )
 
     def _create_memory_store(self, store_config: dict[str, Any]) -> Store:
