@@ -47,7 +47,14 @@ class CacheManager:
 
             locker = Locker(locker_store)
         else:
-            locker = Locker(self._create_memory_store())
+            locker = Locker(
+                self._create_memory_store(
+                    {
+                        "driver": "memory",
+                        "max_items": 1000,
+                    }
+                )
+            )
 
         self._caches[name] = Cache(store, locker=locker)
 
@@ -74,7 +81,7 @@ class CacheManager:
 
         match store_config["driver"]:
             case "memory":
-                return self._create_memory_store()
+                return self._create_memory_store(store_config)
 
             case "database":
                 return await self._create_database_store(store_config)
@@ -90,10 +97,17 @@ class CacheManager:
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
                 )
 
-    def _create_memory_store(self) -> Store:
+    def _create_memory_store(self, store_config: dict[str, Any]) -> Store:
+        from expanse.cache.config.memory import MemoryStoreConfig
         from expanse.cache.synchronous.stores.memory import MemoryStore
 
-        return MemoryStore()
+        config = MemoryStoreConfig.model_validate(store_config)
+
+        return MemoryStore(
+            max_items=config.max_items,
+            max_size=config.max_size,
+            default_ttl=config.default_ttl,
+        )
 
     async def _create_database_store(self, store_config: dict[str, Any]) -> Store:
         from expanse.cache.config.database import DatabaseStoreConfig

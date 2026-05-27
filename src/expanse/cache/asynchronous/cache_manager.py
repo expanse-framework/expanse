@@ -1,4 +1,5 @@
 from typing import Any
+from typing import cast
 
 from expanse.cache.asynchronous.cache import Cache
 from expanse.cache.config.locker import LockerConfig
@@ -74,7 +75,7 @@ class CacheManager:
 
         match store_config["driver"]:
             case "memory":
-                return self._create_memory_store()
+                return await self._create_memory_store(name)
 
             case "database":
                 return await self._create_database_store(store_config)
@@ -90,13 +91,23 @@ class CacheManager:
                     f"Unsupported cache store driver '{store_config['driver']}' for store '{name}'."
                 )
 
-    def _create_memory_store(self) -> Store:
+    async def _create_memory_store(self, name: str | None = None) -> Store:
         from expanse.cache.asynchronous.stores.memory import MemoryStore
+        from expanse.cache.synchronous.cache_manager import (
+            CacheManager as SyncCacheManager,
+        )
         from expanse.cache.synchronous.stores.memory import (
             MemoryStore as SyncMemoryStore,
         )
 
-        return MemoryStore(SyncMemoryStore())
+        if name is None or not self._container.has(SyncCacheManager):
+            return MemoryStore(SyncMemoryStore())
+
+        sync_cache_manager = await self._container.get(SyncCacheManager)
+        sync_cache = await sync_cache_manager.cache(name)
+        sync_store: SyncMemoryStore = cast("SyncMemoryStore", sync_cache._store)
+
+        return MemoryStore(sync_store)
 
     async def _create_database_store(self, store_config: dict[str, Any]) -> Store:
         from expanse.cache.asynchronous.stores.database.store import DatabaseStore

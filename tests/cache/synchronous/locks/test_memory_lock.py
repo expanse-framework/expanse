@@ -20,9 +20,7 @@ def make_store() -> MemoryStore:
 
 def make_lock_factory(store: MemoryStore) -> Callable[..., MemoryLock]:
     def factory(owner: str = "owner-1", **kwargs: Any) -> MemoryLock:
-        return MemoryLock(
-            store._locks, store._mutex, "test-lock", owner=owner, **kwargs
-        )
+        return MemoryLock("test-lock", owner=owner, locks=store._locks, **kwargs)
 
     return factory
 

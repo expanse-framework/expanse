@@ -22,8 +22,8 @@ class MemoryLock(Lock):
     ) -> None:
         super().__init__(name, ttl, owner, refresh=refresh)
 
-        self._sync_lock = SyncMemoryLock(
-            sync_store._locks, sync_store._mutex, name, ttl, self._owner, refresh=False
+        self._sync_lock: SyncMemoryLock = SyncMemoryLock(
+            name, ttl, self._owner, refresh=False, locks=sync_store._locks
         )
 
     @override
