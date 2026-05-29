@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from expanse.cache.asynchronous.buses.memory import MemoryBus
 from expanse.cache.asynchronous.cache import Cache
 from expanse.cache.asynchronous.cache_stack import CacheStack
 from expanse.cache.asynchronous.stores.memory import MemoryStore
@@ -30,7 +31,7 @@ def l2_cache(l2_store: MemoryStore) -> Cache:
 
 @pytest.fixture()
 def stack(l1_cache: Cache, l2_cache: Cache) -> CacheStack:
-    return CacheStack(l1_cache, l2_cache)
+    return CacheStack(l1_cache, l2_cache, MemoryBus())
 
 
 # --- get ---

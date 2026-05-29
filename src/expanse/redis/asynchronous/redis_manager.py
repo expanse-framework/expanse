@@ -29,6 +29,18 @@ class RedisManager:
         if name in self._connections:
             return self._connections[name]
 
+        self._connections[name] = self.create_connection(name)
+
+        return self._connections[name]
+
+    def get_default_connection_name(self) -> str:
+        return self._config.get("redis.connection", "default")
+
+    async def close(self) -> None:
+        for connection in self._connections.values():
+            await connection.aclose()
+
+    def create_connection(self, name: str) -> "Connection":
         connections_configs = self._config.get("redis.connections", {})
         if name not in connections_configs:
             raise UnconfiguredConnectionError(
@@ -39,16 +51,7 @@ class RedisManager:
 
         connection = self._create_connection(connection_config)
 
-        self._connections[name] = connection
-
         return connection
-
-    def get_default_connection_name(self) -> str:
-        return self._config.get("redis.connection", "default")
-
-    async def close(self) -> None:
-        for connection in self._connections.values():
-            await connection.aclose()
 
     def _create_connection(self, raw_config: dict[str, Any]) -> "Connection":
         from redis.asyncio import Redis

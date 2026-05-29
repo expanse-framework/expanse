@@ -7,6 +7,8 @@ from typing import Any
 from typing import TypeVar
 from typing import override
 
+from expanse.cache.messages.cache_item_set import CacheItemSet
+from expanse.contracts.cache.asynchronous.bus import Bus
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 
 
@@ -21,9 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class CacheStack(CacheContract):
-    def __init__(self, l1_cache: CacheContract, l2_cache: CacheContract) -> None:
+    def __init__(
+        self, l1_cache: CacheContract, l2_cache: CacheContract, bus: Bus
+    ) -> None:
         self._l1_cache: CacheContract = l1_cache
         self._l2_cache: CacheContract = l2_cache
+        self._bus: Bus = bus
+        self._bus.subscribe(self._on_cache_item_set)
 
     @override
     async def get(self, key: str, default: Any | None = None) -> Any | None:
@@ -77,8 +83,7 @@ class CacheStack(CacheContract):
         l2_result = await self._l2_cache.set(key, value, ttl, until)
 
         if l2_result:
-            # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-            pass
+            await self._bus.publish(CacheItemSet(key))
         else:
             logger.warning("Failed to set key '%s' in L2 cache.", key)
 
@@ -196,3 +201,9 @@ class CacheStack(CacheContract):
         refresh: bool = False,
     ) -> "Lock":
         return self._l2_cache.lock(name, ttl, owner, refresh)
+
+    async def _on_cache_item_set(self, message: CacheItemSet) -> None:
+        logger.debug("Received cache item set message for key %s", message.key)
+        await self._l1_cache.delete(message.key)
+
+        await self.get(message.key)
