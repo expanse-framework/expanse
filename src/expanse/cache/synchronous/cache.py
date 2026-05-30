@@ -103,9 +103,9 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or the default value if the key does not exist.
         """
-        value = self._store.get(key)
+        item = self._store.get(key)
 
-        if value is None:
+        if not item.is_hit:
             logger.debug(
                 "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
             )
@@ -116,7 +116,7 @@ class Cache(CacheContract):
             "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
         )
 
-        return value
+        return item.value
 
     @override
     def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
@@ -127,12 +127,16 @@ class Cache(CacheContract):
 
         :return: A dictionary mapping each key to its associated value, or None if the key does not exist.
         """
+        defaults = keys if isinstance(keys, dict) else {}
         if isinstance(keys, dict):
             keys = list(keys.keys())
 
-        values = self._store.get_many(keys)
+        items = self._store.get_many(keys)
 
-        return dict(values.items())
+        return {
+            key: item.value if item.is_hit else defaults.get(key)  # type: ignore[union-attr]
+            for key, item in items.items()
+        }
 
     @override
     def remember(
@@ -187,12 +191,13 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or None if the key does not exist.
         """
-        value = self._store.get(key)
+        item = self._store.get(key)
 
-        if value is not None:
+        if item.is_hit:
             self.delete(key)
+            return item.value
 
-        return value
+        return None
 
     @override
     def delete(self, key: str) -> bool:

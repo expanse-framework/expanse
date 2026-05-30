@@ -7,6 +7,7 @@ from typing import override
 from atomic_lru import CACHE_MISS
 from atomic_lru import Cache as LRUCache
 
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.contracts.cache.synchronous.store import Store
 
 
@@ -40,26 +41,30 @@ class MemoryStore(Store):
         return True
 
     @override
-    def get(self, key: str) -> Any | None:
+    def get(self, key: str) -> CacheItem:
         result = self._cache.get(key)
         if result is CACHE_MISS:
-            return None
+            return CacheItem(key=key)
 
-        return result
+        return CacheItem(key=key, value=result, is_hit=True)
 
     @override
-    def get_many(self, keys: list[str]) -> dict[str, Any | None]:
-        results: dict[str, Any | None] = {}
+    def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
+        results: dict[str, CacheItem] = {}
 
         for key in keys:
             result = self._cache.get(key)
-            results[key] = result if result is not CACHE_MISS else None
+            results[key] = (
+                CacheItem(key=key, value=result, is_hit=True)
+                if result is not CACHE_MISS
+                else CacheItem(key=key)
+            )
 
         return results
 
     @override
     def has(self, key: str) -> bool:
-        return self.get(key) is not None
+        return self.get(key).is_hit
 
     @override
     def delete(self, key: str) -> bool:

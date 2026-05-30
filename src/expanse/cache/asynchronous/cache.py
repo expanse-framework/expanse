@@ -105,9 +105,9 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or the default value if the key does not exist.
         """
-        value = await self._store.get(key)
+        item = await self._store.get(key)
 
-        if value is None:
+        if not item.is_hit:
             logger.debug(
                 "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
             )
@@ -116,7 +116,7 @@ class Cache(CacheContract):
         logger.debug(
             "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
         )
-        return value
+        return item.value
 
     @override
     async def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
@@ -128,20 +128,15 @@ class Cache(CacheContract):
 
         :return: A dictionary mapping each key to its associated value, or the default value if the key does not exist.
         """
+        defaults = keys if isinstance(keys, dict) else {}
         if isinstance(keys, dict):
             keys = list(keys.keys())
 
-        values = await self._store.get_many(keys)
+        items = await self._store.get_many(keys)
 
         return {
-            key: (
-                value
-                if value is not None
-                else keys[key]
-                if isinstance(keys, dict)
-                else None
-            )
-            for key, value in values.items()
+            key: item.value if item.is_hit else defaults.get(key)  # type: ignore[union-attr]
+            for key, item in items.items()
         }
 
     @overload
@@ -217,12 +212,13 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or None if the key does not exist.
         """
-        value = await self._store.get(key)
+        item = await self._store.get(key)
 
-        if value is not None:
+        if item.is_hit:
             await self.delete(key)
+            return item.value
 
-        return value
+        return None
 
     @override
     async def delete(self, key: str) -> bool:

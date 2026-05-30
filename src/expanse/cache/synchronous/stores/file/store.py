@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.contracts.cache.synchronous.store import Store
 
 
@@ -59,11 +60,11 @@ class FileStore(Store):
         return all(results)
 
     @override
-    def get(self, key: str) -> Any | None:
+    def get(self, key: str) -> CacheItem:
         path = self._path_for_key(key)
 
         if not path.exists():
-            return None
+            return CacheItem(key=key)
 
         content = path.read_text()
         expiration_str, value_hex = content.split("\n", 1)
@@ -72,12 +73,17 @@ class FileStore(Store):
         if expiration != 0 and expiration < int(time.time()):
             path.unlink()
 
-            return None
+            return CacheItem(key=key)
 
-        return pickle.loads(bytes.fromhex(value_hex))
+        return CacheItem(
+            key=key,
+            value=pickle.loads(bytes.fromhex(value_hex)),
+            is_hit=True,
+            expiration=expiration if expiration != 0 else None,
+        )
 
     @override
-    def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         if not keys:
             return {}
 
@@ -85,7 +91,7 @@ class FileStore(Store):
 
     @override
     def has(self, key: str) -> bool:
-        return self.get(key) is not None
+        return self.get(key).is_hit
 
     @override
     def delete(self, key: str) -> bool:

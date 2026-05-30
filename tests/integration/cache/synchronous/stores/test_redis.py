@@ -62,14 +62,14 @@ def test_set_stores_value(store: RedisStore) -> None:
     result = store.set("key", "value")
 
     assert result is True
-    assert store.get("key") == "value"
+    assert store.get("key").value == "value"
 
 
 def test_set_overwrites_existing_value(store: RedisStore) -> None:
     store.set("key", "original")
     store.set("key", "updated")
 
-    assert store.get("key") == "updated"
+    assert store.get("key").value == "updated"
 
 
 def test_set_stores_complex_value(store: RedisStore) -> None:
@@ -77,14 +77,14 @@ def test_set_stores_complex_value(store: RedisStore) -> None:
 
     store.set("key", value)
 
-    assert store.get("key") == value
+    assert store.get("key").value == value
 
 
 def test_set_with_ttl_stores_value(store: RedisStore) -> None:
     result = store.set("key", "value", ttl=60)
 
     assert result is True
-    assert store.get("key") == "value"
+    assert store.get("key").value == "value"
 
 
 def test_set_with_ttl_sets_expiration(store: RedisStore, redis: RedisManager) -> None:
@@ -96,11 +96,11 @@ def test_set_with_ttl_sets_expiration(store: RedisStore, redis: RedisManager) ->
     assert 0 < ttl <= 60
 
 
-def test_get_returns_none_for_missing_key(store: RedisStore) -> None:
-    assert store.get("missing") is None
+def test_get_returns_miss_for_missing_key(store: RedisStore) -> None:
+    assert store.get("missing").is_hit is False
 
 
-def test_get_returns_none_for_expired_key(
+def test_get_returns_miss_for_expired_key(
     store: RedisStore, redis: RedisManager
 ) -> None:
     store.set("key", "value")
@@ -108,16 +108,16 @@ def test_get_returns_none_for_expired_key(
     connection.pexpire("key", 1)
     time.sleep(0.01)
 
-    assert store.get("key") is None
+    assert store.get("key").is_hit is False
 
 
 def test_set_many_stores_multiple_values(store: RedisStore) -> None:
     result = store.set_many({"a": 1, "b": 2, "c": 3})
 
     assert result is True
-    assert store.get("a") == 1
-    assert store.get("b") == 2
-    assert store.get("c") == 3
+    assert store.get("a").value == 1
+    assert store.get("b").value == 2
+    assert store.get("c").value == 3
 
 
 def test_set_many_with_ttl_stores_values(
@@ -135,20 +135,25 @@ def test_set_many_with_ttl_stores_values(
     assert 0 < ttl_y <= 60
 
 
-def test_get_many_returns_values_for_existing_keys(store: RedisStore) -> None:
+def test_get_many_returns_hits_for_existing_keys(store: RedisStore) -> None:
     store.set_many({"x": 10, "y": 20})
 
     result = store.get_many(["x", "y"])
 
-    assert result == {"x": 10, "y": 20}
+    assert result["x"].is_hit is True
+    assert result["x"].value == 10
+    assert result["y"].is_hit is True
+    assert result["y"].value == 20
 
 
-def test_get_many_returns_none_for_missing_keys(store: RedisStore) -> None:
+def test_get_many_returns_miss_for_missing_keys(store: RedisStore) -> None:
     store.set("x", 10)
 
     result = store.get_many(["x", "missing"])
 
-    assert result == {"x": 10, "missing": None}
+    assert result["x"].is_hit is True
+    assert result["x"].value == 10
+    assert result["missing"].is_hit is False
 
 
 def test_get_many_returns_empty_dict_for_empty_keys(store: RedisStore) -> None:
@@ -184,7 +189,7 @@ def test_delete_removes_key(store: RedisStore) -> None:
     result = store.delete("key")
 
     assert result is True
-    assert store.get("key") is None
+    assert store.get("key").is_hit is False
 
 
 def test_delete_returns_false_for_missing_key(store: RedisStore) -> None:
@@ -199,8 +204,8 @@ def test_clear_removes_all_entries(store: RedisStore) -> None:
     result = store.clear()
 
     assert result is True
-    assert store.get("a") is None
-    assert store.get("b") is None
+    assert store.get("a").is_hit is False
+    assert store.get("b").is_hit is False
 
 
 def test_lock_acquire_and_release(store: RedisStore) -> None:

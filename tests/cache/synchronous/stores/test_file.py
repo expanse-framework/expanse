@@ -22,24 +22,24 @@ def test_set_stores_value(store: FileStore) -> None:
     result = store.set("key", "value")
 
     assert result is True
-    assert store.get("key") == "value"
+    assert store.get("key").value == "value"
 
 
 def test_set_overwrites_existing_key(store: FileStore) -> None:
     store.set("key", "original")
     store.set("key", "updated")
 
-    assert store.get("key") == "updated"
+    assert store.get("key").value == "updated"
 
 
 def test_set_with_ttl_stores_value(store: FileStore) -> None:
     result = store.set("key", "value", ttl=60)
 
     assert result is True
-    assert store.get("key") == "value"
+    assert store.get("key").value == "value"
 
 
-def test_set_with_expired_ttl_returns_none(store: FileStore) -> None:
+def test_set_with_expired_ttl_returns_miss(store: FileStore) -> None:
     store.set("key", "value", ttl=1)
 
     path = store._path_for_key("key")
@@ -47,34 +47,37 @@ def test_set_with_expired_ttl_returns_none(store: FileStore) -> None:
     _expiration, value_hex = content.split("\n", 1)
     path.write_text(f"{int(time.time()) - 1}\n{value_hex}")
 
-    assert store.get("key") is None
+    assert store.get("key").is_hit is False
 
 
 def test_set_many_stores_multiple_values(store: FileStore) -> None:
     result = store.set_many({"a": 1, "b": 2, "c": 3})
 
     assert result is True
-    assert store.get("a") == 1
-    assert store.get("b") == 2
-    assert store.get("c") == 3
+    assert store.get("a").value == 1
+    assert store.get("b").value == 2
+    assert store.get("c").value == 3
 
 
 def test_set_many_overwrites_existing_keys(store: FileStore) -> None:
     store.set("key", "original")
     store.set_many({"key": "updated", "new": "value"})
 
-    assert store.get("key") == "updated"
-    assert store.get("new") == "value"
+    assert store.get("key").value == "updated"
+    assert store.get("new").value == "value"
 
 
 def test_get_returns_stored_value(store: FileStore) -> None:
     store.set("key", "value")
 
-    assert store.get("key") == "value"
+    item = store.get("key")
+
+    assert item.is_hit is True
+    assert item.value == "value"
 
 
-def test_get_returns_none_for_missing_key(store: FileStore) -> None:
-    assert store.get("missing") is None
+def test_get_returns_miss_for_missing_key(store: FileStore) -> None:
+    assert store.get("missing").is_hit is False
 
 
 def test_get_deletes_expired_file(store: FileStore) -> None:
@@ -90,20 +93,25 @@ def test_get_deletes_expired_file(store: FileStore) -> None:
     assert not path.exists()
 
 
-def test_get_many_returns_values_for_existing_keys(store: FileStore) -> None:
+def test_get_many_returns_hits_for_existing_keys(store: FileStore) -> None:
     store.set_many({"x": 10, "y": 20})
 
     result = store.get_many(["x", "y"])
 
-    assert result == {"x": 10, "y": 20}
+    assert result["x"].is_hit is True
+    assert result["x"].value == 10
+    assert result["y"].is_hit is True
+    assert result["y"].value == 20
 
 
-def test_get_many_returns_none_for_missing_keys(store: FileStore) -> None:
+def test_get_many_returns_miss_for_missing_keys(store: FileStore) -> None:
     store.set("x", 10)
 
     result = store.get_many(["x", "missing"])
 
-    assert result == {"x": 10, "missing": None}
+    assert result["x"].is_hit is True
+    assert result["x"].value == 10
+    assert result["missing"].is_hit is False
 
 
 def test_get_many_returns_empty_dict_for_empty_keys(store: FileStore) -> None:
@@ -139,7 +147,7 @@ def test_delete_removes_key(store: FileStore) -> None:
     result = store.delete("key")
 
     assert result is True
-    assert store.get("key") is None
+    assert store.get("key").is_hit is False
 
 
 def test_delete_returns_false_for_missing_key(store: FileStore) -> None:
@@ -154,8 +162,8 @@ def test_clear_removes_all_keys(store: FileStore) -> None:
     result = store.clear()
 
     assert result is True
-    assert store.get("a") is None
-    assert store.get("b") is None
+    assert store.get("a").is_hit is False
+    assert store.get("b").is_hit is False
 
 
 def test_stores_various_value_types(store: FileStore) -> None:
@@ -163,9 +171,9 @@ def test_stores_various_value_types(store: FileStore) -> None:
     store.set("list", [1, 2, 3])
     store.set("dict", {"nested": True})
 
-    assert store.get("int") == 42
-    assert store.get("list") == [1, 2, 3]
-    assert store.get("dict") == {"nested": True}
+    assert store.get("int").value == 42
+    assert store.get("list").value == [1, 2, 3]
+    assert store.get("dict").value == {"nested": True}
 
 
 def test_creates_cache_directory_if_not_exists(tmp_path: Path) -> None:
@@ -185,4 +193,4 @@ def test_no_expiration_value_is_never_expired(store: FileStore) -> None:
     expiration_str = path.read_text().split("\n", 1)[0]
 
     assert expiration_str == "0"
-    assert store.get("key") == "value"
+    assert store.get("key").value == "value"

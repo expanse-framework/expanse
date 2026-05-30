@@ -16,6 +16,7 @@ from sqlalchemy import exists
 from sqlalchemy import select
 from sqlalchemy import table
 
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.contracts.cache.synchronous.store import Store
 
 
@@ -84,17 +85,17 @@ class DatabaseStore(Store):
         return True
 
     @override
-    def get(self, key: str) -> Any | None:
-        return self.get_many([key]).get(key)
+    def get(self, key: str) -> CacheItem:
+        return self.get_many([key])[key]
 
     @override
-    def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         if not keys:
             return {}
 
         now = int(time.time())
         expired: list[str] = []
-        items: dict[str, Any | None] = dict.fromkeys(keys)
+        items: dict[str, CacheItem] = {key: CacheItem(key=key) for key in keys}
         with self._db.connection(self._config.connection) as connection:
             stmt: Select[tuple[str, bytes | None]] = (
                 select(
@@ -114,7 +115,9 @@ class DatabaseStore(Store):
             for row in rows:
                 key, data = row
                 if data is not None:
-                    items[key] = pickle.loads(data)
+                    items[key] = CacheItem(
+                        key=key, value=pickle.loads(data), is_hit=True
+                    )
                 else:
                     expired.append(key)
 
