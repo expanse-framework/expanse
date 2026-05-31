@@ -11,6 +11,7 @@ from typing import cast
 from typing import overload
 from typing import override
 
+from expanse.cache.logger import Logger
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 
 
@@ -24,10 +25,13 @@ if TYPE_CHECKING:
 _T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
+logger.__class__ = Logger
+logger = cast("Logger", logger)
 
 
 class Cache(CacheContract):
-    def __init__(self, store: Store, locker: Locker | None = None) -> None:
+    def __init__(self, name: str, store: Store, locker: Locker | None = None) -> None:
+        self._name: str = name
         self._store: Store = store
         self._locker: Locker | None = locker
 
@@ -106,15 +110,11 @@ class Cache(CacheContract):
         item = self._store.get(key)
 
         if not item.is_hit:
-            logger.debug(
-                "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
-            )
+            logger.miss(self._name, key)
 
             return default
 
-        logger.debug(
-            "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
-        )
+        logger.hit(self._name, key)
 
         return item.value
 
@@ -166,6 +166,8 @@ class Cache(CacheContract):
                 ttl=30,
             )
 
+            logger.debug("Attempting to acquire remember lock", extra={"key": key})
+
             with lock:
                 return self._compute(key, callback, ttl)
 
@@ -208,7 +210,11 @@ class Cache(CacheContract):
 
         :return: True if the key was successfully deleted, False otherwise.
         """
-        return self._store.delete(key)
+        result = self._store.delete(key)
+        if result:
+            logger.delete(self._name, key)
+
+        return result
 
     @override
     def delete_many(self, keys: list[str]) -> bool:
@@ -219,14 +225,26 @@ class Cache(CacheContract):
 
         :return: True if all keys were successfully deleted, False otherwise.
         """
-        return all(self.delete(key) for key in keys)
+        deleted_keys = []
+        for key in keys:
+            if self.delete(key):
+                deleted_keys.append(key)
+
+        if deleted_keys:
+            logger.delete(self._name, ", ".join(deleted_keys))
+
+        return len(deleted_keys) == len(keys)
 
     @override
     def clear(self) -> bool:
         """
         Clear all items from the cache.
         """
-        return self._store.clear()
+        result = self._store.clear()
+        if result:
+            logger.clear(self._name)
+
+        return result
 
     @override
     def lock(
@@ -259,7 +277,7 @@ class Cache(CacheContract):
             return cast("_T", cached)
 
         logger.debug(
-            "Computing cache value for key %s using callback %s", key, callback
+            "Computing cache value", extra={"key": key, "callback": callback.__name__}
         )
 
         value = callback()

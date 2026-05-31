@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 import logging
 
@@ -13,6 +12,7 @@ from typing import cast
 from typing import overload
 from typing import override
 
+from expanse.cache.logger import Logger
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.locker import Locker
 from expanse.contracts.cache.asynchronous.store import Store
@@ -26,10 +26,13 @@ if TYPE_CHECKING:
 _T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
+logger.__class__ = Logger
+logger = cast("Logger", logger)
 
 
 class Cache(CacheContract):
-    def __init__(self, store: Store, locker: Locker | None = None) -> None:
+    def __init__(self, name: str, store: Store, locker: Locker | None = None) -> None:
+        self._name: str = name
         self._store: Store = store
         self._locker: Locker | None = locker
 
@@ -108,14 +111,12 @@ class Cache(CacheContract):
         item = await self._store.get(key)
 
         if not item.is_hit:
-            logger.debug(
-                "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
-            )
+            logger.miss(self._name, key)
+
             return default
 
-        logger.debug(
-            "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
-        )
+        logger.hit(self._name, key)
+
         return item.value
 
     @override
@@ -183,9 +184,7 @@ class Cache(CacheContract):
                 # crashes before releasing it.
                 ttl=30,
             )
-            logger.debug(
-                "Attempting to acquire lock for remember operation (key: %s)", key
-            )
+            logger.debug("Attempting to acquire remember lock", extra={"key": key})
 
             async with lock:
                 return await self._compute(key, callback, ttl)
@@ -229,7 +228,11 @@ class Cache(CacheContract):
 
         :return: True if the key was successfully deleted, False otherwise.
         """
-        return await self._store.delete(key)
+        result = await self._store.delete(key)
+        if result:
+            logger.delete(self._name, key)
+
+        return result
 
     @override
     async def delete_many(self, keys: list[str]) -> bool:
@@ -240,18 +243,26 @@ class Cache(CacheContract):
 
         :return: True if all keys were successfully deleted, False otherwise.
         """
-        tasks = [self.delete(key) for key in keys]
+        deleted_keys = []
+        for key in keys:
+            if await self.delete(key):
+                deleted_keys.append(key)
 
-        results = await asyncio.gather(*tasks)
+        if deleted_keys:
+            logger.delete(self._name, ", ".join(deleted_keys))
 
-        return all(results)
+        return len(deleted_keys) == len(keys)
 
     @override
     async def clear(self) -> bool:
         """
         Clear all items from the cache.
         """
-        return await self._store.clear()
+        result = await self._store.clear()
+        if result:
+            logger.clear(self._name)
+
+        return result
 
     @override
     def lock(
@@ -288,12 +299,12 @@ class Cache(CacheContract):
 
         :return: The value returned by the callback.
         """
-        cached = await self.get(key)
-        if cached is not None:
-            return cast("_T", cached)
+        cached = await self._store.get(key)
+        if cached.is_hit:
+            return cast("_T", cached.value)
 
         logger.debug(
-            "Computing cache value for key %s using callback %s", key, callback
+            "Computing cache value", extra={"key": key, "callback": callback.__name__}
         )
         value: _T
         if inspect.iscoroutinefunction(callback):
@@ -303,7 +314,9 @@ class Cache(CacheContract):
         else:
             value = await run_in_threadpool(cast("Callable[..., _T]", callback))
 
-        logger.debug("Computed value for key %s using callback %s", key, callback)
+        logger.debug(
+            "Computed cache value", extra={"key": key, "callback": callback.__name__}
+        )
         await self._store.set(key, value, ttl)
 
         return value

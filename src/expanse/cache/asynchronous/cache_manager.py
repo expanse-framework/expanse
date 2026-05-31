@@ -71,11 +71,10 @@ class CacheManager:
 
         if not l1_cache_config:
             logger.debug(
-                "Creating single-level cache for store '%s' with driver '%s'.",
-                name,
-                store_config["driver"],
+                "Creating single-level cache",
+                extra={"store": name, "driver": store_config["driver"]},
             )
-            return Cache(store, locker=locker)
+            return Cache(name, store, locker=locker)
 
         l1_store_config = l1_cache_config.get("store", None)
         if not l1_store_config:
@@ -92,15 +91,15 @@ class CacheManager:
         bus = await self._create_bus(l1_bus_config)
 
         logger.debug(
-            "Creating two-level cache for store '%s' with driver '%s', L1 cache driver '%s' and bus driver '%s'.",
-            name,
-            store_config["driver"],
-            l1_store_config["driver"],
-            l1_bus_config["driver"],
+            "Creating two-level cache",
+            extra={
+                "store": name,
+                "l1": l1_store_config["driver"],
+                "l2": store_config["driver"],
+                "bus": l1_bus_config["driver"],
+            },
         )
-        return CacheStack(
-            Cache(l1_store, locker=locker), Cache(store, locker=locker), bus
-        )
+        return CacheStack(f"{name}", l1_store, store, bus, locker=locker)
 
     async def _create_store(self, name: str, store_config: dict[str, Any]) -> Store:
         match store_config["driver"]:

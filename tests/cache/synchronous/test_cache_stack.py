@@ -1,10 +1,42 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import TypeVar
+
 import pytest
 
+from expanse.cache.synchronous.buses.memory import MemoryBus
 from expanse.cache.synchronous.cache import Cache
 from expanse.cache.synchronous.cache_stack import CacheStack
 from expanse.cache.synchronous.stores.memory import MemoryStore
+from expanse.contracts.cache.synchronous.bus import Bus
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+_T = TypeVar("_T")
+
+
+class NullBus(Bus):
+    @property
+    def id(self) -> str:
+        return "null"
+
+    def publish(self, message: Any) -> None:
+        pass
+
+    def subscribe(
+        self,
+        message: type[_T],
+        handler: Callable[[_T], None],
+    ) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
 
 
 @pytest.fixture()
@@ -19,23 +51,23 @@ def l2_store() -> MemoryStore:
 
 @pytest.fixture()
 def l1_cache(l1_store: MemoryStore) -> Cache:
-    return Cache(l1_store)
+    return Cache("l1", l1_store)
 
 
 @pytest.fixture()
 def l2_cache(l2_store: MemoryStore) -> Cache:
-    return Cache(l2_store)
+    return Cache("l2", l2_store)
 
 
 @pytest.fixture()
-def stack(l1_cache: Cache, l2_cache: Cache) -> CacheStack:
-    return CacheStack(l1_cache, l2_cache)
+def stack(l1_store: MemoryStore, l2_store: MemoryStore) -> CacheStack:
+    return CacheStack("test", l1_store, l2_store, NullBus())
 
 
 # --- get ---
 
 
-async def test_get_returns_l1_value_when_present(
+def test_get_returns_l1_value_when_present(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("key", "l1_value")
@@ -44,15 +76,13 @@ async def test_get_returns_l1_value_when_present(
     assert stack.get("key") == "l1_value"
 
 
-async def test_get_returns_l2_value_on_l1_miss(
-    stack: CacheStack, l2_cache: Cache
-) -> None:
+def test_get_returns_l2_value_on_l1_miss(stack: CacheStack, l2_cache: Cache) -> None:
     l2_cache.set("key", "l2_value")
 
     assert stack.get("key") == "l2_value"
 
 
-async def test_get_populates_l1_from_l2_on_miss(
+def test_get_populates_l1_from_l2_on_miss(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l2_cache.set("key", "value")
@@ -62,11 +92,11 @@ async def test_get_populates_l1_from_l2_on_miss(
     assert l1_cache.get("key") == "value"
 
 
-async def test_get_returns_none_when_both_miss(stack: CacheStack) -> None:
+def test_get_returns_none_when_both_miss(stack: CacheStack) -> None:
     assert stack.get("missing") is None
 
 
-async def test_get_does_not_populate_l1_when_both_miss(
+def test_get_does_not_populate_l1_when_both_miss(
     stack: CacheStack, l1_cache: Cache
 ) -> None:
     stack.get("missing")
@@ -77,7 +107,7 @@ async def test_get_does_not_populate_l1_when_both_miss(
 # --- get_many ---
 
 
-async def test_get_many_returns_all_l1_values_when_all_present(
+def test_get_many_returns_all_l1_values_when_all_present(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("a", "l1_a")
@@ -88,7 +118,7 @@ async def test_get_many_returns_all_l1_values_when_all_present(
     assert result == {"a": "l1_a"}
 
 
-async def test_get_many_fetches_missing_keys_from_l2(
+def test_get_many_fetches_missing_keys_from_l2(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("a", "l1_a")
@@ -100,7 +130,7 @@ async def test_get_many_fetches_missing_keys_from_l2(
     assert result["b"] == "l2_b"
 
 
-async def test_get_many_populates_l1_for_l2_hits(
+def test_get_many_populates_l1_for_l2_hits(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l2_cache.set("b", "l2_b")
@@ -110,7 +140,7 @@ async def test_get_many_populates_l1_for_l2_hits(
     assert l1_cache.get("b") == "l2_b"
 
 
-async def test_get_many_returns_none_for_missing_keys(stack: CacheStack) -> None:
+def test_get_many_returns_none_for_missing_keys(stack: CacheStack) -> None:
     result = stack.get_many(["x", "y"])
 
     assert result == {"x": None, "y": None}
@@ -119,7 +149,7 @@ async def test_get_many_returns_none_for_missing_keys(stack: CacheStack) -> None
 # --- set ---
 
 
-async def test_set_writes_to_both_caches(
+def test_set_writes_to_both_caches(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     stack.set("key", "value")
@@ -128,14 +158,14 @@ async def test_set_writes_to_both_caches(
     assert l2_cache.get("key") == "value"
 
 
-async def test_set_returns_true(stack: CacheStack) -> None:
+def test_set_returns_true(stack: CacheStack) -> None:
     assert stack.set("key", "value") is True
 
 
 # --- set_many ---
 
 
-async def test_set_many_writes_to_both_caches(
+def test_set_many_writes_to_both_caches(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     stack.set_many({"a": 1, "b": 2})
@@ -146,22 +176,20 @@ async def test_set_many_writes_to_both_caches(
     assert l2_cache.get("b") == 2
 
 
-async def test_set_many_returns_true(stack: CacheStack) -> None:
+def test_set_many_returns_true(stack: CacheStack) -> None:
     assert stack.set_many({"a": 1}) is True
 
 
 # --- has ---
 
 
-async def test_has_returns_true_when_key_in_l1(
-    stack: CacheStack, l1_cache: Cache
-) -> None:
+def test_has_returns_true_when_key_in_l1(stack: CacheStack, l1_cache: Cache) -> None:
     l1_cache.set("key", "value")
 
     assert stack.has("key") is True
 
 
-async def test_has_returns_true_when_key_only_in_l2(
+def test_has_returns_true_when_key_only_in_l2(
     stack: CacheStack, l2_cache: Cache
 ) -> None:
     l2_cache.set("key", "value")
@@ -169,14 +197,14 @@ async def test_has_returns_true_when_key_only_in_l2(
     assert stack.has("key") is True
 
 
-async def test_has_returns_false_when_key_in_neither(stack: CacheStack) -> None:
+def test_has_returns_false_when_key_in_neither(stack: CacheStack) -> None:
     assert stack.has("missing") is False
 
 
 # --- remember ---
 
 
-async def test_remember_returns_l1_value_without_invoking_callback(
+def test_remember_returns_l1_value_without_invoking_callback(
     stack: CacheStack, l1_cache: Cache
 ) -> None:
     l1_cache.set("key", "cached")
@@ -193,7 +221,7 @@ async def test_remember_returns_l1_value_without_invoking_callback(
     assert calls == 0
 
 
-async def test_remember_executes_callback_and_populates_both_on_miss(
+def test_remember_executes_callback_and_populates_both_on_miss(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     result = stack.remember("key", lambda: "computed")
@@ -203,7 +231,7 @@ async def test_remember_executes_callback_and_populates_both_on_miss(
     assert l2_cache.get("key") == "computed"
 
 
-async def test_remember_populates_l1_from_l2_on_l1_miss(
+def test_remember_populates_l1_from_l2_on_l1_miss(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l2_cache.set("key", "l2_value")
@@ -224,7 +252,7 @@ async def test_remember_populates_l1_from_l2_on_l1_miss(
 # --- delete ---
 
 
-async def test_delete_removes_from_both_caches(
+def test_delete_removes_from_both_caches(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("key", "value")
@@ -236,7 +264,7 @@ async def test_delete_removes_from_both_caches(
     assert l2_cache.get("key") is None
 
 
-async def test_delete_returns_true(
+def test_delete_returns_true(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("key", "value")
@@ -248,7 +276,7 @@ async def test_delete_returns_true(
 # --- delete_many ---
 
 
-async def test_delete_many_removes_from_both_caches(
+def test_delete_many_removes_from_both_caches(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set_many({"a": 1, "b": 2})
@@ -262,7 +290,7 @@ async def test_delete_many_removes_from_both_caches(
     assert l2_cache.get("b") is None
 
 
-async def test_delete_many_returns_true(
+def test_delete_many_returns_true(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set_many({"a": 1})
@@ -274,7 +302,7 @@ async def test_delete_many_returns_true(
 # --- clear ---
 
 
-async def test_clear_removes_all_from_both_caches(
+def test_clear_removes_all_from_both_caches(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set_many({"a": 1, "b": 2})
@@ -288,14 +316,14 @@ async def test_clear_removes_all_from_both_caches(
     assert l2_cache.get("d") is None
 
 
-async def test_clear_returns_true(stack: CacheStack) -> None:
+def test_clear_returns_true(stack: CacheStack) -> None:
     assert stack.clear() is True
 
 
 # --- pop ---
 
 
-async def test_pop_returns_l1_value_and_removes_from_both(
+def test_pop_returns_l1_value_and_removes_from_both(
     stack: CacheStack, l1_cache: Cache, l2_cache: Cache
 ) -> None:
     l1_cache.set("key", "l1_value")
@@ -308,7 +336,7 @@ async def test_pop_returns_l1_value_and_removes_from_both(
     assert l2_cache.get("key") is None
 
 
-async def test_pop_returns_l2_value_and_removes_it_on_l1_miss(
+def test_pop_returns_l2_value_and_removes_it_on_l1_miss(
     stack: CacheStack, l2_cache: Cache
 ) -> None:
     l2_cache.set("key", "l2_value")
@@ -319,15 +347,64 @@ async def test_pop_returns_l2_value_and_removes_it_on_l1_miss(
     assert l2_cache.get("key") is None
 
 
-async def test_pop_returns_none_when_both_miss(stack: CacheStack) -> None:
+def test_pop_returns_none_when_both_miss(stack: CacheStack) -> None:
     assert stack.pop("missing") is None
 
 
 # --- lock ---
 
 
-async def test_lock_delegates_to_l2_cache(stack: CacheStack, l2_cache: Cache) -> None:
+def test_lock_delegates_to_l2_store(stack: CacheStack, l2_cache: Cache) -> None:
     stack_lock = stack.lock("my-lock")
     l2_lock = l2_cache.lock("my-lock")
 
     assert type(stack_lock) is type(l2_lock)
+
+
+# --- bus invalidation ---
+
+
+def test_bus_invalidates_l1_on_set_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(), l2_store, bus)
+
+    l1_cache.set("key", "stale")
+
+    stack_b.set("key", "new_value")
+
+    assert l1_cache.get("key") is None
+
+
+def test_bus_invalidates_l1_on_delete_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(), l2_store, bus)
+
+    l1_cache.set("key", "value")
+    l2_store.set("key", "value")
+
+    stack_b.delete("key")
+
+    assert l1_cache.get("key") is None
+
+
+def test_bus_clears_l1_on_clear_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(), l2_store, bus)
+
+    l1_cache.set("key", "value")
+
+    stack_b.clear()
+
+    assert l1_cache.get("key") is None

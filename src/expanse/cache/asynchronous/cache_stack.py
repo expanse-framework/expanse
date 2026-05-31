@@ -1,18 +1,30 @@
+import inspect
 import logging
+import time
 
 from collections.abc import Awaitable
 from collections.abc import Callable
+from datetime import UTC
+from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
+from typing import cast
 from typing import override
 
+from expanse.cache.logger import Logger
+from expanse.cache.messages.cache_clear import CacheClear
+from expanse.cache.messages.cache_item_deleted import CacheItemDeleted
 from expanse.cache.messages.cache_item_set import CacheItemSet
 from expanse.contracts.cache.asynchronous.bus import Bus
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
+from expanse.contracts.cache.asynchronous.store import Store as StoreContract
+from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import should_run_in_threadpool
 
 
 if TYPE_CHECKING:
+    from expanse.contracts.cache.asynchronous.locker import Locker
     from expanse.contracts.lock.asynchronous.lock import Lock
 
 
@@ -20,55 +32,81 @@ _T = TypeVar("_T")
 
 
 logger = logging.getLogger(__name__)
+logger.__class__ = Logger
+logger = cast("Logger", logger)
 
 
 class CacheStack(CacheContract):
     def __init__(
-        self, l1_cache: CacheContract, l2_cache: CacheContract, bus: Bus
+        self,
+        name: str,
+        l1_store: StoreContract,
+        l2_store: StoreContract,
+        bus: Bus,
+        locker: "Locker | None" = None,
     ) -> None:
-        self._l1_cache: CacheContract = l1_cache
-        self._l2_cache: CacheContract = l2_cache
+        self._name: str = name
+        self._l1_store: StoreContract = l1_store
+        self._l2_store: StoreContract = l2_store
         self._bus: Bus = bus
-        self._bus.subscribe(self._on_cache_item_set)
+        self._bus.subscribe(CacheItemSet, self._on_cache_item_set)
+        self._bus.subscribe(CacheItemDeleted, self._on_cache_item_deleted)
+        self._bus.subscribe(CacheClear, self._on_cache_clear)
+        self._locker: Locker | None = locker
 
     @override
-    async def get(self, key: str, default: Any | None = None) -> Any | None:
-        value = await self._l1_cache.get(key)
+    async def get(self, key: str, default: Any | None = None) -> Any:
+        item = await self._l1_store.get(key)
 
-        if value is not None:
-            logger.debug("L1 cache hit for key: %s", key)
+        if item.is_hit:
+            logger.l1_hit(self._name, key)
 
-            return value
+            return item.value
 
-        value = await self._l2_cache.get(key)
+        item = await self._l2_store.get(key)
 
-        if value is not None:
-            await self._l1_cache.set(key, value)
+        if item.is_hit:
+            ttl = None
+            if item.expiration is not None:
+                ttl = int(time.time()) - item.expiration
 
-            logger.debug("L2 cache hit for key: %s", key)
+            await self._l1_store.set(key, item.value, ttl)
 
-        return value
+            logger.l2_hit(self._name, key)
+
+        return item.value
 
     @override
-    async def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
-        l1_values = await self._l1_cache.get_many(keys)
+    async def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any]:
+        defaults = keys if isinstance(keys, dict) else {}
+        if isinstance(keys, dict):
+            keys = list(keys.keys())
 
-        missing_keys = [key for key in keys if l1_values.get(key) is None]
+        l1_items = await self._l1_store.get_many(keys)
+
+        missing_keys = [key for key in keys if not l1_items[key].is_hit]
 
         if not missing_keys:
-            logger.debug("L1 cache hit for keys: %s", missing_keys)
+            logger.l1_hit(self._name, ", ".join(keys))
 
-            return l1_values
+            return {key: l1_items[key].value for key in keys}
 
-        l2_values = await self._l2_cache.get_many(missing_keys)
+        l2_items = await self._l2_store.get_many(missing_keys)
 
-        for key, value in l2_values.items():
-            if value is not None:
-                await self._l1_cache.set(key, value)
+        for key, item in l2_items.items():
+            if item.is_hit:
+                await self._l1_store.set(key, item.value)
 
-        logger.debug("L2 cache hit for keys: %s", missing_keys)
+        logger.l2_hit(self._name, ", ".join(missing_keys))
 
-        return {**l1_values, **l2_values}
+        return {
+            key: l1_items[key].value
+            if l1_items[key].is_hit
+            else l2_items[key].value
+            if l2_items[key].is_hit
+            else defaults.get(key)
+            for key in keys
+        }
 
     @override
     async def set(
@@ -78,12 +116,18 @@ class CacheStack(CacheContract):
         ttl: int | None = None,
         until: Any | None = None,
     ) -> bool:
-        await self._l1_cache.set(key, value, ttl, until)
+        if ttl is not None and until is not None:
+            raise ValueError("Cannot specify both 'ttl' and 'until' parameters.")
 
-        l2_result = await self._l2_cache.set(key, value, ttl, until)
+        if until is not None:
+            ttl = int((until - datetime.now(UTC)).total_seconds())
+
+        await self._l1_store.set(key, value, ttl)
+
+        l2_result = await self._l2_store.set(key, value, ttl)
 
         if l2_result:
-            await self._bus.publish(CacheItemSet(key))
+            await self._bus.publish(CacheItemSet([key]))
         else:
             logger.warning("Failed to set key '%s' in L2 cache.", key)
 
@@ -96,22 +140,27 @@ class CacheStack(CacheContract):
         ttl: int | None = None,
         until: Any | None = None,
     ) -> bool:
-        await self._l1_cache.set_many(items, ttl, until)
+        if ttl is not None and until is not None:
+            raise ValueError("Cannot specify both 'ttl' and 'until' parameters.")
 
-        l2_result = await self._l2_cache.set_many(items, ttl, until)
+        if until is not None:
+            ttl = int((until - datetime.now(UTC)).total_seconds())
+
+        await self._l1_store.set_many(items, ttl)
+
+        l2_result = await self._l2_store.set_many(items, ttl)
 
         if l2_result:
-            # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-            pass
+            await self._bus.publish(CacheItemSet(list(items.keys())))
 
         return True
 
     @override
     async def has(self, key: str) -> bool:
-        if await self._l1_cache.has(key):
+        if await self._l1_store.has(key):
             return True
 
-        return await self._l2_cache.has(key)
+        return await self._l2_store.has(key)
 
     @override
     async def remember(
@@ -120,77 +169,82 @@ class CacheStack(CacheContract):
         callback: Callable[..., _T] | Callable[..., Awaitable[_T]],
         ttl: int | None = None,
     ) -> _T:
-        # If the value is in the L1 cache, return it immediately
-        value = await self._l1_cache.get(key)
+        # Check th L1 cache first
+        item = await self._l1_store.get(key)
+        if item.is_hit:
+            return cast("_T", item.value)
 
-        if value is not None:
-            return value
+        if self._locker is not None:
+            lock = self._locker.lock(
+                f"remember:{key}",
+                # We force a TTL on the lock to prevent deadlocks in case the process that acquired the lock
+                # crashes before releasing it.
+                ttl=30,
+            )
+            logger.debug(
+                "Attempting to acquire lock for remember operation", extra={"key": key}
+            )
 
-        value = await self._l2_cache.remember(key, callback, ttl)
+            async with lock:
+                return await self._compute(key, callback, ttl)
 
-        await self._l1_cache.set(key, value, ttl)
-
-        # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-
-        return value
+        return await self._compute(key, callback, ttl)
 
     @override
     async def delete(self, key: str) -> bool:
-        await self._l1_cache.delete(key)
+        await self._l1_store.delete(key)
 
-        l2_result = await self._l2_cache.delete(key)
+        l2_result = await self._l2_store.delete(key)
 
         if l2_result:
-            # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-            pass
+            await self._bus.publish(CacheItemDeleted([key]))
         else:
-            logger.warning("Failed to delete key '%s' in L2 cache.", key)
+            logger.warning("Failed to delete key in L2 cache.", extra={"key": key})
 
         return True
 
     @override
     async def delete_many(self, keys: list[str]) -> bool:
-        await self._l1_cache.delete_many(keys)
+        for key in keys:
+            await self._l1_store.delete(key)
 
-        l2_result = await self._l2_cache.delete_many(keys)
+        l2_results = [await self._l2_store.delete(key) for key in keys]
 
-        if l2_result:
-            # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-            pass
+        if all(l2_results):
+            await self._bus.publish(CacheItemDeleted(keys))
         else:
-            logger.warning("Failed to delete keys '%s' in L2 cache.", keys)
+            logger.warning("Failed to delete keys in L2 cache.", extra={"keys": keys})
 
         return True
 
     @override
     async def clear(self) -> bool:
-        await self._l1_cache.clear()
+        await self._l1_store.clear()
 
-        l2_result = await self._l2_cache.clear()
+        l2_result = await self._l2_store.clear()
 
         if l2_result:
-            # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-            pass
+            await self._bus.publish(CacheClear())
         else:
             logger.warning("Failed to clear L2 cache.")
 
         return True
 
     @override
-    async def pop(self, key: str) -> Any | None:
-        value = await self._l1_cache.pop(key)
+    async def pop(self, key: str) -> Any:
+        value = await self._l1_store.get(key)
 
-        if value is not None:
-            if await self._l2_cache.delete(key):
-                # TODO: Dispatch message to bus to invalidate L1 cache in other instances
-                pass
+        if value.is_hit:
+            await self.delete(key)
+            return value.value
 
-            return value
+        value = await self._l2_store.get(key)
 
-        value = await self._l2_cache.pop(key)
+        if value.is_hit:
+            await self.delete(key)
+            return value.value
 
-        if value is not None:
-            return value
+        return None
 
     @override
     def lock(
@@ -200,10 +254,63 @@ class CacheStack(CacheContract):
         owner: str | None = None,
         refresh: bool = False,
     ) -> "Lock":
-        return self._l2_cache.lock(name, ttl, owner, refresh)
+        return self._l2_store.lock(name, ttl, owner, refresh)
 
     async def _on_cache_item_set(self, message: CacheItemSet) -> None:
-        logger.debug("Received cache item set message for key %s", message.key)
-        await self._l1_cache.delete(message.key)
+        logger.debug(
+            "Invalidating cache items",
+            extra={"keys": message.keys, "source": CacheItemSet.__name__},
+        )
 
-        await self.get(message.key)
+        for key in message.keys:
+            await self._l1_store.delete(key)
+
+    async def _on_cache_item_deleted(self, message: CacheItemDeleted) -> None:
+        logger.debug(
+            "Deleting cache items",
+            extra={"keys": message.keys, "source": CacheItemDeleted.__name__},
+        )
+
+        for key in message.keys:
+            await self._l1_store.delete(key)
+
+    async def _on_cache_clear(self, message: CacheClear) -> None:
+        logger.debug(
+            "Clearing cache",
+            extra={"source": CacheClear.__name__},
+        )
+
+        await self._l1_store.clear()
+
+    async def _compute(
+        self,
+        key: str,
+        callback: Callable[..., _T] | Callable[..., Awaitable[_T]],
+        ttl: int | None = None,
+    ) -> _T:
+        item = await self._l2_store.get(key)
+        if item.is_hit:
+            item_ttl = None
+            if item.expiration is not None:
+                item_ttl = int(time.time()) - item.expiration
+            await self._l1_store.set(key, item.value, item_ttl)
+
+            return cast("_T", item.value)
+
+        logger.debug(
+            "Computing cache value", extra={"key": key, "callback": callback.__name__}
+        )
+        value: _T
+        if inspect.iscoroutinefunction(callback):
+            value = await cast("Callable[..., Awaitable[_T]]", callback)()
+        elif not should_run_in_threadpool(callback):
+            value = cast("Callable[..., _T]", callback)()
+        else:
+            value = await run_in_threadpool(cast("Callable[..., _T]", callback))
+
+        logger.debug(
+            "Computed cache value", extra={"key": key, "callback": callback.__name__}
+        )
+        await self.set(key, value, ttl)
+
+        return value

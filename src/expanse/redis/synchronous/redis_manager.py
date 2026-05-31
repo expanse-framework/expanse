@@ -29,6 +29,17 @@ class RedisManager:
         if name in self._connections:
             return self._connections[name]
 
+        self._connections[name] = self.create_connection(name)
+
+        return self._connections[name]
+
+    def create_connection(self, name: str) -> "Connection":
+        """
+        Create a new (non-cached) Redis connection by name.
+
+        :param name: The name of the connection to create.
+        :return: A new Redis connection instance.
+        """
         connections_configs = self._config.get("redis.connections", {})
         if name not in connections_configs:
             raise UnconfiguredConnectionError(
@@ -37,11 +48,7 @@ class RedisManager:
 
         connection_config = connections_configs[name]
 
-        connection = self._create_connection(connection_config)
-
-        self._connections[name] = connection
-
-        return connection
+        return self._create_connection(connection_config)
 
     def get_default_connection_name(self) -> str:
         return self._config.get("redis.connection", "default")

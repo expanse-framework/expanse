@@ -9,6 +9,7 @@ from expanse.cache.exceptions import UnsupportedStoreDriverError
 from expanse.cache.synchronous.cache import Cache
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.cache.synchronous.bus import Bus
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.synchronous.store import Store
 from expanse.core.application import Application
@@ -83,7 +84,7 @@ class CacheManager:
                 name,
                 store_config["driver"],
             )
-            return Cache(store, locker=locker)
+            return Cache(name, store, locker=locker)
 
         l1_store_config = l1_cache_config.get("store", None)
         if not l1_store_config:
@@ -92,6 +93,12 @@ class CacheManager:
             )
 
         l1_store = self._create_l1_store(l1_store_config)
+
+        l1_bus_config = l1_cache_config.get("bus", None)
+        if not l1_bus_config:
+            l1_bus_config = {"driver": "memory"}
+
+        bus = await self._create_bus(l1_bus_config)
 
         logger.debug(
             "Creating two-level cache for store '%s' with driver '%s' and L1 cache driver '%s'.",
@@ -102,7 +109,7 @@ class CacheManager:
 
         from expanse.cache.synchronous.cache_stack import CacheStack
 
-        return CacheStack(Cache(l1_store, locker=locker), Cache(store, locker=locker))
+        return CacheStack(name, l1_store, store, bus, locker=locker)
 
     async def _create_store(self, name: str) -> Store:
         stores: dict[str, dict[str, Any]] = self._config.get("cache.stores", {})
@@ -196,3 +203,32 @@ class CacheManager:
         redis = await self._container.get(RedisManager)
 
         return RedisStore(redis, config.connection, config.lock_connection)
+
+    async def _create_bus(self, bus_config: dict[str, Any]) -> Bus:
+        driver = bus_config.get("driver")
+
+        match driver:
+            case "redis":
+                from expanse.cache.config.buses.redis import RedisBusConfig
+                from expanse.cache.synchronous.buses.redis import RedisBus
+                from expanse.redis.synchronous.redis_manager import RedisManager
+
+                config = RedisBusConfig.model_validate(bus_config)
+
+                redis = await self._container.get(RedisManager)
+
+                return RedisBus(
+                    redis.connection(config.connection),
+                    redis.create_connection(config.connection),
+                    config.channel,
+                )
+
+            case "memory":
+                from expanse.cache.synchronous.buses.memory import MemoryBus
+
+                return MemoryBus()
+
+            case _:
+                raise UnsupportedStoreDriverError(
+                    f"Unsupported L1 cache bus driver '{driver}'."
+                )

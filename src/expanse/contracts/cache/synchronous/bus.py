@@ -1,6 +1,5 @@
 from abc import ABC
 from abc import abstractmethod
-from collections.abc import Awaitable
 from collections.abc import Callable
 from typing import Any
 from typing import TypeVar
@@ -18,7 +17,7 @@ class Bus(ABC):
         """
 
     @abstractmethod
-    async def publish(self, message: Any) -> None:
+    def publish(self, message: Any) -> None:
         """
         Publish a message to the bus.
 
@@ -29,7 +28,7 @@ class Bus(ABC):
     def subscribe(
         self,
         message: type[_T],
-        handler: Callable[[_T], None] | Callable[[_T], Awaitable[None]],
+        handler: Callable[[_T], None],
     ) -> None:
         """
         Subscribe a handler to the bus.
@@ -38,7 +37,7 @@ class Bus(ABC):
         """
 
     @abstractmethod
-    async def close(self) -> None:
+    def close(self) -> None:
         """
         Close the bus and release any resources.
         """

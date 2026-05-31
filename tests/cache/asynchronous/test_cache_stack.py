@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import TypeVar
+
 import pytest
 
 from expanse.cache.asynchronous.buses.memory import MemoryBus
@@ -7,6 +11,34 @@ from expanse.cache.asynchronous.cache import Cache
 from expanse.cache.asynchronous.cache_stack import CacheStack
 from expanse.cache.asynchronous.stores.memory import MemoryStore
 from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemoryStore
+from expanse.contracts.cache.asynchronous.bus import Bus
+
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable
+    from collections.abc import Callable
+
+
+_T = TypeVar("_T")
+
+
+class NullBus(Bus):
+    @property
+    def id(self) -> str:
+        return "null"
+
+    async def publish(self, message: Any) -> None:
+        pass
+
+    def subscribe(
+        self,
+        message: type[_T],
+        handler: Callable[[_T], None] | Callable[[_T], Awaitable[None]],
+    ) -> None:
+        pass
+
+    async def close(self) -> None:
+        pass
 
 
 @pytest.fixture()
@@ -21,17 +53,17 @@ def l2_store() -> MemoryStore:
 
 @pytest.fixture()
 def l1_cache(l1_store: MemoryStore) -> Cache:
-    return Cache(l1_store)
+    return Cache("l1", l1_store)
 
 
 @pytest.fixture()
 def l2_cache(l2_store: MemoryStore) -> Cache:
-    return Cache(l2_store)
+    return Cache("l2", l2_store)
 
 
 @pytest.fixture()
-def stack(l1_cache: Cache, l2_cache: Cache) -> CacheStack:
-    return CacheStack(l1_cache, l2_cache, MemoryBus())
+def stack(l1_store: MemoryStore, l2_store: MemoryStore) -> CacheStack:
+    return CacheStack("test", l1_store, l2_store, NullBus())
 
 
 # --- get ---
@@ -341,8 +373,57 @@ async def test_pop_returns_none_when_both_miss(stack: CacheStack) -> None:
 # --- lock ---
 
 
-async def test_lock_delegates_to_l2_cache(stack: CacheStack, l2_cache: Cache) -> None:
+async def test_lock_delegates_to_l2_store(stack: CacheStack, l2_cache: Cache) -> None:
     stack_lock = stack.lock("my-lock")
     l2_lock = l2_cache.lock("my-lock")
 
     assert type(stack_lock) is type(l2_lock)
+
+
+# --- bus invalidation ---
+
+
+async def test_bus_invalidates_l1_on_set_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(SyncMemoryStore()), l2_store, bus)
+
+    await l1_cache.set("key", "stale")
+
+    await stack_b.set("key", "new_value")
+
+    assert await l1_cache.get("key") is None
+
+
+async def test_bus_invalidates_l1_on_delete_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(SyncMemoryStore()), l2_store, bus)
+
+    await l1_cache.set("key", "value")
+    await l2_store.set("key", "value")
+
+    await stack_b.delete("key")
+
+    assert await l1_cache.get("key") is None
+
+
+async def test_bus_clears_l1_on_clear_from_another_stack(
+    l1_store: MemoryStore, l2_store: MemoryStore, l1_cache: Cache
+) -> None:
+    bus = MemoryBus()
+    # Both stacks share the same L2; each has its own L1
+    _stack_a = CacheStack("a", l1_store, l2_store, bus)
+    stack_b = CacheStack("b", MemoryStore(SyncMemoryStore()), l2_store, bus)
+
+    await l1_cache.set("key", "value")
+
+    await stack_b.clear()
+
+    assert await l1_cache.get("key") is None
