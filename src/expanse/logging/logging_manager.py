@@ -154,6 +154,8 @@ class LoggingManager:
         channel_name: str,
         base_logger: logging.Logger | None = None,
     ) -> LogChannel:
+        from expanse.logging.filters.context import ContextFilter
+
         logger = base_logger or self._create_base_logger(config, channel_name)
 
         stream = config.stream
@@ -177,6 +179,7 @@ class LoggingManager:
             handler.setFormatter(logging.Formatter(fmt=fmt))
 
         handler.setLevel(config.level)
+        handler.addFilter(ContextFilter())
 
         if self._config.get("mode", "async") == "sync":
             return SyncLogChannel(logger, [handler]).start()
@@ -210,6 +213,8 @@ class LoggingManager:
         channel_name: str,
         base_logger: logging.Logger | None = None,
     ) -> LogChannel:
+        from expanse.logging.filters.context import ContextFilter
+
         logger = base_logger or self._create_base_logger(config, channel_name)
 
         path = config.path
@@ -227,6 +232,7 @@ class LoggingManager:
             handler.setFormatter(logging.Formatter(fmt=fmt))
 
         handler.setLevel(config.level)
+        handler.addFilter(ContextFilter())
 
         if self._config.get("mode", "async") == "sync":
             return SyncLogChannel(logger, [handler]).start()

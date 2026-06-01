@@ -10,6 +10,8 @@ import pytest
 
 from expanse.logging.channel import GroupLogChannel
 from expanse.logging.channel import SimpleLogChannel
+from expanse.logging.exceptions import LogChannelConfigurationError
+from expanse.logging.exceptions import UnconfiguredLogChannelError
 from expanse.logging.logging_manager import LoggingManager
 
 
@@ -68,7 +70,9 @@ def test_channel_caches_instances(manager: LoggingManager) -> None:
 
 
 def test_channel_raises_for_undefined_channel(manager: LoggingManager) -> None:
-    with pytest.raises(RuntimeError, match="Log channel 'nonexistent' is not defined"):
+    with pytest.raises(
+        UnconfiguredLogChannelError, match="Log channel 'nonexistent' is not defined"
+    ):
         manager.channel("nonexistent")
 
 
@@ -176,7 +180,7 @@ def test_invalid_stream_raises_value_error(app: Application) -> None:
     }
     mgr = LoggingManager(app)
 
-    with pytest.raises(ValueError, match="Invalid stream"):
+    with pytest.raises(LogChannelConfigurationError, match="Invalid stream"):
         mgr.channel("bad")
 
 
@@ -274,7 +278,8 @@ def test_route_base_logger_raises_for_undefined_routing(
     manager: LoggingManager,
 ) -> None:
     with pytest.raises(
-        RuntimeError, match="Log routing for logger 'unknown' is not defined"
+        UnconfiguredLogChannelError,
+        match="Log routing for logger 'unknown' is not defined",
     ):
         manager.route_base_logger("unknown")
 
