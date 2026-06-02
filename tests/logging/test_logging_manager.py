@@ -284,6 +284,112 @@ def test_route_base_logger_raises_for_undefined_routing(
         manager.route_base_logger("unknown")
 
 
+def test_creates_structured_stream_channel(app: Application) -> None:
+    from expanse.logging.formatters.structured import StructuredFormatter
+
+    app.config["logging"] = {
+        "default": "stream",
+        "channels": {
+            "stream": {
+                "driver": "stream",
+                "stream": "stderr",
+                "level": "INFO",
+                "structured": True,
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("stream")
+
+    assert isinstance(channel, SimpleLogChannel)
+    handler = channel._listener.handlers[0]
+    assert isinstance(handler.formatter, StructuredFormatter)
+
+    mgr.terminate()
+
+
+def test_creates_structured_file_channel(app: Application, tmp_path: Path) -> None:
+    from expanse.logging.formatters.structured import StructuredFormatter
+
+    log_file = tmp_path / "structured.log"
+    app.config["logging"] = {
+        "default": "file",
+        "channels": {
+            "file": {
+                "driver": "file",
+                "path": str(log_file),
+                "level": "INFO",
+                "structured": True,
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("file")
+
+    assert isinstance(channel, SimpleLogChannel)
+    handler = channel._listener.handlers[0]
+    assert isinstance(handler.formatter, StructuredFormatter)
+
+    mgr.terminate()
+
+
+def test_structured_file_channel_writes_json(app: Application, tmp_path: Path) -> None:
+    import json
+
+    log_file = tmp_path / "structured.log"
+    app.config["logging"] = {
+        "default": "file",
+        "channels": {
+            "file": {
+                "driver": "file",
+                "path": str(log_file),
+                "level": "INFO",
+                "structured": True,
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("file")
+    channel.info("structured message", extra={"user_id": 99})
+    time.sleep(0.1)
+
+    mgr.terminate()
+
+    data = json.loads(log_file.read_text().strip())
+    assert data["message"] == "structured message"
+    assert data["user_id"] == 99
+
+
+def test_non_structured_channel_does_not_use_structured_formatter(
+    app: Application,
+) -> None:
+    from expanse.logging.formatters.structured import StructuredFormatter
+
+    app.config["logging"] = {
+        "default": "stream",
+        "channels": {
+            "stream": {
+                "driver": "stream",
+                "stream": "stderr",
+                "level": "INFO",
+                "structured": False,
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("stream")
+
+    assert isinstance(channel, SimpleLogChannel)
+    handler = channel._listener.handlers[0]
+    assert not isinstance(handler.formatter, StructuredFormatter)
+
+    mgr.terminate()
+
+
 def test_file_channel_with_relative_path(app: Application, tmp_path: Path) -> None:
     app.config["logging"] = {
         "default": "file",
