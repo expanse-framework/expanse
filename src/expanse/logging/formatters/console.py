@@ -57,11 +57,13 @@ class ConsoleFormatter(logging.Formatter):
         validate: bool = True,
         *,
         defaults=None,
+        multiline: bool = False,
     ) -> None:
         super().__init__(fmt="%(message)s", style="%")
 
         self._formatter = Formatter(decorated=True)
         self._terminal = Terminal()
+        self._multiline = multiline
         self._top_left_marker = "┌"
         self._top_right_marker = "┐"
         self._bottom_left_marker = "└"
@@ -105,12 +107,20 @@ class ConsoleFormatter(logging.Formatter):
 
         extra = {k: v for k, v in record.__dict__.items() if k not in RESERVED_ATTRS}
         if extra:
-            lines.extend(
-                [
-                    f"  <options=bold>{k}</>: {highlight(json.dumps(v, indent=2, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).replace('\n', '\n  ')}"
-                    for k, v in extra.items()
-                ]
-            )
+            if self._multiline:
+                lines.extend(
+                    [
+                        f"  <options=bold>{k}</>: {highlight(json.dumps(v, indent=2, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).replace('\n', '\n  ')}"
+                        for k, v in extra.items()
+                    ]
+                )
+            else:
+                lines[-1] += " " + " ".join(
+                    [
+                        f"<options=bold>{k}</>: {highlight(json.dumps(v, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).strip()}"
+                        for k, v in extra.items()
+                    ]
+                )
 
         if exception and isinstance(exception, Exception):
             output = BufferedOutput(decorated=True)

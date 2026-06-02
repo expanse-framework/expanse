@@ -199,7 +199,7 @@ class LoggingManager:
 
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(config.level)
-        handler.setFormatter(ConsoleFormatter())
+        handler.setFormatter(ConsoleFormatter(multiline=config.multiline))
         handler.addFilter(ContextFilter())
 
         if self._config.get("mode", "async") == "sync":

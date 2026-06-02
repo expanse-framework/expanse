@@ -28,6 +28,8 @@ class StreamConfig(BaseConfig):
 class ConsoleConfig(BaseConfig):
     driver: Literal["console"] = "console"
 
+    multiline: bool = False
+
 
 class FileConfig(BaseConfig):
     driver: Literal["file"] = "file"
