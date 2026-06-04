@@ -34,7 +34,7 @@ class Context(MutableMapping[str, Any]):
         return self._data.get(key, default)
 
     @override
-    def pop(self, key: str, *args: Any) -> Any:  # type: ignore[override]
+    def pop(self, key: str, *args: Any) -> Any:
         return self._data.pop(key, *args)
 
     @override

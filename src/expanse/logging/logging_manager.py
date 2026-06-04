@@ -121,24 +121,26 @@ class LoggingManager:
 
         match driver:
             case "stream":
-                channel_config = StreamConfig.model_validate(config)
                 channel = self._create_stream_channel(
-                    channel_config, channel_name, base_logger=base_logger
+                    StreamConfig.model_validate(config),
+                    channel_name,
+                    base_logger=base_logger,
                 )
             case "console":
-                channel_config = ConsoleConfig.model_validate(config)
                 channel = self._create_console_channel(
-                    channel_config, channel_name, base_logger=base_logger
+                    ConsoleConfig.model_validate(config),
+                    channel_name,
+                    base_logger=base_logger,
                 )
             case "file":
-                channel_config = FileConfig.model_validate(config)
                 channel = self._create_file_channel(
-                    channel_config, channel_name, base_logger=base_logger
+                    FileConfig.model_validate(config),
+                    channel_name,
+                    base_logger=base_logger,
                 )
             case "group":
-                channel_config = GroupConfig.model_validate(config)
                 channel = self._create_group_channel(
-                    channel_config, base_logger=base_logger
+                    GroupConfig.model_validate(config), base_logger=base_logger
                 )
 
             case _:

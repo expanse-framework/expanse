@@ -191,7 +191,7 @@ def test_context_filter_does_not_overwrite_existing_context_attribute() -> None:
     try:
         f = ContextFilter()
         record = _make_record()
-        record.context = {"key": "already_set"}  # type: ignore[attr-defined]
+        record.context = {"key": "already_set"}
         f.filter(record)
 
         assert record.context == {"key": "already_set"}  # type: ignore[attr-defined]
