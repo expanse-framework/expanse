@@ -5,6 +5,7 @@ import time
 
 from collections.abc import AsyncIterator
 from typing import Any
+from typing import cast
 
 from redis.exceptions import ResponseError
 
@@ -36,26 +37,30 @@ class Connection:
         if self._config.auto_setup:
             await self.setup()
 
+        id: str
         if delay > 0:
             id = base64.b64encode(secrets.token_bytes(9)).decode()
             now = time.time() * 1000
             score = now + delay
-            added = await self._connection.zadd(
+            if not await self._connection.zadd(
                 self._queue,
                 {json.dumps({"body": body, "headers": headers, "uid": id}): score},
                 nx=True,
-            )
+            ):
+                raise RuntimeError("Failed to add message to Redis stream")
         else:
             message = json.dumps({"body": body, "headers": headers})
-            id = added = await self._connection.xadd(
-                self._config.stream,
-                fields={"message": message},
-                maxlen=self._config.max_entries,
-                approximate=True,
+            id = cast(
+                "str",
+                await self._connection.xadd(
+                    self._config.stream,
+                    fields={"message": message},
+                    maxlen=self._config.max_entries,
+                    approximate=True,
+                ),
             )
-
-        if not added:
-            raise RuntimeError("Failed to add message to Redis stream")
+            if not id:
+                raise RuntimeError("Failed to add message to Redis stream")
 
         return id
 
@@ -150,9 +155,13 @@ class Connection:
         now = time.time() * 1000
         message_count = await self._connection.zcount(self._queue, 0, now) or 0
 
+        message_info: list[tuple[str, int]]
         while message_count > 0:
             message_count -= 1
-            message_info = await self._connection.zpopmin(self._queue, count=1)
+            message_info = cast(
+                "list[tuple[str, int]]",
+                await self._connection.zpopmin(self._queue, count=1),
+            )
 
             if not message_info:
                 break
@@ -187,28 +196,36 @@ class Connection:
                 )
 
     async def _get_new_messages(self) -> AsyncIterator[dict[str, Any]]:
-        for message in await self._connection.xreadgroup(
-            self._config.group,
-            self._config.consumer,
-            streams={self._config.stream: ">"},
-            count=1,
-            block=1000,
-        ):
+        messages: list[tuple[str, list[tuple[str, dict[str, str]]]]] = cast(
+            "list[tuple[str, list[tuple[str, dict[str, str]]]]]",
+            await self._connection.xreadgroup(
+                self._config.group,
+                self._config.consumer,
+                streams={self._config.stream: ">"},
+                count=1,
+                block=1000,
+            ),
+        )
+        for message in messages:
             yield {
                 "id": message[1][0][0],
                 "data": message[1][0][1]["message"],
             }
 
     async def _get_pending_messages(self) -> AsyncIterator[dict[str, Any]]:
-        if self._last_pending_message_id is None:
-            return
-
         while True:
-            messages = await self._connection.xreadgroup(
-                self._config.group,
-                self._config.consumer,
-                streams={self._config.stream: self._last_pending_message_id},
-                count=1,
+            last_id = self._last_pending_message_id
+            if last_id is None:
+                return
+
+            messages: list[tuple[str, list[tuple[str, dict[str, str]]]]] = cast(
+                "list[tuple[str, list[tuple[str, dict[str, str]]]]]",
+                await self._connection.xreadgroup(
+                    self._config.group,
+                    self._config.consumer,
+                    streams={self._config.stream: last_id},
+                    count=1,
+                ),
             )
 
             if not messages or not messages[0][1]:
@@ -221,7 +238,7 @@ class Connection:
 
     async def _claim_old_pending_messages(self) -> None:
         try:
-            pending = await self._connection.xpending_range(
+            pending: list[dict[str, Any]] = await self._connection.xpending_range(
                 self._config.stream,
                 self._config.group,
                 "-",

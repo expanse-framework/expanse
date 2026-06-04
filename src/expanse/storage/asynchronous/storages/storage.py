@@ -15,12 +15,12 @@ from expanse.http.responses.streamed import StreamedResponse
 
 
 if TYPE_CHECKING:
-    from obstore.store import _ObjectStoreMixin
+    from obstore.store import ObjectStore
 
 
 class Storage(StorageContract):
-    def __init__(self, store: "_ObjectStoreMixin") -> None:
-        self._store: _ObjectStoreMixin = store
+    def __init__(self, store: "ObjectStore") -> None:
+        self._store: ObjectStore = store
 
     async def get(self, path: str) -> bytes:
         result = await self._store.get_async(path)
