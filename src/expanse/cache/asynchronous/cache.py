@@ -25,9 +25,8 @@ if TYPE_CHECKING:
 
 _T = TypeVar("_T")
 
-logger = logging.getLogger(__name__)
+logger = cast("Logger", logging.getLogger(__name__))
 logger.__class__ = Logger
-logger = cast("Logger", logger)
 
 
 class Cache(CacheContract):
