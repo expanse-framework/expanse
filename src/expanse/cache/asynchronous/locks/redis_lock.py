@@ -42,10 +42,10 @@ class RedisLock(Lock):
         super().__init__(f"lock:{name}", ttl, owner, refresh=refresh)
 
         self._connection: Connection = connection
-        self._release_script: AsyncScript = self._connection.register_script(  # type: ignore[misc]
+        self._release_script: AsyncScript = self._connection.register_script(
             _RELEASE_SCRIPT
         )
-        self._refresh_script: AsyncScript = self._connection.register_script(  # type: ignore[misc]
+        self._refresh_script: AsyncScript = self._connection.register_script(
             _REFRESH_SCRIPT
         )
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -20,6 +22,8 @@ if TYPE_CHECKING:
     from expanse.contracts.lock.synchronous.lock import Lock
 
 _T = TypeVar("_T")
+
+logger = logging.getLogger(__name__)
 
 
 class Cache(CacheContract):
@@ -102,7 +106,15 @@ class Cache(CacheContract):
         value = self._store.get(key)
 
         if value is None:
+            logger.debug(
+                "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
+            )
+
             return default
+
+        logger.debug(
+            "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
+        )
 
         return value
 
@@ -237,11 +249,17 @@ class Cache(CacheContract):
         callback: Callable[..., _T],
         ttl: int | None = None,
     ) -> _T:
-        cached = self._store.get(key)
+        cached = self.get(key)
         if cached is not None:
             return cast("_T", cached)
 
+        logger.debug(
+            "Computing cache value for key %s using callback %s", key, callback
+        )
+
         value = callback()
+
+        logger.debug("Computed value for key %s using callback %s", key, callback)
 
         self._store.set(key, value, ttl)
 

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import secrets
 
 from abc import ABC
@@ -8,6 +9,10 @@ from typing import override
 
 from expanse.contracts.lock.asynchronous.lock import Lock as LockContract
 from expanse.support._utils import wait_for_event
+
+
+logger = logging.getLogger(__name__)
+refresh_logger = logger.getChild("refresh")
 
 
 class Lock(LockContract, ABC):
@@ -51,17 +56,24 @@ class Lock(LockContract, ABC):
 
         while not await self._do_acquire():
             if not blocking:
+                logger.warning("Failed to acquire lock '%s'", self._name)
                 return False
 
             now = time()
 
             if timeout is not None and now - start >= timeout:
+                logger.warning(
+                    "Failed to acquire lock '%s' after %d seconds", self._name, timeout
+                )
                 return False
 
             await asyncio.sleep(self._sleep_time)
 
+        logger.debug("Acquired lock '%s'", self._name)
+
         # Start auto-refreshing the lock if it is enabled and the lock has a TTL.
         if self._refresh and self._ttl is not None:
+            refresh_logger.debug("Starting auto-refresh for lock '%s'", self._name)
             self._stop_refreshing.clear()
             self._refreshing_task = asyncio.create_task(self._auto_refresh())
 
@@ -77,11 +89,26 @@ class Lock(LockContract, ABC):
         :return: True if the lock was released successfully, False otherwise.
         """
         if self._refreshing_task is not None:
+            refresh_logger.debug("Stopping auto-refresh for lock '%s'", self._name)
             self._stop_refreshing.set()
             self._refreshing_task.cancel()
 
         if await self.is_owned_by_current_process() or force:
-            return await self._do_release(force=force)
+            result = await self._do_release(force=force)
+            if result:
+                logger.debug("Released lock '%s'", self._name)
+            else:
+                logger.warning(
+                    "Failed to release lock '%s'. It may have already been released or expired.",
+                    self._name,
+                )
+
+            return result
+
+        logger.warning(
+            "Cannot release lock '%s' because it is owned by another process.",
+            self._name,
+        )
 
         return False
 
@@ -150,12 +177,5 @@ class Lock(LockContract, ABC):
         interval = self._ttl * 2 / 3
 
         while not await wait_for_event(self._stop_refreshing, timeout=interval):
+            refresh_logger.debug("Auto-refreshing lock '%s'", self._name)
             await self.refresh(self._ttl)
-
-    def __del__(self) -> None:
-        """
-        Ensure that the lock is released when the lock object is garbage collected.
-        """
-        if self._refreshing_task is not None:
-            self._stop_refreshing.set()
-            self._refreshing_task.cancel()

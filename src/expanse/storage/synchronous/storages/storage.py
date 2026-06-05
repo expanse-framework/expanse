@@ -13,14 +13,14 @@ from expanse.http.responses.streamed import StreamedResponse
 
 
 if TYPE_CHECKING:
-    from obstore.store import _ObjectStoreMixin
+    from obstore.store import ObjectStore
 
 from expanse.contracts.storage.synchronous.storage import Storage as StorageContract
 
 
 class Storage(StorageContract):
-    def __init__(self, store: "_ObjectStoreMixin") -> None:
-        self._store: _ObjectStoreMixin = store
+    def __init__(self, store: "ObjectStore") -> None:
+        self._store: ObjectStore = store
 
     def get(self, path: str) -> bytes:
         result = self._store.get(path)
