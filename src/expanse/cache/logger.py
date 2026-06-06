@@ -1,3 +1,5 @@
+import logging
+
 from logging import NOTSET
 from logging import Logger as BaseLogger
 
@@ -26,3 +28,9 @@ class Logger(BaseLogger):
 
     def clear(self, store: str) -> None:
         self.debug("Cache cleared", extra={"store": store})
+
+
+def get_logger(name: str) -> Logger:
+    log = logging.getLogger(name)
+    log.__class__ = Logger
+    return log  # type: ignore[return-value]

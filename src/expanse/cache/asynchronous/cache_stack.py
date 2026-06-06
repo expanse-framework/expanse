@@ -1,5 +1,4 @@
 import inspect
-import logging
 import time
 
 from collections.abc import Awaitable
@@ -10,9 +9,10 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
 from typing import cast
+from typing import overload
 from typing import override
 
-from expanse.cache.logger import Logger
+from expanse.cache.logger import get_logger
 from expanse.cache.messages.cache_clear import CacheClear
 from expanse.cache.messages.cache_item_deleted import CacheItemDeleted
 from expanse.cache.messages.cache_item_set import CacheItemSet
@@ -31,9 +31,7 @@ if TYPE_CHECKING:
 _T = TypeVar("_T")
 
 
-logger = logging.getLogger(__name__)
-logger.__class__ = Logger
-logger = cast("Logger", logger)
+logger = get_logger(__name__)
 
 
 class CacheStack(CacheContract):
@@ -161,6 +159,22 @@ class CacheStack(CacheContract):
             return True
 
         return await self._l2_store.has(key)
+
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., Awaitable[_T]],
+        ttl: int | None = None,
+    ) -> _T: ...
+
+    @overload
+    async def remember(
+        self,
+        key: str,
+        callback: Callable[..., _T],
+        ttl: int | None = None,
+    ) -> _T: ...
 
     @override
     async def remember(

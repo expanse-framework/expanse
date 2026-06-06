@@ -135,7 +135,7 @@ class Cache(CacheContract):
         items = await self._store.get_many(keys)
 
         return {
-            key: item.value if item.is_hit else defaults.get(key)  # type: ignore[union-attr]
+            key: item.value if item.is_hit else defaults.get(key)
             for key, item in items.items()
         }
 

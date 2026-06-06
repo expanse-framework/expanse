@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -11,7 +9,7 @@ from typing import cast
 from typing import overload
 from typing import override
 
-from expanse.cache.logger import Logger
+from expanse.cache.logger import get_logger
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 
 
@@ -24,9 +22,7 @@ if TYPE_CHECKING:
 
 _T = TypeVar("_T")
 
-logger = logging.getLogger(__name__)
-logger.__class__ = Logger
-logger = cast("Logger", logger)
+logger = get_logger(__name__)
 
 
 class Cache(CacheContract):
@@ -134,7 +130,7 @@ class Cache(CacheContract):
         items = self._store.get_many(keys)
 
         return {
-            key: item.value if item.is_hit else defaults.get(key)  # type: ignore[union-attr]
+            key: item.value if item.is_hit else defaults.get(key)
             for key, item in items.items()
         }
 
@@ -282,7 +278,9 @@ class Cache(CacheContract):
 
         value = callback()
 
-        logger.debug("Computed value for key %s using callback %s", key, callback)
+        logger.debug(
+            "Computed cache value", extra={"key": key, "callback": callback.__name__}
+        )
 
         self._store.set(key, value, ttl)
 

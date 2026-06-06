@@ -1,5 +1,6 @@
 import logging
 
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import cast
 
@@ -18,6 +19,10 @@ from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.locker import Locker
 from expanse.contracts.cache.asynchronous.store import Store
 from expanse.core.application import Application
+
+
+if TYPE_CHECKING:
+    from expanse.cache.synchronous.cache import Cache as SyncCache
 
 
 logger = logging.getLogger(__name__)
@@ -147,7 +152,9 @@ class CacheManager:
 
         sync_cache_manager = await self._container.get(SyncCacheManager)
         sync_cache = await sync_cache_manager.cache(name)
-        sync_store: SyncMemoryStore = cast("SyncMemoryStore", sync_cache._store)
+        sync_store: SyncMemoryStore = cast(
+            "SyncMemoryStore", cast("SyncCache", sync_cache)._store
+        )
 
         return MemoryStore(sync_store)
 

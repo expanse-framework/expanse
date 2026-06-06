@@ -190,7 +190,7 @@ async def test_close_stops_message_delivery(
 
     await bus_b.close()
     with contextlib.suppress(asyncio.CancelledError):
-        await bus_b._listen_task  # type: ignore[attr-defined]
+        await bus_b._listen_task
     b_event.clear()
 
     await bus_a.publish(Ping("after close"))
