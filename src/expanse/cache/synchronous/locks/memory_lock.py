@@ -1,32 +1,30 @@
 from __future__ import annotations
 
+import threading
 import time
 
-from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
 from expanse.cache.synchronous.locks.lock import Lock
 
 
-if TYPE_CHECKING:
-    import threading
-
-
 class MemoryLock(Lock):
     def __init__(
         self,
-        locks: dict[str, dict[str, Any]],
-        mutex: threading.Lock,
         name: str,
         ttl: int | None = None,
         owner: str | None = None,
         refresh: bool = False,
+        locks: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(name, ttl, owner, refresh=refresh)
 
+        if locks is None:
+            locks = {}
+
         self._locks: dict[str, dict[str, Any]] = locks
-        self._mutex: threading.Lock = mutex
+        self._mutex: threading.Lock = threading.Lock()
 
     @override
     def _do_acquire(self) -> bool:

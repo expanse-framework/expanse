@@ -4,6 +4,7 @@ from typing import override
 
 from expanse.cache.synchronous.stores.file.store import FileStore as SyncFileStore
 from expanse.contracts.cache.asynchronous.store import Store
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.support._concurrency import run_in_threadpool
 
 
@@ -24,11 +25,11 @@ class FileStore(Store):
         return await run_in_threadpool(self._sync_store.set_many, items, ttl)
 
     @override
-    async def get(self, key: str) -> Any | None:
+    async def get(self, key: str) -> CacheItem:
         return await run_in_threadpool(self._sync_store.get, key)
 
     @override
-    async def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    async def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         return await run_in_threadpool(self._sync_store.get_many, keys)
 
     @override

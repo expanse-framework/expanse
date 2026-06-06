@@ -6,6 +6,7 @@ from typing import cast
 from typing import override
 
 from expanse.contracts.cache.asynchronous.store import Store
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.redis.asynchronous.redis_manager import RedisManager
 
 
@@ -57,20 +58,24 @@ class RedisStore(Store):
             return all(cast("bool", result) for result in results)
 
     @override
-    async def get(self, key: str) -> Any | None:
+    async def get(self, key: str) -> CacheItem:
         result = await self._connection.get(key)
 
         if result is None:
-            return None
+            return CacheItem(key=key)
 
-        return self._deserialize(result)
+        return CacheItem(key=key, value=self._deserialize(result), is_hit=True)
 
     @override
-    async def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    async def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         results = await self._connection.mget(keys)
 
         return {
-            key: self._deserialize(result) if result is not None else None
+            key: (
+                CacheItem(key=key, value=self._deserialize(result), is_hit=True)
+                if result is not None
+                else CacheItem(key=key)
+            )
             for key, result in zip(keys, results)
         }
 

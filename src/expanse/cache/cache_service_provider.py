@@ -27,7 +27,7 @@ class CacheServiceProvider(ServiceProvider):
     async def _get_sync_cache(
         self, manager: SyncCacheManager, name: str | None = None
     ) -> SyncCache:
-        return manager.cache(name)
+        return await manager.cache(name)
 
     async def _get_async_cache(
         self, manager: AsyncCacheManager, name: str | None = None

@@ -30,6 +30,7 @@ dependencies = [
     "asgiref>=3.11.1",
     "obstore>=0.9.3",
     "python-json-logger>=4.1.0",
+    "atomic-lru>=0.0.7",
 ]
 
 [project.optional-dependencies]

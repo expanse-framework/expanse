@@ -3,6 +3,8 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 from typing import Any
 
+from expanse.contracts.cache.cache_item import CacheItem
+
 
 if TYPE_CHECKING:
     from expanse.contracts.lock.asynchronous.lock import Lock
@@ -33,22 +35,22 @@ class Store(ABC):
         """
 
     @abstractmethod
-    async def get(self, key: str) -> Any | None:
+    async def get(self, key: str) -> CacheItem:
         """
         Get a value from the store.
 
         :param key: The key to get.
 
-        :return: The value associated with the key, or None if the key does not exist.
+        :return: A CacheItem instance representing the value associated with the key.
         """
 
     @abstractmethod
-    async def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    async def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         """
         Get multiple values from the store.
 
         :param keys: The keys to get.
-        :return: A dictionary mapping each key to its associated value, or None if the key does not exist.
+        :return: A dictionary mapping each key to its associated cache item.
         """
 
     @abstractmethod

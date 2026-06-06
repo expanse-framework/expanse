@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import threading
-
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import override
 
+from atomic_lru import CACHE_MISS
+from atomic_lru import Cache as LRUCache
+
+from expanse.contracts.cache.cache_item import CacheItem
 from expanse.contracts.cache.synchronous.store import Store
 
 
@@ -14,47 +16,63 @@ if TYPE_CHECKING:
 
 
 class MemoryStore(Store):
-    def __init__(self) -> None:
-        self._store: dict[str, Any] = {}
+    def __init__(
+        self,
+        max_items: int = 1000,
+        max_size: int | None = None,
+        default_ttl: int | None = None,
+    ) -> None:
+        self._cache: LRUCache = LRUCache(
+            max_items=max_items, size_limit_in_bytes=max_size, default_ttl=default_ttl
+        )
         self._locks: dict[str, dict[str, Any]] = {}
-        self._mutex: threading.Lock = threading.Lock()
 
     @override
     def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
-        self._store[key] = value
+        self._cache.set(key, value, ttl=ttl)
 
         return True
 
     @override
     def set_many(self, items: dict[str, Any], ttl: int | None = None) -> bool:
-        self._store.update(items)
+        for key, value in items.items():
+            self._cache.set(key, value, ttl=ttl)
 
         return True
 
     @override
-    def get(self, key: str) -> Any | None:
-        return self._store.get(key)
+    def get(self, key: str) -> CacheItem:
+        result = self._cache.get(key)
+        if result is CACHE_MISS:
+            return CacheItem(key=key)
+
+        return CacheItem(key=key, value=result, is_hit=True)
 
     @override
-    def get_many(self, keys: list[str]) -> dict[str, Any | None]:
-        return {key: self._store.get(key) for key in keys}
+    def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
+        results: dict[str, CacheItem] = {}
+
+        for key in keys:
+            result = self._cache.get(key)
+            results[key] = (
+                CacheItem(key=key, value=result, is_hit=True)
+                if result is not CACHE_MISS
+                else CacheItem(key=key)
+            )
+
+        return results
 
     @override
     def has(self, key: str) -> bool:
-        return key in self._store
+        return self.get(key).is_hit
 
     @override
     def delete(self, key: str) -> bool:
-        if key in self._store:
-            del self._store[key]
-
-            return True
-
-        return False
+        return self._cache.delete(key)
 
     @override
     def clear(self) -> bool:
-        self._store.clear()
+        self._cache.clear()
 
         return True
 
@@ -68,4 +86,4 @@ class MemoryStore(Store):
     ) -> Lock:
         from expanse.cache.synchronous.locks.memory_lock import MemoryLock
 
-        return MemoryLock(self._locks, self._mutex, name, ttl, owner, refresh)
+        return MemoryLock(name, ttl, owner, refresh, locks=self._locks)

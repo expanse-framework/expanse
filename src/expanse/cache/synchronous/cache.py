@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -11,6 +9,7 @@ from typing import cast
 from typing import overload
 from typing import override
 
+from expanse.cache.logger import get_logger
 from expanse.contracts.cache.synchronous.cache import Cache as CacheContract
 
 
@@ -23,11 +22,12 @@ if TYPE_CHECKING:
 
 _T = TypeVar("_T")
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Cache(CacheContract):
-    def __init__(self, store: Store, locker: Locker | None = None) -> None:
+    def __init__(self, name: str, store: Store, locker: Locker | None = None) -> None:
+        self._name: str = name
         self._store: Store = store
         self._locker: Locker | None = locker
 
@@ -103,20 +103,16 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or the default value if the key does not exist.
         """
-        value = self._store.get(key)
+        item = self._store.get(key)
 
-        if value is None:
-            logger.debug(
-                "Cache miss (key: %s, store: %s)", key, self._store.__class__.__name__
-            )
+        if not item.is_hit:
+            logger.miss(self._name, key)
 
             return default
 
-        logger.debug(
-            "Cache hit (key: %s, store: %s)", key, self._store.__class__.__name__
-        )
+        logger.hit(self._name, key)
 
-        return value
+        return item.value
 
     @override
     def get_many(self, keys: list[str] | dict[str, Any]) -> dict[str, Any | None]:
@@ -127,12 +123,16 @@ class Cache(CacheContract):
 
         :return: A dictionary mapping each key to its associated value, or None if the key does not exist.
         """
+        defaults = keys if isinstance(keys, dict) else {}
         if isinstance(keys, dict):
             keys = list(keys.keys())
 
-        values = self._store.get_many(keys)
+        items = self._store.get_many(keys)
 
-        return dict(values.items())
+        return {
+            key: item.value if item.is_hit else defaults.get(key)
+            for key, item in items.items()
+        }
 
     @override
     def remember(
@@ -162,6 +162,8 @@ class Cache(CacheContract):
                 ttl=30,
             )
 
+            logger.debug("Attempting to acquire remember lock", extra={"key": key})
+
             with lock:
                 return self._compute(key, callback, ttl)
 
@@ -187,12 +189,13 @@ class Cache(CacheContract):
 
         :return: The value associated with the key, or None if the key does not exist.
         """
-        value = self._store.get(key)
+        item = self._store.get(key)
 
-        if value is not None:
+        if item.is_hit:
             self.delete(key)
+            return item.value
 
-        return value
+        return None
 
     @override
     def delete(self, key: str) -> bool:
@@ -203,7 +206,11 @@ class Cache(CacheContract):
 
         :return: True if the key was successfully deleted, False otherwise.
         """
-        return self._store.delete(key)
+        result = self._store.delete(key)
+        if result:
+            logger.delete(self._name, key)
+
+        return result
 
     @override
     def delete_many(self, keys: list[str]) -> bool:
@@ -214,14 +221,26 @@ class Cache(CacheContract):
 
         :return: True if all keys were successfully deleted, False otherwise.
         """
-        return all(self.delete(key) for key in keys)
+        deleted_keys = []
+        for key in keys:
+            if self.delete(key):
+                deleted_keys.append(key)
+
+        if deleted_keys:
+            logger.delete(self._name, ", ".join(deleted_keys))
+
+        return len(deleted_keys) == len(keys)
 
     @override
     def clear(self) -> bool:
         """
         Clear all items from the cache.
         """
-        return self._store.clear()
+        result = self._store.clear()
+        if result:
+            logger.clear(self._name)
+
+        return result
 
     @override
     def lock(
@@ -254,12 +273,14 @@ class Cache(CacheContract):
             return cast("_T", cached)
 
         logger.debug(
-            "Computing cache value for key %s using callback %s", key, callback
+            "Computing cache value", extra={"key": key, "callback": callback.__name__}
         )
 
         value = callback()
 
-        logger.debug("Computed value for key %s using callback %s", key, callback)
+        logger.debug(
+            "Computed cache value", extra={"key": key, "callback": callback.__name__}
+        )
 
         self._store.set(key, value, ttl)
 

@@ -4,6 +4,7 @@ from typing import override
 
 from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemoryStore
 from expanse.contracts.cache.asynchronous.store import Store
+from expanse.contracts.cache.cache_item import CacheItem
 
 
 if TYPE_CHECKING:
@@ -23,11 +24,11 @@ class MemoryStore(Store):
         return self._sync_store.set_many(items, ttl)
 
     @override
-    async def get(self, key: str) -> Any | None:
+    async def get(self, key: str) -> CacheItem:
         return self._sync_store.get(key)
 
     @override
-    async def get_many(self, keys: list[str]) -> dict[str, Any | None]:
+    async def get_many(self, keys: list[str]) -> dict[str, CacheItem]:
         return self._sync_store.get_many(keys)
 
     @override

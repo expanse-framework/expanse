@@ -18,12 +18,12 @@ def store() -> MemoryStore:
 
 @pytest.fixture()
 def cache(store: MemoryStore) -> Cache:
-    return Cache(store)
+    return Cache("test", store)
 
 
 @pytest.fixture()
 def cache_with_locker(store: MemoryStore) -> Cache:
-    return Cache(store, locker=Locker(store))
+    return Cache("test", store, locker=Locker(store))
 
 
 def test_set_stores_value(cache: Cache) -> None:
