@@ -987,3 +987,66 @@ def test_multiple_set_methods_chaining() -> None:
     assert request._trusted_proxies == ["192.168.1.0/24"]
     assert request._trusted_headers == [TrustedHeader.X_FORWARDED_FOR]
     assert request._trusted_hosts == ["example.com"]
+
+
+def test_host_subdomain_allowed() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"api.example.com")]}
+    request = Request.create("http://example.com", scope=scope)
+    assert request.host == "api.example.com"
+
+
+def test_host_with_hyphen_is_allowed() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"my-api.example.com")]}
+    request = Request.create("http://example.com", scope=scope)
+    assert request.host == "my-api.example.com"
+
+
+def test_host_with_underscore_is_allowed() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"my_host.example.com")]}
+    request = Request.create("http://example.com", scope=scope)
+    assert request.host == "my_host.example.com"
+
+
+def test_host_localhost_is_allowed() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"localhost")]}
+    request = Request.create("http://localhost", scope=scope)
+    assert request.host == "localhost"
+
+
+def test_host_ipv4_address() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"192.168.1.100")]}
+    request = Request.create("http://192.168.1.100", scope=scope)
+    assert request.host == "192.168.1.100"
+
+
+def test_host_ipv6_loopback() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"[::1]:8080")]}
+    request = Request.create("http://[::1]:8080", scope=scope)
+    assert request.host == "[::1]"
+
+
+def test_host_ipv6_full_address() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"[2001:db8::1]")]}
+    request = Request.create("http://example.com", scope=scope)
+    assert request.host == "[2001:db8::1]"
+
+
+def test_host_with_path_separator_raises_error() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"evil.com/path")]}
+    request = Request.create("http://example.com", scope=scope)
+    with pytest.raises(SuspiciousOperationError, match="Invalid host header"):
+        _ = request.host
+
+
+def test_host_with_query_string_raises_error() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"evil.com?foo=bar")]}
+    request = Request.create("http://example.com", scope=scope)
+    with pytest.raises(SuspiciousOperationError, match="Invalid host header"):
+        _ = request.host
+
+
+def test_host_with_at_sign_raises_error() -> None:
+    scope: PartialScope = {"headers": [(b"host", b"user@evil.com")]}
+    request = Request.create("http://example.com", scope=scope)
+    with pytest.raises(SuspiciousOperationError, match="Invalid host header"):
+        _ = request.host

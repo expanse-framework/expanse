@@ -183,6 +183,9 @@ class Request:
 
         host = re.sub(r":\d+$", "", host).lower()
 
+        if host and not self._validate_host(host):
+            raise SuspiciousOperationError(f"Invalid host header: '{host}'")
+
         is_trusted: bool = False
         for trusted_host in self._trusted_hosts:
             if trusted_host.startswith("."):
@@ -662,6 +665,17 @@ class Request:
             + f"and a {header} header, which are conflicting. "
             + "You should configure your proxy to remove one of them."
         )
+
+    def _validate_host(self, host: str) -> bool:
+        # Handle bracketed IPv6 addresses in Host headers (e.g. "[::1]")
+        if host.startswith("[") and host.endswith("]"):
+            try:
+                ipaddress.ip_address(host[1:-1])
+                return True
+            except ValueError:
+                return False
+
+        return bool(re.match(r"^[a-zA-Z0-9._-]+$", host))
 
 
 __all__ = ["Request"]
