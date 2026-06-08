@@ -1,20 +1,27 @@
+from typing import TYPE_CHECKING
 from typing import Any
 
 from sqlalchemy import URL
+from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy import make_url
+from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.util import immutabledict
 
 from expanse.core.application import Application
-from expanse.database._utils import create_engine
-from expanse.database.config import DatabaseConfig
 from expanse.database.config import MySQLConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig
-from expanse.database.connection import AsyncConnection
-from expanse.database.engine import AsyncEngine
+from expanse.database.exceptions import UnconfiguredDatabaseDriverError
+from expanse.database.exceptions import UnconfiguredDatabaseError
+from expanse.database.exceptions import UnsupportedDatabaseDriverError
 from expanse.database.session import AsyncSession
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class AsyncDatabaseManager:
@@ -22,6 +29,9 @@ class AsyncDatabaseManager:
         self._app: Application = app
         self._engines: dict[str, AsyncEngine] = {}
         self._factories: dict[str, async_sessionmaker] = {}
+        self._creators: dict[
+            str, Callable[[AsyncDatabaseManager, str, dict[str, Any]], AsyncEngine]
+        ] = {}
 
     def connection(self, name: str | None = None) -> AsyncConnection:
         engine = self.configure_engine(name)
@@ -58,10 +68,7 @@ class AsyncDatabaseManager:
 
         config = self._configuration(name)
 
-        if not config:
-            raise
-
-        self._engines[name] = self._create_engine(config)
+        self._engines[name] = self._create_engine(name, config)
 
         return self._engines[name]
 
@@ -75,27 +82,55 @@ class AsyncDatabaseManager:
         self._engines.clear()
         self._factories.clear()
 
-    def _create_engine(self, raw_config: dict[str, Any]) -> AsyncEngine:
-        config = DatabaseConfig.model_validate(raw_config).root
+    def extend(
+        self,
+        driver: str,
+        creator: "Callable[[AsyncDatabaseManager, str, dict[str, Any]], AsyncEngine]",
+    ) -> None:
+        """
+        Extend the database manager with a custom driver and its corresponding engine creation logic.
 
-        match config:
-            case SQLiteConfig():
-                return self._create_sqlite_engine(config)
+        :param driver: The name of the custom database driver.
+        :param creator: A callable that takes a connection name and its raw configuration, and returns an AsyncEngine instance.
+        """
+        self._creators[driver] = creator
 
-            case PostgreSQLConfig():
-                return self._create_postgresql_engine(config)
+    def _create_engine(self, name: str, raw_config: dict[str, Any]) -> AsyncEngine:
+        driver = raw_config.get("driver")
+        if driver is None:
+            raise UnconfiguredDatabaseDriverError(
+                f"The database connection [{name}] does not specify a driver."
+            )
 
-            case MySQLConfig():
-                return self._create_mysql_engine(config)
+        match driver:
+            case "sqlite":
+                return self._create_sqlite_engine(name, raw_config)
+            case "postgresql":
+                return self._create_postgresql_engine(name, raw_config)
+            case "mysql":
+                return self._create_mysql_engine(name, raw_config)
+            case _:
+                if driver not in self._creators:
+                    raise UnsupportedDatabaseDriverError(
+                        f"The database connection [{name}] specifies an unsupported driver [{driver}]."
+                    )
 
-    def _create_sqlite_engine(self, config: SQLiteConfig) -> AsyncEngine:
+                return self._creators[driver](self, name, raw_config)
+
+    def _create_sqlite_engine(
+        self, name: str, raw_config: dict[str, Any]
+    ) -> AsyncEngine:
+        config = SQLiteConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
             if url.drivername == "sqlite":
                 url = URL("sqlite+aiosqlite", *url[1:])
         else:
             if config.database is None:
-                raise ValueError("The SQLite database path is not configured.")
+                raise UnconfiguredDatabaseError(
+                    f"The database connection [{name}] does not specify a database."
+                )
 
             database_path = config.database
 
@@ -132,7 +167,11 @@ class AsyncDatabaseManager:
 
         return engine
 
-    def _create_postgresql_engine(self, config: PostgreSQLConfig) -> AsyncEngine:
+    def _create_postgresql_engine(
+        self, name: str, raw_config: dict[str, Any]
+    ) -> AsyncEngine:
+        config = PostgreSQLConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
             if url.drivername in {"postgresql", "postgresql+psycopg"}:
@@ -180,7 +219,11 @@ class AsyncDatabaseManager:
 
         return engine
 
-    def _create_mysql_engine(self, config: MySQLConfig) -> AsyncEngine:
+    def _create_mysql_engine(
+        self, name: str, raw_config: dict[str, Any]
+    ) -> AsyncEngine:
+        config = MySQLConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
             if url.drivername in {"mysql"}:
@@ -220,6 +263,8 @@ class AsyncDatabaseManager:
         connections = self._app.config.get("database.connections", {})
 
         if name not in connections:
-            raise ValueError(f"The database connection [{name}] not configured.")
+            raise UnconfiguredDatabaseError(
+                f"The database connection [{name}] is not configured."
+            )
 
         return connections[name]

@@ -1,15 +1,24 @@
+import re
+
+from typing import Any
+
 import pytest
 
 from sqlalchemy import URL
+from sqlalchemy import create_engine
+from sqlalchemy import make_url
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.util import immutabledict
 from treat.mock import Mockery
 
 from expanse.configuration.config import Config
 from expanse.core.application import Application
-from expanse.database._utils import create_engine
 from expanse.database.asynchronous import database_manager
-from expanse.database.connection import AsyncConnection
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.database.database_manager import AsyncDatabaseManager
+from expanse.database.exceptions import UnconfiguredDatabaseDriverError
+from expanse.database.exceptions import UnconfiguredDatabaseError
+from expanse.database.exceptions import UnsupportedDatabaseDriverError
 from expanse.database.session import AsyncSession
 
 
@@ -67,6 +76,13 @@ def manager() -> AsyncDatabaseManager:
                             "driver": "mysql",
                             "url": "mysql+aiomysql://root:password@127.0.0.1:3306/expanse?charset=utf8mb4",
                         },
+                        "custom": {
+                            "driver": "custom",
+                            "url": "sqlite+aiosqlite://",
+                        },
+                        "undefined_driver": {
+                            "database": ":memory:",
+                        },
                     },
                 }
             }
@@ -94,6 +110,95 @@ def test_database_manager_can_retrieve_a_named_connection(
 
 def test_database_manager_can_retrieve_a_named_session(manager: AsyncDatabaseManager):
     assert isinstance(manager.session("another_sqlite"), AsyncSession)
+
+
+def test_database_manager_raises_when_retrieving_undefined_connection(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnconfiguredDatabaseError,
+        match=re.escape(
+            r"The database connection [undefined_connection] is not configured."
+        ),
+    ):
+        manager.connection("undefined_connection")
+
+
+def test_database_manager_raises_when_retrieving_undefined_session(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnconfiguredDatabaseError,
+        match=re.escape(
+            r"The database connection [undefined_connection] is not configured."
+        ),
+    ):
+        manager.session("undefined_connection")
+
+
+def test_database_manager_raises_when_retrieving_connection_with_undefined_driver(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnconfiguredDatabaseDriverError,
+        match=re.escape(
+            r"The database connection [undefined_driver] does not specify a driver."
+        ),
+    ):
+        manager.connection("undefined_driver")
+
+
+def test_database_manager_raises_when_retrieving_session_with_undefined_driver(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnconfiguredDatabaseDriverError,
+        match=re.escape(
+            r"The database connection [undefined_driver] does not specify a driver."
+        ),
+    ):
+        manager.session("undefined_driver")
+
+
+def test_database_manager_raises_when_retrieving_connection_with_unsupported_driver(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnsupportedDatabaseDriverError,
+        match=re.escape(
+            r"The database connection [custom] specifies an unsupported driver [custom]."
+        ),
+    ):
+        manager.connection("custom")
+
+
+def test_database_manager_raises_when_retrieving_session_with_unsupported_driver(
+    manager: AsyncDatabaseManager,
+):
+    with pytest.raises(
+        UnsupportedDatabaseDriverError,
+        match=re.escape(
+            r"The database connection [custom] specifies an unsupported driver [custom]."
+        ),
+    ):
+        manager.session("custom")
+
+
+def test_database_manager_can_be_extended_with_custom_driver(
+    manager: AsyncDatabaseManager,
+):
+    def create_mariadb_engine(
+        db: AsyncDatabaseManager, name: str, config: dict[str, Any]
+    ) -> AsyncEngine:
+        url = config["url"]
+        url = make_url(str(config["url"]))
+
+        return db.create_base_engine(url)
+
+    manager.extend("custom", create_mariadb_engine)
+
+    engine = manager.configure_engine("custom")
+    assert engine.dialect.name == "sqlite"
 
 
 @pytest.mark.parametrize(

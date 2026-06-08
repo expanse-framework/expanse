@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.contracts.messenger.asynchronous.message_bus import MessageBus
 from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
@@ -90,7 +92,7 @@ async def test_messages_are_dispatched_if_no_transaction_is_active(
     db = await app.container.get(AsyncDatabaseManager)
 
     async with db.connection("sqlite") as connection:
-        result = await connection.execute("SELECT * FROM messages")
+        result = await connection.execute(text("SELECT * FROM messages"))
         messages = result.fetchall()
 
         assert len(messages) == 1
@@ -122,7 +124,7 @@ async def test_messages_are_not_dispatched_if_transaction_is_not_committed(
     db = await app.container.get(AsyncDatabaseManager)
 
     async with db.connection("sqlite") as connection:
-        result = await connection.execute("SELECT * FROM messages")
+        result = await connection.execute(text("SELECT * FROM messages"))
         messages = result.fetchall()
 
         assert len(messages) == 0
@@ -154,7 +156,7 @@ async def test_messages_are_dispatched_after_transaction_is_committed(
     db = await app.container.get(AsyncDatabaseManager)
 
     async with db.connection("sqlite") as connection:
-        result = await connection.execute("SELECT * FROM messages")
+        result = await connection.execute(text("SELECT * FROM messages"))
         messages = result.fetchall()
 
         assert len(messages) == 1
@@ -190,7 +192,7 @@ async def test_messages_are_cleared_after_transaction_is_rolled_back(
     db = await app.container.get(AsyncDatabaseManager)
 
     async with db.connection("sqlite") as connection:
-        result = await connection.execute("SELECT * FROM messages")
+        result = await connection.execute(text("SELECT * FROM messages"))
         messages = result.fetchall()
 
         assert len(messages) == 1

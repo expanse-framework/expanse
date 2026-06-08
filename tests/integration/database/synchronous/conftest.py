@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.database_manager import DatabaseManager
 
@@ -44,9 +46,9 @@ async def setup_additional_databases(
     db = await app.container.get(DatabaseManager)
 
     with db.connection("postgresql") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")
+        connection.execute(text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)"))
         connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "postgresql_psycopg2"},
                 {"id": "postgresql_psycopg"},
@@ -56,9 +58,11 @@ async def setup_additional_databases(
         connection.commit()
 
     with db.connection("mysql") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))")
         connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))")
+        )
+        connection.execute(
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "mysql_pymysql"},
                 {"id": "mysql_mysqldb"},

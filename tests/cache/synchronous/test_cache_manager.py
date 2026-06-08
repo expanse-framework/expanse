@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.cache.exceptions import NoDefaultStoreError
 from expanse.cache.exceptions import UnconfiguredStoreError
 from expanse.cache.exceptions import UnsupportedStoreDriverError
@@ -157,13 +159,15 @@ async def test_manager_can_create_database_store(app: Application) -> None:
     db = await app.container.get(DatabaseManager)
     with db.connection("sqlite") as connection:
         connection.execute(
-            """
-            CREATE TABLE cache (
-                key TEXT PRIMARY KEY,
-                data BLOB NOT NULL,
-                expiration INTEGER
+            text(
+                """
+                CREATE TABLE cache (
+                    key TEXT PRIMARY KEY,
+                    data BLOB NOT NULL,
+                    expiration INTEGER
+                )
+                """
             )
-            """
         )
         connection.commit()
 

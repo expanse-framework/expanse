@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.synchronous.database_manager import DatabaseManager
 
@@ -43,32 +45,38 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
     db = await app.container.get(DatabaseManager)
 
     with db.connection("sqlite") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")
+        connection.execute(text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)"))
         connection.execute(
-            """
+            text("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER NOT NULL,
                 first_name VARCHAR NOT NULL,
                 last_name VARCHAR,
                 email VARCHAR NOT NULL,
                 PRIMARY KEY (id)
-            );"""
+            );""")
         )
-        connection.execute("INSERT INTO my_table (id) VALUES (:id)", {"id": "sqlite"})
         connection.execute(
-            "INSERT INTO users (first_name, last_name, email) VALUES ('John', 'Doe', 'john@doe.com')"
+            text("INSERT INTO my_table (id) VALUES (:id)"), {"id": "sqlite"}
+        )
+        connection.execute(
+            text(
+                "INSERT INTO users (first_name, last_name, email) VALUES ('John', 'Doe', 'john@doe.com')"
+            )
         )
         connection.commit()
 
     with db.connection("sqlite2") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")
-        connection.execute("INSERT INTO my_table (id) VALUES (:id)", {"id": "sqlite2"})
+        connection.execute(text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)"))
+        connection.execute(
+            text("INSERT INTO my_table (id) VALUES (:id)"), {"id": "sqlite2"}
+        )
         connection.commit()
 
     with db.connection("postgresql") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)")
+        connection.execute(text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR)"))
         connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "postgresql"},
             ],
@@ -76,9 +84,11 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
         connection.commit()
 
     with db.connection("mysql") as connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))")
         connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("CREATE TABLE IF NOT EXISTS my_table (id VARCHAR(255))")
+        )
+        connection.execute(
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "mysql"},
             ],
@@ -88,7 +98,7 @@ async def setup_databases(app: Application, tmp_path: Path) -> AsyncGenerator[No
     yield
 
     with db.connection("postgresql") as connection:
-        connection.execute("DROP TABLE IF EXISTS my_table")
+        connection.execute(text("DROP TABLE IF EXISTS my_table"))
 
     with db.connection("mysql") as connection:
-        connection.execute("DROP TABLE IF EXISTS my_table")
+        connection.execute(text("DROP TABLE IF EXISTS my_table"))

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.database_manager import AsyncDatabaseManager
 
@@ -47,7 +49,7 @@ async def setup_additional_databases(
 
     async with db.connection("postgresql") as connection:
         await connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "postgresql_psycopg"},
                 {"id": "postgresql_asyncpg"},
@@ -57,7 +59,7 @@ async def setup_additional_databases(
 
     async with db.connection("mysql") as connection:
         await connection.execute(
-            "INSERT INTO my_table (id) VALUES (:id)",
+            text("INSERT INTO my_table (id) VALUES (:id)"),
             [
                 {"id": "mysql_asyncmy"},
                 {"id": "mysql_aiomysql"},

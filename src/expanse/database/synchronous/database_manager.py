@@ -1,19 +1,22 @@
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import URL
+from sqlalchemy import Connection
+from sqlalchemy import Engine
+from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.util import immutabledict
 
 from expanse.core.application import Application
-from expanse.database._utils import create_engine
-from expanse.database.config import DatabaseConfig
 from expanse.database.config import MySQLConfig
 from expanse.database.config import PostgreSQLConfig
 from expanse.database.config import SQLiteConfig
-from expanse.database.synchronous.connection import Connection
-from expanse.database.synchronous.engine import Engine
+from expanse.database.exceptions import UnconfiguredDatabaseDriverError
+from expanse.database.exceptions import UnconfiguredDatabaseError
+from expanse.database.exceptions import UnsupportedDatabaseDriverError
 from expanse.database.synchronous.session import Session
 
 
@@ -22,6 +25,9 @@ class DatabaseManager:
         self._app: Application = app
         self._engines: dict[str, Engine] = {}
         self._factories: dict[str, sessionmaker] = {}
+        self._creators: dict[
+            str, Callable[[DatabaseManager, str, dict[str, Any]], Engine]
+        ] = {}
 
     def connection(self, name: str | None = None) -> Connection:
         engine = self.configure_engine(name)
@@ -44,7 +50,7 @@ class DatabaseManager:
         return self._factories[name]()
 
     def create_base_engine(self, url: URL, **kwargs) -> Engine:
-        engine = create_engine(url, engine_class=Engine, **kwargs)
+        engine = create_engine(url, **kwargs)
 
         return engine
 
@@ -56,10 +62,7 @@ class DatabaseManager:
 
         config = self._configuration(name)
 
-        if not config:
-            raise
-
-        self._engines[name] = self._create_engine(config)
+        self._engines[name] = self._create_engine(name, config)
 
         return self._engines[name]
 
@@ -73,25 +76,51 @@ class DatabaseManager:
         self._engines.clear()
         self._factories.clear()
 
-    def _create_engine(self, raw_config: dict[str, Any]) -> Engine:
-        config = DatabaseConfig.model_validate(raw_config).root
+    def extend(
+        self,
+        driver: str,
+        creator: Callable[["DatabaseManager", str, dict[str, Any]], Engine],
+    ) -> None:
+        """
+        Extend the database manager with a custom driver and engine creator.
 
-        match config:
-            case SQLiteConfig():
-                return self._create_sqlite_engine(config)
+        :param driver: The name of the custom driver.
+        :param creator: A callable that takes a connection name and raw configuration dictionary and returns an instance of Engine.
+        """
+        self._creators[driver] = creator
 
-            case PostgreSQLConfig():
-                return self._create_postgresql_engine(config)
+    def _create_engine(self, name: str, raw_config: dict[str, Any]) -> Engine:
+        driver = raw_config.get("driver")
+        if driver is None:
+            raise UnconfiguredDatabaseDriverError(
+                f"The database connection [{name}] does not specify a driver."
+            )
 
-            case MySQLConfig():
-                return self._create_mysql_engine(config)
+        match driver:
+            case "sqlite":
+                return self._create_sqlite_engine(name, raw_config)
+            case "postgresql":
+                return self._create_postgresql_engine(name, raw_config)
+            case "mysql":
+                return self._create_mysql_engine(name, raw_config)
+            case _:
+                if driver not in self._creators:
+                    raise UnsupportedDatabaseDriverError(
+                        f"The database connection [{name}] specifies an unsupported driver [{driver}]."
+                    )
 
-    def _create_sqlite_engine(self, config: SQLiteConfig) -> Engine:
+                return self._creators[driver](self, name, raw_config)
+
+    def _create_sqlite_engine(self, name: str, raw_config: dict[str, Any]) -> Engine:
+        config = SQLiteConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
         else:
             if config.database is None:
-                raise ValueError("The SQLite database path is not configured.")
+                raise UnconfiguredDatabaseError(
+                    f"The database connection [{name}] does not specify a database."
+                )
 
             database_path = config.database
 
@@ -128,7 +157,11 @@ class DatabaseManager:
 
         return engine
 
-    def _create_postgresql_engine(self, config: PostgreSQLConfig) -> Engine:
+    def _create_postgresql_engine(
+        self, nname: str, raw_config: dict[str, Any]
+    ) -> Engine:
+        config = PostgreSQLConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
         else:
@@ -168,7 +201,9 @@ class DatabaseManager:
 
         return engine
 
-    def _create_mysql_engine(self, config: MySQLConfig) -> Engine:
+    def _create_mysql_engine(self, name: str, raw_config: dict[str, Any]) -> Engine:
+        config = MySQLConfig.model_validate(raw_config)
+
         if config.url is not None:
             url = make_url(str(config.url))
         else:
@@ -204,6 +239,8 @@ class DatabaseManager:
         connections = self._app.config.get("database.connections", {})
 
         if name not in connections:
-            raise ValueError(f"The database connection [{name}] not configured.")
+            raise UnconfiguredDatabaseError(
+                f"The database connection [{name}] is not configured."
+            )
 
         return connections[name]

@@ -1,11 +1,9 @@
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-
-from expanse.database.config import DatabaseConfig
-from expanse.database.config import SQLiteConfig
 
 
 class Config(BaseSettings):
@@ -22,12 +20,12 @@ class Config(BaseSettings):
     # For instance:
     # >>> DB_CONNECTIONS__SQLITE__DRIVER=sqlite
     # >>> DB_CONNECTIONS__SQLITE__DATABASE=database/database.sqlite
-
-    connections: dict[str, DatabaseConfig] = Field(
+    connections: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
-            "sqlite": DatabaseConfig(
-                root=SQLiteConfig(database=Path("database/database.sqlite"))
-            )
+            "sqlite": {
+                "driver": "sqlite",
+                "database": Path("database/database.sqlite"),
+            }
         }
     )
 

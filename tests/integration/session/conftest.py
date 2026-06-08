@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.database_manager import DatabaseManager
 from expanse.testing.command_tester import CommandTester
@@ -44,14 +46,14 @@ async def setup_databases(
 
     for connection in config["database"]["connections"]:
         with db.connection(connection) as connection:
-            connection.execute("DROP TABLE IF EXISTS sessions")
-            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.execute(text("DROP TABLE IF EXISTS sessions"))
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
             connection.commit()
 
     yield
 
     for connection in config["database"]["connections"]:
         with db.connection(connection) as connection:
-            connection.execute("DROP TABLE IF EXISTS sessions")
-            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.execute(text("DROP TABLE IF EXISTS sessions"))
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
             connection.commit()

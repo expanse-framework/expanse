@@ -2,8 +2,10 @@ from typing import Annotated
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.contracts.routing.router import Router
-from expanse.database.connection import AsyncConnection
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.http.helpers import json
 from expanse.http.response import Response
 from expanse.testing.client import TestClient
@@ -16,7 +18,7 @@ async def default_connection(connection: AsyncConnection) -> Response:
     return json(
         (
             await connection.execute(
-                "SELECT id FROM my_table WHERE id = 'sqlite' LIMIT 1"
+                text("SELECT id FROM my_table WHERE id = 'sqlite' LIMIT 1")
             )
         ).scalar()
     )
@@ -53,7 +55,7 @@ def test_a_named_connection_can_be_injected(
     ) -> Response:
         return json(
             await connection.scalar(
-                "SELECT id FROM my_table WHERE id = :id LIMIT 1", {"id": name}
+                text("SELECT id FROM my_table WHERE id = :id LIMIT 1"), {"id": name}
             )
         )
 
