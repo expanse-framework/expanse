@@ -4,12 +4,22 @@ from pydantic_settings import SettingsConfigDict
 
 
 class Config(BaseSettings):
+    # Application name
+
+    # The name of the application.
     name: str = "Expanse"
 
     # Application environment
     #
     # The environment the application is running in.
     env: str = "production"
+
+    # Application URL
+    #
+    # The URL of the application. This is used by some components of the application to generate URLs.
+    # It should be set to the root URL of the application, including the scheme (http or https) and the domain name.
+    # For instance: `https://example.com`.
+    url: str = "http://localhost"
 
     # Debug mode
     #
@@ -32,4 +42,4 @@ class Config(BaseSettings):
     # application. This is used to decrypt messages that were encrypted with an older key.
     previous_keys: SecretStr | None = None
 
-    model_config = SettingsConfigDict(env_prefix="app_")
+    model_config = SettingsConfigDict(env_prefix="app_", env_nested_delimiter="__")

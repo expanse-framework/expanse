@@ -23,5 +23,5 @@ class Config(BaseSettings):
     export_path: str = "api.json"
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
-        env_prefix="SCHEMATIC_", env_nested_delimiter="__"
+        env_prefix="schematic_", env_nested_delimiter="__"
     )
