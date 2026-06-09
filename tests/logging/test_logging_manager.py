@@ -4,6 +4,7 @@ import logging
 import time
 
 from typing import TYPE_CHECKING
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -417,3 +418,28 @@ def test_file_channel_with_relative_path(app: Application, tmp_path: Path) -> No
 
     content = (tmp_path / "log" / "app.log").read_text()
     assert "relative path test" in content
+
+
+def test_new_drivers_can_be_added(app: Application) -> None:
+    def create_custom_handler(
+        channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        return logging.StreamHandler()
+
+    app.config["logging"] = {
+        "default": "custom",
+        "channels": {
+            "custom": {
+                "driver": "custom",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+    mgr.extend("custom", create_custom_handler)
+
+    channel = mgr.channel("custom")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    mgr.terminate()

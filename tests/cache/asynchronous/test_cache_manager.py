@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.cache.asynchronous.cache import Cache
 from expanse.cache.asynchronous.cache_manager import CacheManager
 from expanse.cache.asynchronous.cache_stack import CacheStack
@@ -162,13 +164,15 @@ async def test_manager_can_create_database_store(app: Application) -> None:
     db = await app.container.get(AsyncDatabaseManager)
     async with db.connection("sqlite") as connection:
         await connection.execute(
-            """
-            CREATE TABLE cache (
-                key TEXT PRIMARY KEY,
-                data BLOB NOT NULL,
-                expiration INTEGER
+            text(
+                """
+                CREATE TABLE cache (
+                    key TEXT PRIMARY KEY,
+                    data BLOB NOT NULL,
+                    expiration INTEGER
+                )
+                """
             )
-            """
         )
         await connection.commit()
 

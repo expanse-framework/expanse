@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
-from expanse.database._utils import create_engine
-from expanse.database.asynchronous.engine import AsyncEngine
 from expanse.database.asynchronous.session import AsyncSession
 from expanse.messenger.asynchronous.transactional_message_bus import (
     TransactionalMessageBus,

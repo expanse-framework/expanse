@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.console.commands.db_migrate import DbMigrateCommand  # noqa: F401
 from expanse.database.database_manager import AsyncDatabaseManager
@@ -35,7 +37,7 @@ async def test_migrate(
 
     db = await app.container.get(AsyncDatabaseManager)
     async with db.connection() as connection:
-        result = await connection.execute("SELECT * FROM users")
+        result = await connection.execute(text("SELECT * FROM users"))
         assert result.fetchall() == [(1, "John", "Doe", "john@doe.com", "true")]
 
 

@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 
 from expanse.configuration.config import Config
 from expanse.core.application import Application
-from expanse.database.connection import AsyncConnection
-from expanse.database.connection import Connection
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.database.database_manager import AsyncDatabaseManager
 from expanse.database.database_manager import DatabaseManager
 from expanse.database.migration.migrator import Migrator
 from expanse.database.session import AsyncSession
 from expanse.database.session import Session
+from expanse.database.synchronous.connection import Connection
 from expanse.exceptions.handler import ExceptionHandler
 from expanse.pagination.pagination_manager import PaginationManager
 from expanse.support.service_provider import ServiceProvider

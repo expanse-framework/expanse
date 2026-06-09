@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.core.application import Application
 from expanse.database.database_manager import AsyncDatabaseManager
 
@@ -20,7 +22,8 @@ async def setup_database(app: Application, tmp_path: Path) -> AsyncGenerator[Non
 
     async with db.connection("sqlite") as connection:
         await connection.execute(
-            """
+            text(
+                """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER NOT NULL,
                 first_name VARCHAR NOT NULL,
@@ -29,6 +32,7 @@ async def setup_database(app: Application, tmp_path: Path) -> AsyncGenerator[Non
                 PRIMARY KEY (id)
             );
             """
+            )
         )
 
         await connection.commit()

@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlalchemy import text
+
 from expanse.database.database_manager import DatabaseManager
 
 
@@ -47,14 +49,14 @@ async def setup_databases(
 
     for connection_name in config["database"]["connections"]:
         with db.connection(connection_name) as connection:
-            connection.execute("DROP TABLE IF EXISTS messages")
-            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.execute(text("DROP TABLE IF EXISTS messages"))
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
             connection.commit()
 
     yield
 
     for connection_name in config["database"]["connections"]:
         with db.connection(connection_name) as connection:
-            connection.execute("DROP TABLE IF EXISTS messages")
-            connection.execute("DROP TABLE IF EXISTS alembic_version")
+            connection.execute(text("DROP TABLE IF EXISTS messages"))
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
             connection.commit()
