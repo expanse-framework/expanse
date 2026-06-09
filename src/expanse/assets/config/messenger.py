@@ -22,7 +22,7 @@ class Config(BaseSettings):
     # The transports that are defined for your applications.
     # They can all be defined with environment variables in you `.env` file.
     # For instance:
-    # >>> TRANSPORTS__MEMORY__DRIVER=memory
+    # >>> MESSENGER_TRANSPORTS__MEMORY__DRIVER=memory
     transports: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
             "sync": {"driver": "sync"},
@@ -35,9 +35,9 @@ class Config(BaseSettings):
     # The retry strategies that are defined for your application.
     # They can all be defined with environment variables in you `.env` file.
     # For instance:
-    # >>> RETRY_STRATEGIES__MULTIPLIER__TYPE=multiplier
-    # >>> RETRY_STRATEGIES__MULTIPLIER__DELAY=1000
-    # >>> RETRY_STRATEGIES__MULTIPLIER__MULTIPLIER=2
+    # >>> MESSENGER_RETRY_STRATEGIES__MULTIPLIER__TYPE=multiplier
+    # >>> MESSENGER_RETRY_STRATEGIES__MULTIPLIER__DELAY=1000
+    # >>> MESSENGER_RETRY_STRATEGIES__MULTIPLIER__MULTIPLIER=2
     retry_strategies: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
             "multiplier": {

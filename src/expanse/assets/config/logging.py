@@ -65,7 +65,7 @@ class Config(BaseSettings):
     # >>> LOG_ROUTING=app:stream,file;expanse:console
     routing: str | dict[str, list[str]] = Field(default_factory=dict)
 
-    model_config = SettingsConfigDict(env_prefix="LOG_", env_nested_delimiter="__")
+    model_config = SettingsConfigDict(env_prefix="log_", env_nested_delimiter="__")
 
     @field_validator("routing", mode="before")
     @classmethod

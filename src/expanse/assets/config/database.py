@@ -29,4 +29,4 @@ class Config(BaseSettings):
         }
     )
 
-    model_config = SettingsConfigDict(env_prefix="DB_", env_nested_delimiter="__")
+    model_config = SettingsConfigDict(env_prefix="db_", env_nested_delimiter="__")

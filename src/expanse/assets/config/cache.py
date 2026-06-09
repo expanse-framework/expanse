@@ -36,6 +36,7 @@ class Config(BaseSettings):
                     "connection": "cache",
                     "lock_connection": "default",
                     "locker": {"store": "memory"},
+                    "l1_cache": {"store": {"driver": "memory"}},
                 },
             }
         )
@@ -45,10 +46,10 @@ class Config(BaseSettings):
     #
     # The configuration for the locker that should be used by the cache stores to protect
     # against cache stampedes.
-    # IF not set, a default locker using an in-memory store will be used.
+    # If not set, a default locker using an in-memory store will be used.
     # Use the `CACHE_LOCKER__STORE` environment variable to set this value in your `.env` file.
     # For instance:
     # >>> CACHE_LOCKER__STORE=memory
     locker: dict[str, Any] | None = None
 
-    model_config = SettingsConfigDict(env_prefix="CACHE_", env_nested_delimiter="__")
+    model_config = SettingsConfigDict(env_prefix="cache_", env_nested_delimiter="__")

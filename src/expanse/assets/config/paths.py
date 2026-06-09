@@ -8,4 +8,4 @@ class Config(BaseSettings):
     database: Path = Path("database")
     static: Path = Path("static")
 
-    model_config = SettingsConfigDict(env_prefix="path_")
+    model_config = SettingsConfigDict(env_prefix="path_", env_nested_delimiter="__")
