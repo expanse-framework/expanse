@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from typing import TYPE_CHECKING
 from typing import Any
 
 from expanse.core.application import Application
@@ -16,6 +17,11 @@ from expanse.logging.config import StreamConfig
 from expanse.logging.exceptions import LogChannelConfigurationError
 from expanse.logging.exceptions import UnconfiguredLogChannelError
 from expanse.logging.exceptions import UnsupportedLogChannelDriverError
+from expanse.logging.filters.context import ContextFilter
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class LoggingManager:
@@ -26,6 +32,9 @@ class LoggingManager:
         self._channels: dict[str, LogChannel] = {}
         self._routing: dict[str, list[LogChannel]] = {}
         self._config: dict[str, Any] = self._app.config.get("logging", {})
+        self._handler_creators: dict[
+            str, Callable[[str, dict[str, Any]], logging.Handler]
+        ] = {}
 
     def channel(self, name: str | None = None) -> LogChannel:
         channel_name = name or self._config["default"]
@@ -105,6 +114,13 @@ class LoggingManager:
 
         return self._routing[logger_name]
 
+    def extend(
+        self,
+        driver: str,
+        creator: "Callable[[str, dict[str, Any]], logging.Handler]",
+    ) -> None:
+        self._handler_creators[driver] = creator
+
     def _create_channel(
         self,
         config: dict[str, Any],
@@ -120,45 +136,53 @@ class LoggingManager:
             )
 
         match driver:
-            case "stream":
-                channel = self._create_stream_channel(
-                    StreamConfig.model_validate(config),
-                    channel_name,
-                    base_logger=base_logger,
-                )
-            case "console":
-                channel = self._create_console_channel(
-                    ConsoleConfig.model_validate(config),
-                    channel_name,
-                    base_logger=base_logger,
-                )
-            case "file":
-                channel = self._create_file_channel(
-                    FileConfig.model_validate(config),
-                    channel_name,
-                    base_logger=base_logger,
-                )
             case "group":
-                channel = self._create_group_channel(
+                return self._create_group_channel(
                     GroupConfig.model_validate(config), base_logger=base_logger
                 )
 
-            case _:
-                raise UnsupportedLogChannelDriverError(
-                    f"Log channel '{channel_name}' has an unsupported driver '{driver}'."
-                )
+        handler = self._create_handler(channel_name, driver, config)
+        handler.addFilter(ContextFilter())
 
-        return channel
+        logger = base_logger or self._create_base_logger(
+            BaseConfig.model_validate(config), channel_name
+        )
 
-    def _create_stream_channel(
+        if self._config.get("mode", "async") == "sync":
+            return SyncLogChannel(logger, [handler]).start()
+
+        return SimpleLogChannel(logger, [handler]).start()
+
+    def _create_handler(
         self,
-        config: StreamConfig,
         channel_name: str,
-        base_logger: logging.Logger | None = None,
-    ) -> LogChannel:
-        from expanse.logging.filters.context import ContextFilter
+        driver: str,
+        config: dict[str, Any],
+    ) -> logging.Handler:
+        match driver:
+            case "stream":
+                handler = self._create_stream_handler(channel_name, config)
+            case "console":
+                handler = self._create_console_channel(channel_name, config)
+            case "file":
+                handler = self._create_file_channel(channel_name, config)
 
-        logger = base_logger or self._create_base_logger(config, channel_name)
+            case _:
+                if driver not in self._handler_creators:
+                    raise UnsupportedLogChannelDriverError(
+                        f"Log channel '{channel_name}' has an unsupported driver '{driver}'."
+                    )
+
+                handler = self._handler_creators[driver](channel_name, config)
+
+        return handler
+
+    def _create_stream_handler(
+        self,
+        channel_name: str,
+        raw_config: dict[str, Any],
+    ) -> logging.Handler:
+        config = StreamConfig.model_validate(raw_config)
 
         stream = config.stream
 
@@ -181,43 +205,28 @@ class LoggingManager:
             handler.setFormatter(logging.Formatter(fmt=fmt))
 
         handler.setLevel(config.level)
-        handler.addFilter(ContextFilter())
 
-        if self._config.get("mode", "async") == "sync":
-            return SyncLogChannel(logger, [handler]).start()
-
-        return SimpleLogChannel(logger, [handler]).start()
+        return handler
 
     def _create_console_channel(
         self,
-        config: ConsoleConfig,
         channel_name: str,
-        base_logger: logging.Logger | None = None,
-    ) -> LogChannel:
-        from expanse.logging.filters.context import ContextFilter
-        from expanse.logging.formatters.console import ConsoleFormatter
+        raw_config: dict[str, Any],
+    ) -> logging.Handler:
+        config = ConsoleConfig.model_validate(raw_config)
 
-        logger = base_logger or self._create_base_logger(config, channel_name)
+        from expanse.logging.formatters.console import ConsoleFormatter
 
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(config.level)
         handler.setFormatter(ConsoleFormatter(multiline=config.multiline))
-        handler.addFilter(ContextFilter())
 
-        if self._config.get("mode", "async") == "sync":
-            return SyncLogChannel(logger, [handler]).start()
-
-        return SimpleLogChannel(logger, [handler], preserve_exception_info=True).start()
+        return handler
 
     def _create_file_channel(
-        self,
-        config: FileConfig,
-        channel_name: str,
-        base_logger: logging.Logger | None = None,
-    ) -> LogChannel:
-        from expanse.logging.filters.context import ContextFilter
-
-        logger = base_logger or self._create_base_logger(config, channel_name)
+        self, channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        config = FileConfig.model_validate(raw_config)
 
         path = config.path
         if not path.is_absolute():
@@ -234,12 +243,8 @@ class LoggingManager:
             handler.setFormatter(logging.Formatter(fmt=fmt))
 
         handler.setLevel(config.level)
-        handler.addFilter(ContextFilter())
 
-        if self._config.get("mode", "async") == "sync":
-            return SyncLogChannel(logger, [handler]).start()
-
-        return SimpleLogChannel(logger, [handler]).start()
+        return handler
 
     def _create_group_channel(
         self, config: GroupConfig, base_logger: logging.Logger | None = None
