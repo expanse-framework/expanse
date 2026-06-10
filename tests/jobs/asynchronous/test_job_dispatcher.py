@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import override
 
 import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.jobs.asynchronous.job_dispatcher import AsyncJobDispatcher
-from expanse.jobs.asynchronous.pending_job import AsyncPendingJob
+from expanse.jobs.asynchronous.job import Job
+from expanse.jobs.asynchronous.job_dispatcher import JobDispatcher
+from expanse.jobs.stamps.job import JobStamp
 from expanse.messenger.asynchronous.message_bus import MessageBus
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.stamps.delay import DelayStamp
-from expanse.messenger.stamps.self_handling import SelfHandlingStamp
+from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 
@@ -47,8 +49,8 @@ def bus(container: Container, transport_manager: TransportManager) -> MessageBus
 
 
 @pytest.fixture()
-def dispatcher(bus: MessageBus) -> AsyncJobDispatcher:
-    return AsyncJobDispatcher(bus)
+def dispatcher(bus: MessageBus) -> JobDispatcher:
+    return JobDispatcher(bus)
 
 
 @pytest.fixture()
@@ -59,63 +61,55 @@ async def transport(transport_manager: TransportManager) -> MemoryTransport:
 
 
 @dataclass
-class MyJob:
+class Payload:
     value: str
 
-    async def handle(self) -> None:
+
+class MyJob(Job[Payload]):
+    @override
+    async def execute(self) -> None:
         pass
 
 
-def test_prepare_returns_async_pending_job(dispatcher: AsyncJobDispatcher) -> None:
-    job = MyJob(value="test")
-    pending = dispatcher.prepare(job)
-
-    assert isinstance(pending, AsyncPendingJob)
-
-
-def test_prepare_wraps_job_with_self_handling_stamp(
-    dispatcher: AsyncJobDispatcher,
+async def test_dispatch_sends_payload_through_bus(
+    dispatcher: JobDispatcher, transport: MemoryTransport
 ) -> None:
-    job = MyJob(value="test")
-    pending = dispatcher.prepare(job)
-
-    assert pending._job.has_stamp(SelfHandlingStamp)
-
-
-def test_prepare_exposes_original_job(dispatcher: AsyncJobDispatcher) -> None:
-    job = MyJob(value="test")
-    pending = dispatcher.prepare(job)
-
-    assert pending._job.open() is job
-
-
-async def test_dispatch_sends_job_through_bus(
-    dispatcher: AsyncJobDispatcher, transport: MemoryTransport
-) -> None:
-    job = MyJob(value="hello")
+    job = MyJob(Payload("hello"))
     await dispatcher.dispatch(job)
 
     sent = transport.sent
     assert len(sent) == 1
-    assert sent[0].open() == job
+    assert sent[0].open() == Payload("hello")
 
 
-async def test_dispatch_sends_envelope_with_self_handling_stamp(
-    dispatcher: AsyncJobDispatcher, transport: MemoryTransport
+async def test_dispatch_sends_envelope_with_job_stamp(
+    dispatcher: JobDispatcher, transport: MemoryTransport
 ) -> None:
-    job = MyJob(value="hello")
+    job = MyJob(Payload("hello"))
     await dispatcher.dispatch(job)
 
     sent = transport.sent
     assert len(sent) == 1
-    assert sent[0].has_stamp(SelfHandlingStamp)
+    assert sent[0].has_stamp(JobStamp)
 
 
-async def test_prepare_delay_dispatch_sends_delayed_job(
-    dispatcher: AsyncJobDispatcher, transport: MemoryTransport
+async def test_dispatch_job_stamp_identifies_job_class(
+    dispatcher: JobDispatcher, transport: MemoryTransport
 ) -> None:
-    job = MyJob(value="delayed")
-    await dispatcher.prepare(job).delay(30).dispatch()
+    job = MyJob(Payload("hello"))
+    await dispatcher.dispatch(job)
+
+    stamp = transport.sent[0].stamp(JobStamp)
+    assert stamp is not None
+    assert stamp.job.endswith("MyJob")
+
+
+async def test_dispatch_with_delay_adds_delay_stamp(
+    dispatcher: JobDispatcher, transport: MemoryTransport
+) -> None:
+    job = MyJob(Payload("delayed"))
+    job.delay(30)
+    await dispatcher.dispatch(job)
 
     sent = transport.sent
     assert len(sent) == 1
@@ -125,24 +119,36 @@ async def test_prepare_delay_dispatch_sends_delayed_job(
     assert delay_stamp.delay == 30 * 1000
 
 
-async def test_prepare_without_delay_sends_no_delay_stamp(
-    dispatcher: AsyncJobDispatcher, transport: MemoryTransport
+async def test_dispatch_without_delay_sends_no_delay_stamp(
+    dispatcher: JobDispatcher, transport: MemoryTransport
 ) -> None:
-    job = MyJob(value="immediate")
-    await dispatcher.prepare(job).dispatch()
+    job = MyJob(Payload("immediate"))
+    await dispatcher.dispatch(job)
 
     sent = transport.sent
     assert len(sent) == 1
     assert not sent[0].has_stamp(DelayStamp)
 
 
-async def test_multiple_dispatches_send_separate_envelopes(
-    dispatcher: AsyncJobDispatcher, transport: MemoryTransport
+def test_prepare_with_via_includes_transport_stamp(
+    dispatcher: JobDispatcher,
 ) -> None:
-    await dispatcher.dispatch(MyJob(value="first"))
-    await dispatcher.dispatch(MyJob(value="second"))
+    job = MyJob(Payload("routed"))
+    job.via("custom_transport")
+    envelope = dispatcher.prepare(job)
+
+    stamp = envelope.stamp(TransportStamp)
+    assert stamp is not None
+    assert stamp.name == "custom_transport"
+
+
+async def test_multiple_dispatches_send_separate_envelopes(
+    dispatcher: JobDispatcher, transport: MemoryTransport
+) -> None:
+    await dispatcher.dispatch(MyJob(Payload("first")))
+    await dispatcher.dispatch(MyJob(Payload("second")))
 
     sent = transport.sent
     assert len(sent) == 2
-    assert sent[0].open() == MyJob(value="first")
-    assert sent[1].open() == MyJob(value="second")
+    assert sent[0].open() == Payload("first")
+    assert sent[1].open() == Payload("second")

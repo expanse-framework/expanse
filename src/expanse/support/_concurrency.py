@@ -6,6 +6,7 @@ import functools
 from collections import deque
 from collections.abc import AsyncGenerator
 from collections.abc import Callable
+from collections.abc import Coroutine
 from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
@@ -15,7 +16,10 @@ from typing import Any
 from typing import ParamSpec
 from typing import TypeVar
 
+import anyio.from_thread
 import anyio.to_thread
+
+from anyio._core._eventloop import threadlocals
 
 
 if TYPE_CHECKING:
@@ -84,6 +88,20 @@ async def run_in_threadpool[**P, T](
         _restore_context(context)
 
     return result
+
+
+def async_to_sync[**P, T](
+    async_function: Callable[P, Coroutine[Any, Any, T]],
+) -> Callable[P, T]:
+    @functools.wraps(async_function)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        current_async_module = getattr(threadlocals, "current_token", None)
+        partial_f = functools.partial(async_function, *args, **kwargs)
+        if current_async_module is None:
+            raise RuntimeError("async_to_sync() can only be used in an async context.")
+        return anyio.from_thread.run(partial_f)
+
+    return wrapper
 
 
 class AsyncIteratorWrapper[T]:

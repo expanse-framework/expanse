@@ -1,7 +1,5 @@
 from typing import override
 
-from asgiref.sync import async_to_sync
-
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as AsyncMessageBusContract,
 )
@@ -9,6 +7,7 @@ from expanse.contracts.messenger.synchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
 from expanse.messenger.envelope import Envelope
+from expanse.support._concurrency import async_to_sync
 from expanse.types.messenger import Message
 
 

@@ -11,4 +11,6 @@ class MessageBus(ABC):
         """
         Dispatch a message through the bus, applying middleware and returning the final envelope.
         :param message: The message, or envelope, to dispatch.
+
+        :return: The final envelope after dispatching.
         """
