@@ -4,6 +4,7 @@ import uuid
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Callable
+from typing import Annotated
 from typing import Any
 
 from expanse.container.container import Container
@@ -90,6 +91,11 @@ class Bar:
 class MyGeneric[T]:
     def __init__(self, value: T | None = None) -> None:
         self.value: T | None = value
+
+
+class MySomething:
+    def __init__(self, value: str = "Something") -> None:
+        self.value = value
 
 
 async def test_singleton_returns_same_instance() -> None:
@@ -328,3 +334,20 @@ async def test_resolve_generic() -> None:
 
     assert isinstance(result, MyGeneric)
     assert result.value is None
+
+
+async def test_call_honors_annotated_metadata_on_parameters() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.register(MySomething, make_something)
+
+    def handler_with_tag(something: Annotated[MySomething, "foo-bar"]) -> str:
+        return something.value
+
+    def handler_without_tag(something: MySomething) -> str:
+        return something.value
+
+    assert await container.call(handler_with_tag) == "foo-bar"
+    assert await container.call(handler_without_tag) == "default"

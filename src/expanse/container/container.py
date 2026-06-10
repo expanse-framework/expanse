@@ -167,10 +167,21 @@ class Container:
 
                 is_class = True
 
-        (
-            positional,
-            keywords,
-        ) = await self._resolve_callable_dependencies(function, *args)
+        if is_class:
+            # Use the class signature (which excludes `self`) so positional
+            # metadata isn't consumed by `self`. Pass `__init__` as the callable
+            # so __globals__ remains available for forward-reference resolution.
+            (
+                positional,
+                keywords,
+            ) = await self._resolve_signature(
+                inspect.signature(concrete), args, {}, callable=function
+            )
+        else:
+            (
+                positional,
+                keywords,
+            ) = await self._resolve_callable_dependencies(function, *args)
 
         if isasyncgenfunction(concrete):
             generator = concrete(*positional, **keywords)
@@ -339,7 +350,10 @@ class Container:
                 f"Unbound abstract [{abstract}] cannot be resolved"
             )
         else:
-            concrete = abstract
+            # Fall back to building the bare class directly. For Annotated[X, ...]
+            # we must use `actual_abstract` (the unwrapped class), otherwise
+            # `_can_build` returns False and `self.get(concrete)` recurses forever.
+            concrete = actual_abstract
 
         terminating_callback: _Callback | None = None
         if self._can_build(actual_abstract, concrete):
