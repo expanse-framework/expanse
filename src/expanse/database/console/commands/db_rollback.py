@@ -6,7 +6,7 @@ from cleo.io.inputs.option import Option
 
 from expanse.database.console.command import MigrationCommand
 from expanse.database.migration.migrator import Migrator
-from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import sync_to_async
 
 
 class DbRollbackCommand(MigrationCommand):
@@ -41,6 +41,6 @@ The --reset option can be used to rollback all migrations.
         if self.option("reset"):
             revision = "base"
 
-        await run_in_threadpool(migrator.rollback, revision=revision, io=self._io)
+        await sync_to_async(migrator.rollback, revision=revision, io=self._io)
 
         return 0

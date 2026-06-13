@@ -7,7 +7,7 @@ from expanse.messenger.stamps.context import ContextStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 
 
-class PopulateContext:
+class PropagateContext:
     """
     Middleware that adds the context information to the envelope upon dispatch and hydrate
     the context upon reception.

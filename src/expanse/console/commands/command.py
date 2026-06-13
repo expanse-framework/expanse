@@ -14,8 +14,8 @@ from cleo.io.inputs.definition import Definition
 from cleo.io.null_io import NullIO
 from cleo.io.outputs.output import Verbosity
 
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 
 
 if TYPE_CHECKING:
@@ -85,10 +85,10 @@ class Command:
                 if inspect.iscoroutinefunction(handle):
                     return await handle()
 
-                if not should_run_in_threadpool(handle):
+                if not should_run_as_async(handle):
                     return handle()
 
-                return await run_in_threadpool(handle)
+                return await sync_to_async(handle)
 
             return await self._container.call(handle)
         except KeyboardInterrupt:

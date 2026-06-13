@@ -6,7 +6,6 @@ import functools
 from collections import deque
 from collections.abc import AsyncGenerator
 from collections.abc import Callable
-from collections.abc import Coroutine
 from collections.abc import Iterable
 from collections.abc import Iterator
 from contextvars import Context
@@ -16,10 +15,8 @@ from typing import Any
 from typing import ParamSpec
 from typing import TypeVar
 
-import anyio.from_thread
-import anyio.to_thread
-
-from anyio._core._eventloop import threadlocals
+from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async as _asgiref_sync_to_async
 
 
 if TYPE_CHECKING:
@@ -44,7 +41,7 @@ def _restore_context(context: Context) -> None:
             cvar.set(new_val)
 
 
-def should_run_in_threadpool(func: Callable[..., Any]) -> bool:
+def should_run_as_async(func: Callable[..., Any]) -> bool:
     is_async_safe: bool | None = getattr(func, "is_async_safe", None)
 
     if is_async_safe is None:
@@ -71,7 +68,7 @@ def warn_about_implicit_async_safe_status(
         )
 
 
-async def run_in_threadpool[**P, T](
+async def sync_to_async[**P, T](
     func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
 ) -> T:
     if kwargs:  # pragma: no cover
@@ -81,27 +78,13 @@ async def run_in_threadpool[**P, T](
     context = copy_context()
     func = functools.partial(context.run, func)
 
-    result = await anyio.to_thread.run_sync(func, *args)
+    result = await _asgiref_sync_to_async(func, thread_sensitive=True)(*args)
 
     if context is not None:
         # restore the context
         _restore_context(context)
 
     return result
-
-
-def async_to_sync[**P, T](
-    async_function: Callable[P, Coroutine[Any, Any, T]],
-) -> Callable[P, T]:
-    @functools.wraps(async_function)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        current_async_module = getattr(threadlocals, "current_token", None)
-        partial_f = functools.partial(async_function, *args, **kwargs)
-        if current_async_module is None:
-            raise RuntimeError("async_to_sync() can only be used in an async context.")
-        return anyio.from_thread.run(partial_f)
-
-    return wrapper
 
 
 class AsyncIteratorWrapper[T]:
@@ -125,7 +108,7 @@ class AsyncIteratorWrapper[T]:
     async def _async_generator(self) -> AsyncGenerator[T, None]:
         while True:
             try:
-                yield await run_in_threadpool(self._call_next)
+                yield await sync_to_async(self._call_next)
             except ValueError:
                 return
 
@@ -227,3 +210,13 @@ class AsyncRLock:
 
     async def __aexit__(self, exc_type, exc, tb):
         self.release()
+
+
+__all__ = [
+    "AsyncIteratorWrapper",
+    "AsyncRLock",
+    "async_to_sync",
+    "should_run_as_async",
+    "sync_to_async",
+    "warn_about_implicit_async_safe_status",
+]

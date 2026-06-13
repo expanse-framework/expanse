@@ -3,7 +3,7 @@ from typing import override
 
 from expanse.cache.asynchronous.locks.lock import Lock
 from expanse.cache.synchronous.locks.file_lock import FileLock as SyncFileLock
-from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import sync_to_async
 
 
 class FileLock(Lock):
@@ -23,11 +23,11 @@ class FileLock(Lock):
 
     @override
     async def _do_acquire(self) -> bool:
-        return await run_in_threadpool(self._sync_lock._do_acquire)
+        return await sync_to_async(self._sync_lock._do_acquire)
 
     @override
     async def _do_release(self, force: bool = False) -> bool:
-        return await run_in_threadpool(self._sync_lock._do_release, force)
+        return await sync_to_async(self._sync_lock._do_release, force)
 
     @override
     async def refresh(self, ttl: int | None = None) -> bool:

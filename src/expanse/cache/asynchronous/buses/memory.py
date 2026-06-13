@@ -10,8 +10,8 @@ from typing import TypeVar
 from typing import override
 
 from expanse.contracts.cache.asynchronous.bus import Bus
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 
 
 _T = TypeVar("_T")
@@ -42,8 +42,8 @@ class MemoryBus(Bus):
                 try:
                     if inspect.iscoroutinefunction(handler):
                         await handler(message)
-                    elif should_run_in_threadpool(handler):
-                        await run_in_threadpool(handler, message)
+                    elif should_run_as_async(handler):
+                        await sync_to_async(handler, message)
                     else:
                         handler(message)
                 except Exception:

@@ -6,7 +6,7 @@ from cleo.io.inputs.option import Option
 
 from expanse.database.console.command import MigrationCommand
 from expanse.database.migration.migrator import Migrator
-from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import sync_to_async
 
 
 class DbMigrateCommand(MigrationCommand):
@@ -43,7 +43,7 @@ This will apply the next two migrations.
         if self.option("step"):
             revision = f"+{self.option('step').removeprefix('+')}"
 
-        await run_in_threadpool(
+        await sync_to_async(
             migrator.migrate,
             revision=revision,
             dry_run=dry_run,

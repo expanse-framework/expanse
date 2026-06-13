@@ -14,8 +14,8 @@ from typing import override
 
 from expanse.contracts.cache.asynchronous.bus import Bus
 from expanse.redis.asynchronous.connections.connection import Connection
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 
 
 if TYPE_CHECKING:
@@ -120,8 +120,8 @@ class RedisBus(Bus):
                 try:
                     if inspect.iscoroutinefunction(handler):
                         await handler(message)
-                    elif should_run_in_threadpool(handler):
-                        await run_in_threadpool(handler, message)
+                    elif should_run_as_async(handler):
+                        await sync_to_async(handler, message)
                     else:
                         handler(message)
                 except Exception:

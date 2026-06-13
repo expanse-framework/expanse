@@ -25,8 +25,8 @@ from expanse.container.exceptions import ContainerException
 from expanse.container.exceptions import ResolutionException
 from expanse.container.exceptions import UnboundAbstractException
 from expanse.support._concurrency import AsyncRLock
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 from expanse.support._utils import eval_type_lenient
 from expanse.support._utils import string_to_class
 
@@ -207,10 +207,10 @@ class Container:
         if inspect.iscoroutinefunction(concrete):
             return await concrete(*positional, **keywords), None
 
-        if not should_run_in_threadpool(concrete):
+        if not should_run_as_async(concrete):
             return concrete(*positional, **keywords), None
 
-        return await run_in_threadpool(concrete, *positional, **keywords), None
+        return await sync_to_async(concrete, *positional, **keywords), None
 
     @overload
     async def get(self, abstract: type[T]) -> T: ...
@@ -242,10 +242,10 @@ class Container:
         if inspect.iscoroutinefunction(callable_):
             return await callable_(*positional, **keywords)
 
-        if not should_run_in_threadpool(callable_):
+        if not should_run_as_async(callable_):
             return callable_(*positional, **keywords)
 
-        return await run_in_threadpool(callable_, *positional, **keywords)
+        return await sync_to_async(callable_, *positional, **keywords)
 
     def has_scoped_bindings(self) -> bool:
         return bool(self._scoped["bindings"])

@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 from expanse.http.cookie import Cookie
 from expanse.http.header_bag import HeaderBag
-from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import sync_to_async
 from expanse.support._datastructures import MultiMapping
 
 
@@ -136,7 +136,7 @@ class RawUploadFile:
         if self.in_memory:
             self.write(data)
         else:
-            await run_in_threadpool(self.write, data)
+            await sync_to_async(self.write, data)
 
     def read(self, size: int = -1) -> bytes:
         return self.file.read(size)
@@ -144,7 +144,7 @@ class RawUploadFile:
     async def aread(self, size: int = -1) -> bytes:
         if self.in_memory:
             return self.read(size)
-        return await run_in_threadpool(self.read, size)
+        return await sync_to_async(self.read, size)
 
     def seek(self, offset: int) -> None:
         self.file.seek(offset)
@@ -153,7 +153,7 @@ class RawUploadFile:
         if self.in_memory:
             self.seek(offset)
         else:
-            await run_in_threadpool(self.seek, offset)
+            await sync_to_async(self.seek, offset)
 
     def close(self) -> None:
         self.file.close()
@@ -162,7 +162,7 @@ class RawUploadFile:
         if self.in_memory:
             self.close()
         else:
-            await run_in_threadpool(self.close)
+            await sync_to_async(self.close)
 
     def save(self, filepath: str) -> None:
         """
@@ -187,7 +187,7 @@ class RawUploadFile:
         """
         Save file to disk, work in threading pool.
         """
-        await run_in_threadpool(self.save, filepath)
+        await sync_to_async(self.save, filepath)
 
 
 class FormData(MultiMapping[str, str | RawUploadFile]):
