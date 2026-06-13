@@ -1,21 +1,10 @@
-from typing import Any
-from typing import Protocol
+from abc import ABC
+
+from expanse.types.jobs.job_options import JobOptions
 
 
-class SyncJob(Protocol):
-    def handle(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Handle the job. This method will be called by the worker when the job is executed.
-        """
-        ...
+class Job[T](ABC):
+    options: JobOptions
 
-
-class AsyncJob(Protocol):
-    async def handle(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Handle the job. This method will be called by the worker when the job is executed.
-        """
-        ...
-
-
-type Job = SyncJob | AsyncJob
+    def __init__(self, payload: T) -> None:
+        self.payload: T = payload

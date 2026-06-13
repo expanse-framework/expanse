@@ -5,9 +5,11 @@ from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
+from expanse.jobs.asynchronous.job import Job as AsyncJob
+from expanse.jobs.stamps.job import JobStamp
+from expanse.jobs.synchronous.job import Job as SyncJob
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageHandlingFailedError
-from expanse.messenger.exceptions import SelfHandlingMessageWithNoHandlerError
 from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.exceptions import UnsupportedRetryStrategyError
@@ -19,11 +21,11 @@ from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
-from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
 from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.support._utils import string_to_class
 from expanse.support.asynchronous.pipeline import Pipeline
 from expanse.types.messenger import MessageHandler
 
@@ -183,27 +185,31 @@ class Worker:
         message = envelope.open()
         errors: dict[str, Exception] = {}
         handlers: list[MessageHandler] = []
-        if envelope.has_stamp(SelfHandlingStamp):
-            # If the envelope is marked with the SelfHandlingStamp,
+        if stamp := envelope.stamp(JobStamp):
+            # If the envelope is marked with the JobStamp,
             # we skip the registry and handle it directly.
-            handler = getattr(message, "handle", None)
+            job_class = string_to_class(stamp.job)
+            job = job_class(message)
+            if not isinstance(job, SyncJob | AsyncJob):
+                raise TypeError(
+                    f"Expected job of type 'Job', got '{type(job).__name__}'"
+                )
+
             try:
-                if handler is None or not callable(handler):
-                    raise SelfHandlingMessageWithNoHandlerError(
-                        "Self handling messages must have a callable 'handle' method"
-                    )
-                await self._container.call(handler)
+                await self._container.call(job.execute)
 
                 envelope = envelope.with_stamps(
-                    HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
+                    HandledStamp(
+                        handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
+                    )
                 )
             except Exception as e:
-                if handler is not None and callable(handler):
-                    errors[f"{handler.__module__}.{handler.__qualname__}"] = e
-                else:
-                    errors[
-                        f"{type(message).__module__}.{type(message).__qualname__}.handle"
-                    ] = e
+                errors[f"{job_class.__module__}.{job_class.__qualname__}.execute"] = e
+
+            if errors:
+                raise MessageHandlingFailedError(envelope=envelope, errors=errors)
+
+            return envelope
         else:
             handlers = self._registry.get_handlers(message.__class__)
 

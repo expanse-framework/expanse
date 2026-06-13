@@ -19,8 +19,8 @@ from expanse.cache.messages.cache_item_set import CacheItemSet
 from expanse.contracts.cache.asynchronous.bus import Bus
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.cache.asynchronous.store import Store as StoreContract
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 
 
 if TYPE_CHECKING:
@@ -317,10 +317,10 @@ class CacheStack(CacheContract):
         value: _T
         if inspect.iscoroutinefunction(callback):
             value = await cast("Callable[..., Awaitable[_T]]", callback)()
-        elif not should_run_in_threadpool(callback):
+        elif not should_run_as_async(callback):
             value = cast("Callable[..., _T]", callback)()
         else:
-            value = await run_in_threadpool(cast("Callable[..., _T]", callback))
+            value = await sync_to_async(cast("Callable[..., _T]", callback))
 
         logger.debug(
             "Computed cache value", extra={"key": key, "callback": callback.__name__}

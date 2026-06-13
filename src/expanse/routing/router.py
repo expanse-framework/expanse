@@ -25,8 +25,8 @@ from expanse.routing.finder import Finder
 from expanse.routing.pipeline import Pipeline
 from expanse.routing.route import Route
 from expanse.routing.route_group import RouteGroup
-from expanse.support._concurrency import run_in_threadpool
-from expanse.support._concurrency import should_run_in_threadpool
+from expanse.support._concurrency import should_run_as_async
+from expanse.support._concurrency import sync_to_async
 from expanse.support._concurrency import warn_about_implicit_async_safe_status
 from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
@@ -197,14 +197,12 @@ class Router(RouterContract):
 
             if route.is_async:
                 raw_response = await endpoint(*positional, **keywords)
-            elif not should_run_in_threadpool(endpoint):
+            elif not should_run_as_async(endpoint):
                 warn_about_implicit_async_safe_status(endpoint, self._config)
 
                 raw_response = endpoint(*positional, **keywords)
             else:
-                raw_response = await run_in_threadpool(
-                    endpoint, *positional, **keywords
-                )
+                raw_response = await sync_to_async(endpoint, *positional, **keywords)
 
             # Do not go through the response adapter if the response is already a Response instance
             if isinstance(raw_response, Response):

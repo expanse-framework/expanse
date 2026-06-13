@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 from typing import ClassVar
+from typing import override
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,8 @@ from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
+from expanse.jobs.asynchronous.job import Job as AsyncJob
+from expanse.jobs.stamps.job import JobStamp
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
@@ -22,7 +25,6 @@ from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
-from expanse.messenger.stamps.self_handling import SelfHandlingStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
@@ -30,6 +32,7 @@ from expanse.messenger.stamps.transport_message_id import TransportMessageIdStam
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
+from expanse.support._utils import class_to_name
 
 
 class FakeKeepAliveTransport(KeepAliveTransport):
@@ -81,27 +84,25 @@ class MyService:
         self.called_with: list[str] = []
 
 
-@dataclass
-class SelfHandlingJob:
-    value: str
+class ProcessJob(AsyncJob[WorkerMessage]):
     call_log: ClassVar[list[str]] = []
 
-    async def handle(self) -> None:
-        SelfHandlingJob.call_log.append(self.value)
+    @override
+    async def execute(self) -> None:
+        ProcessJob.call_log.append(self.payload.value)
 
 
-@dataclass
-class SelfHandlingJobWithDep:
-    value: str
+class ProcessJobWithDep(AsyncJob[WorkerMessage]):
     injected: ClassVar[list[MyService]] = []
 
-    async def handle(self, service: MyService) -> None:
-        SelfHandlingJobWithDep.injected.append(service)
+    @override
+    async def execute(self, service: MyService) -> None:
+        ProcessJobWithDep.injected.append(service)
 
 
 @dataclass
-class NoHandleJob:
-    value: str
+class NotAJob:
+    payload: WorkerMessage
 
 
 @pytest.fixture()
@@ -280,55 +281,55 @@ async def test_worker_routes_to_failure_transport_when_retries_are_exhausted(
     assert sent_stamp.original_transport == "memory"
 
 
-async def test_worker_handles_self_handling_messages(
+async def test_worker_handles_job_messages(
     worker: Worker, transport_manager: TransportManager
 ) -> None:
-    SelfHandlingJob.call_log.clear()
+    ProcessJob.call_log.clear()
 
     transport = await transport_manager.transport("memory")
     assert isinstance(transport, MemoryTransport)
 
+    payload = WorkerMessage(value="processed")
     await transport.send(
-        Envelope.wrap(
-            SelfHandlingJob(value="self-handled"), stamps=[SelfHandlingStamp()]
-        )
+        Envelope.wrap(payload, stamps=[JobStamp(class_to_name(ProcessJob))])
     )
 
     await worker.run(limit=1)
 
-    assert SelfHandlingJob.call_log == ["self-handled"]
+    assert ProcessJob.call_log == ["processed"]
     assert [e async for e in transport.receive()] == []
 
 
-async def test_worker_self_handling_message_receives_injected_dependencies(
+async def test_worker_job_receives_injected_dependencies(
     worker: Worker, transport_manager: TransportManager, container: Container
 ) -> None:
-    SelfHandlingJobWithDep.injected.clear()
+    ProcessJobWithDep.injected.clear()
     service = MyService()
     container.instance(MyService, service)
 
     transport = await transport_manager.transport("memory")
     assert isinstance(transport, MemoryTransport)
 
+    payload = WorkerMessage(value="di")
     await transport.send(
-        Envelope.wrap(SelfHandlingJobWithDep(value="di"), stamps=[SelfHandlingStamp()])
+        Envelope.wrap(payload, stamps=[JobStamp(class_to_name(ProcessJobWithDep))])
     )
 
     await worker.run(limit=1)
 
-    assert len(SelfHandlingJobWithDep.injected) == 1
-    assert SelfHandlingJobWithDep.injected[0] is service
+    assert len(ProcessJobWithDep.injected) == 1
+    assert ProcessJobWithDep.injected[0] is service
 
 
-async def test_worker_routes_no_handle_method_message_to_failure_transport(
+async def test_worker_routes_invalid_job_class_to_failure_transport(
     transport_manager: TransportManager,
     retry_strategy_manager: RetryStrategyManager,
     middleware_stack: MiddlewareStack,
     container: Container,
     registry: Registry,
 ) -> None:
-    # SelfHandlingMessageWithNoHandlerError is caught by the retry/failure handling
-    # machinery — verify the message ends up in the failure transport.
+    # A JobStamp pointing to a class that is not a Job subclass raises TypeError,
+    # which is caught by the failure machinery and sent to the failure transport.
     config_no_retry = Config(
         {
             "messenger": {
@@ -355,8 +356,9 @@ async def test_worker_routes_no_handle_method_message_to_failure_transport(
     assert isinstance(transport, MemoryTransport)
     assert isinstance(failure_transport, MemoryTransport)
 
+    payload = WorkerMessage(value="x")
     await transport.send(
-        Envelope.wrap(NoHandleJob(value="x"), stamps=[SelfHandlingStamp()])
+        Envelope.wrap(payload, stamps=[JobStamp(class_to_name(NotAJob))])
     )
 
     await worker.run(limit=1)
@@ -475,19 +477,18 @@ async def test_worker_adds_handled_stamp_after_successful_handling(
     assert handler.__qualname__ in stamps[0].handler
 
 
-async def test_worker_adds_handled_stamp_for_self_handling_messages(
+async def test_worker_adds_handled_stamp_for_job_messages(
     worker: Worker, transport_manager: TransportManager
 ) -> None:
-    SelfHandlingJob.call_log.clear()
+    ProcessJob.call_log.clear()
     handled_envelopes: list[Envelope] = []
 
     transport = await transport_manager.transport("memory")
     assert isinstance(transport, MemoryTransport)
 
+    payload = WorkerMessage(value="stamped")
     await transport.send(
-        Envelope.wrap(
-            SelfHandlingJob(value="self-stamped"), stamps=[SelfHandlingStamp()]
-        )
+        Envelope.wrap(payload, stamps=[JobStamp(class_to_name(ProcessJob))])
     )
 
     original_acknowledge = transport.acknowledge
@@ -500,11 +501,11 @@ async def test_worker_adds_handled_stamp_for_self_handling_messages(
 
     await worker.run(limit=1)
 
-    assert SelfHandlingJob.call_log == ["self-stamped"]
+    assert ProcessJob.call_log == ["stamped"]
     assert len(handled_envelopes) == 1
     stamps = handled_envelopes[0].stamps(HandledStamp)
     assert len(stamps) == 1
-    assert "SelfHandlingJob.handle" in stamps[0].handler
+    assert "ProcessJob.execute" in stamps[0].handler
 
 
 async def test_worker_skips_already_handled_handlers(

@@ -7,7 +7,7 @@ from cleo.io.inputs.option import Option
 
 from expanse.database.console.command import MigrationCommand
 from expanse.database.migration.migrator import Migrator
-from expanse.support._concurrency import run_in_threadpool
+from expanse.support._concurrency import sync_to_async
 
 
 class MakeMigrationCommand(MigrationCommand):
@@ -25,7 +25,7 @@ class MakeMigrationCommand(MigrationCommand):
     async def handle(self, migrator: Migrator) -> int:
         self.line("")
 
-        await run_in_threadpool(
+        await sync_to_async(
             migrator.make,
             message=self.argument("name"),
             auto=self.option("auto"),
