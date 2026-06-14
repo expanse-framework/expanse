@@ -12,8 +12,8 @@ class Config(BaseSettings):
     # The default session store that should be used
     # when no store is explicitly specified.
     #
-    # Supported stores are: database and file
-    store: Literal["database", "file", "dict", "null"] = "database"
+    # Supported stores are: database, file, dict, redis, and null
+    store: Literal["database", "file", "dict", "redis", "null"] = "database"
 
     # Available session stores
     #
@@ -31,7 +31,7 @@ class Config(BaseSettings):
 
     # Session lifetime
     #
-    # This option defines maximum duration the session can remain idle
+    # This option defines the maximum duration in minutes the session can remain idle
     # before it expires.
     lifetime: int = 120
 

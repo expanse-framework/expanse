@@ -17,8 +17,15 @@ class FileStoreConfig(BaseModel):
     path: Path = Path("storage/expanse/sessions")
 
 
+class RedisStoreConfig(BaseModel):
+    # The name of the Redis connection that should be used to store the session data.
+    # The value must match one of the configured Redis connections.
+    connection: str
+
+
 class StoresConfig(BaseModel):
     database: DatabaseStoreConfig = DatabaseStoreConfig()
     dictionary: None = None
     file: FileStoreConfig = FileStoreConfig()
+    redis: RedisStoreConfig = RedisStoreConfig(connection="default")
     null: None = None

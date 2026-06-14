@@ -87,6 +87,38 @@ class SessionManager:
                 from expanse.session.synchronous.stores.null import NullStore
 
                 return NullStore(), AsyncNullStore()
+            case "redis":
+                from expanse.cache.asynchronous.cache import Cache
+                from expanse.cache.asynchronous.cache_manager import CacheManager
+                from expanse.cache.synchronous.cache import Cache as SyncCache
+                from expanse.cache.synchronous.cache_manager import (
+                    CacheManager as SyncCacheManager,
+                )
+                from expanse.session.asynchronous.stores.cache import AsyncCacheStore
+                from expanse.session.synchronous.stores.cache import (
+                    CacheStore as SyncCacheStore,
+                )
+
+                # Create ad-hoc Redis cache stores
+                cache_manager = await self._app.container.get(CacheManager)
+                cache = Cache(
+                    "redis-session",
+                    await cache_manager._create_redis_store(
+                        {"connection": config.redis.connection}
+                    ),
+                )
+                sync_cache_manager = await self._app.container.get(SyncCacheManager)
+                sync_cache = SyncCache(
+                    "redis-session",
+                    await sync_cache_manager._create_redis_store(
+                        {"connection": config.redis.connection}
+                    ),
+                )
+
+                return SyncCacheStore(
+                    cache=sync_cache, lifetime=self._config["lifetime"]
+                ), AsyncCacheStore(cache=cache, lifetime=self._config["lifetime"])
+
             case _:
                 raise RuntimeError(f"Unsupported session store: {name}")
 
