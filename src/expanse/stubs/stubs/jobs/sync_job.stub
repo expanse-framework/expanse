@@ -1,0 +1,13 @@
+from dataclasses import dataclass
+
+from expanse.jobs.synchronous.job import Job
+
+
+@dataclass
+class {name}Payload: ...
+
+
+class {name}(Job[{name}Payload]):
+
+    def execute(self) -> None:
+        pass
