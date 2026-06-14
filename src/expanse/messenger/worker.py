@@ -1,4 +1,7 @@
 import asyncio
+import contextvars
+
+from typing import Any
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
@@ -184,7 +187,6 @@ class Worker:
 
         message = envelope.open()
         errors: dict[str, Exception] = {}
-        handlers: list[MessageHandler] = []
         if stamp := envelope.stamp(JobStamp):
             # If the envelope is marked with the JobStamp,
             # we skip the registry and handle it directly.
@@ -196,7 +198,11 @@ class Worker:
                 )
 
             try:
-                await self._container.call(job.execute)
+                token = self._isolate_log_context()
+                try:
+                    await self._container.call(job.execute)
+                finally:
+                    self._restore_log_context(token)
 
                 envelope = envelope.with_stamps(
                     HandledStamp(
@@ -210,15 +216,19 @@ class Worker:
                 raise MessageHandlingFailedError(envelope=envelope, errors=errors)
 
             return envelope
-        else:
-            handlers = self._registry.get_handlers(message.__class__)
+
+        handlers = self._registry.get_handlers(message.__class__)
 
         for handler in handlers:
             if self._has_already_been_handled(envelope, handler):
                 continue
 
             try:
-                await self._container.call(handler, message)
+                token = self._isolate_log_context()
+                try:
+                    await self._container.call(handler, message)
+                finally:
+                    self._restore_log_context(token)
 
                 envelope = envelope.with_stamps(
                     HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
@@ -274,3 +284,15 @@ class Worker:
             return self._retry_strategy_manager.strategy(retry_strategy_alias)
         except (UnconfiguredRetryStrategyError, UnsupportedRetryStrategyError):
             return None
+
+    def _isolate_log_context(self) -> contextvars.Token[Any]:
+        from expanse.logging.context import Context
+        from expanse.logging.utils import _context
+
+        original = _context.get() or Context()
+        return _context.set(Context(**original))
+
+    def _restore_log_context(self, token: contextvars.Token[Any]) -> None:
+        from expanse.logging.utils import _context
+
+        _context.reset(token)

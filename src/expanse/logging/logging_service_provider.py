@@ -1,5 +1,4 @@
 from collections.abc import AsyncGenerator
-from collections.abc import Generator
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
@@ -14,7 +13,8 @@ class LoggingServiceProvider(ServiceProvider):
     async def register(self) -> None:
         self._container.singleton(LoggingManager, self._create_logging_manager)
         self._container.singleton(LogChannel, self._create_channel)
-        self._container.scoped(Context, self._create_context)
+        self._container.register(Context, self._get_context)
+        self._container.terminating(self._clear_context)
 
     async def boot(self, config: Config, container: Container) -> None:
         logging_routing_config = config.get("logging", {}).get("routing", {})
@@ -43,13 +43,19 @@ class LoggingServiceProvider(ServiceProvider):
     ) -> LogChannel:
         return logger.channel(name)
 
-    def _create_context(self) -> Generator[Context]:
+    def _get_context(self) -> Context:
+        from expanse.logging.utils import _context
+
+        ctx = _context.get()
+        if ctx is not None:
+            return ctx
+
+        new_context = Context()
+        _context.set(new_context)
+
+        return new_context
+
+    def _clear_context(self) -> None:
         from expanse.logging.utils import _set_context
 
-        context = Context()
-        _set_context(context)
-
-        yield context
-
-        context.clear()
         _set_context(None)
