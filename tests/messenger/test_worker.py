@@ -1,9 +1,13 @@
 import asyncio
+import logging
 
 from collections.abc import AsyncIterator
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 from typing import ClassVar
+from typing import Protocol
+from typing import cast
 from typing import override
 from unittest.mock import patch
 
@@ -16,11 +20,16 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
 )
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
+from expanse.logging.context import Context
+from expanse.logging.filters.context import ContextFilter
+from expanse.logging.utils import _set_context
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
+from expanse.messenger.middleware.propagate_context import PropagateContext
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
+from expanse.messenger.stamps.context import ContextStamp
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
@@ -33,6 +42,15 @@ from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
 from expanse.support._utils import class_to_name
+
+
+class ContextLogRecord(Protocol):
+    context: dict[str, Any]
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addFilter(ContextFilter())
 
 
 class FakeKeepAliveTransport(KeepAliveTransport):
@@ -105,9 +123,25 @@ class NotAJob:
     payload: WorkerMessage
 
 
+def context_setter_handler(message: WorkerMessage, context: Context) -> None:
+    context["foo"] = "baz"
+    context["message_value"] = message.value
+
+    logger.info("Setting log context")
+
+
+def logging_handler(message: WorkerMessage) -> None:
+    logger.info("Handling message with context.")
+
+
 @pytest.fixture()
-def container() -> Container:
-    return Container()
+async def container() -> Container:
+    from expanse.logging.logging_service_provider import LoggingServiceProvider
+
+    container = Container()
+    await LoggingServiceProvider(container).register()
+
+    return container
 
 
 @pytest.fixture()
@@ -118,6 +152,16 @@ def middleware_stack() -> MiddlewareStack:
 @pytest.fixture()
 def registry() -> Registry:
     return Registry()
+
+
+@pytest.fixture()
+def context() -> Generator[Context]:
+    context = Context()
+    _set_context(context)
+
+    yield context
+
+    _set_context(None)
 
 
 @pytest.fixture()
@@ -837,3 +881,89 @@ async def test_worker_keep_alive_passes_duration_to_transport(
     await worker.keep_alive(duration=30)
 
     assert fake_transport.keep_alive_calls[0] == (envelope, 30)
+
+
+async def test_log_context_is_not_shared_between_handlers(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    caplog: pytest.LogCaptureFixture,
+    context: Context,
+) -> None:
+    caplog.set_level(logging.INFO)
+    message1 = WorkerMessage(value="message1")
+    message2 = WorkerMessage(value="message2")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    registry.register_handler(context_setter_handler)
+    registry.register_handler(logging_handler)
+
+    await transport.send(Envelope.wrap(message1))
+    await transport.send(Envelope.wrap(message2))
+
+    context["foo"] = "bar"
+
+    await worker.run(limit=2)
+
+    logs = cast(
+        "list[ContextLogRecord]",
+        [
+            log
+            for log in caplog.records
+            if log.message in ("Setting log context", "Handling message with context.")
+        ],
+    )
+    assert logs[0].context["foo"] == "baz"
+    assert logs[0].context["message_value"] == "message1"
+    assert logs[1].context["foo"] == "bar"
+    assert not hasattr(logs[1].context, "message_value")
+    assert logs[2].context["foo"] == "baz"
+    assert logs[2].context["message_value"] == "message2"
+    assert logs[3].context["foo"] == "bar"
+    assert not hasattr(logs[3].context, "message_value")
+
+
+async def test_log_context_is_not_shared_between_messages(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    caplog: pytest.LogCaptureFixture,
+    middleware_stack: MiddlewareStack,
+    context: Context,
+) -> None:
+    caplog.set_level(logging.INFO)
+
+    middleware_stack.append(PropagateContext)
+
+    message1 = WorkerMessage(value="message1")
+    message2 = WorkerMessage(value="message2")
+    message3 = WorkerMessage(value="message3")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    registry.register_handler(logging_handler)
+
+    await transport.send(
+        Envelope.wrap(message1).with_stamps(ContextStamp({"request_id": "123456"}))
+    )
+    await transport.send(
+        Envelope.wrap(message2).with_stamps(ContextStamp({"request_id": "987654"}))
+    )
+    await transport.send(Envelope.wrap(message3))
+
+    await worker.run(limit=3)
+
+    logs = cast(
+        "list[ContextLogRecord]",
+        [
+            log
+            for log in caplog.records
+            if log.message == "Handling message with context."
+        ],
+    )
+    assert logs[0].context["request_id"] == "123456"
+    assert logs[1].context["request_id"] == "987654"
+    assert not hasattr(logs[2].context, "context")

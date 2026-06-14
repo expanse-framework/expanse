@@ -7,8 +7,8 @@ from typing import override
 
 
 class Context(MutableMapping[str, Any]):
-    def __init__(self) -> None:
-        self._data: dict[str, Any] = {}
+    def __init__(self, **data: Any) -> None:
+        self._data: dict[str, Any] = data
 
     def __getitem__(self, key: str) -> Any:
         return self._data[key]
