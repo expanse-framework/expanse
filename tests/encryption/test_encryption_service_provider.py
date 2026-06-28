@@ -1,5 +1,5 @@
-from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.core.application import Application
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryption_service_provider import EncryptionServiceProvider
 from expanse.encryption.encryptor_factory import EncryptorFactory
 
@@ -14,8 +14,4 @@ async def test_service_provider_registers_encryptor_factory_and_encryptor(
     await provider.register()
 
     assert app.container.has(EncryptorFactory)
-    assert app.container.has(Encryptor)
-
-    encryptor = await app.container.get(Encryptor)
-
-    assert isinstance(encryptor, Encryptor)
+    assert app.container.has(EncryptionManager)
