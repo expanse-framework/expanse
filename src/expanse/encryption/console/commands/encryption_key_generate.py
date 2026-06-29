@@ -1,4 +1,3 @@
-import base64
 import re
 
 from typing import ClassVar
@@ -45,10 +44,7 @@ class EncryptionKeyGenerateCommand(Command):
         return 0
 
     async def _generate_key(self, app: Application, key_name: str) -> int:
-        raw_key = Encryptor.generate_random_key(
-            Cipher(app.config.get("encryption.cipher"))
-        )
-        key = f"base64:{base64.urlsafe_b64encode(raw_key).decode()}"
+        key = Encryptor.generate_random_key(Cipher(app.config.get("encryption.cipher")))
 
         if self.option("show"):
             self.line("")

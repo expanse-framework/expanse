@@ -1,6 +1,9 @@
 from pathlib import Path
 
+from pytest_mock import MockerFixture
+
 from expanse.core.application import Application
+from expanse.encryption.encryptor import Encryptor
 from expanse.testing.command_tester import CommandTester
 
 
@@ -116,14 +119,15 @@ async def test_generate_key_with_env_file_and_with_non_empty_app_secret_key_and_
 
 
 async def test_generate_key_show_only(
-    command_tester: CommandTester, app: Application, tmp_path: Path
+    command_tester: CommandTester, mocker: MockerFixture
 ) -> None:
+    mocker.patch.object(Encryptor, "generate_random_key", return_value="random_key")
     command = command_tester.command("encryption key generate")
 
     return_code = command.run("--show")
     assert return_code == 0
 
-    assert command.output.fetch().strip().startswith("base64:")
+    assert command.output.fetch().strip().startswith("random_key")
 
 
 async def test_generate_key_with_key_only(

@@ -1,5 +1,3 @@
-import secrets
-
 from enum import Enum
 from typing import ClassVar
 
@@ -12,6 +10,7 @@ from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
+from expanse.encryption.utils import generate_random_string
 
 
 class Cipher(Enum):
@@ -123,8 +122,7 @@ class Encryptor(EncryptorContract):
         return decrypted.decode()
 
     @classmethod
-    def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> bytes:
+    def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> str:
         cipher_class = cls.CIPHERS[cipher]
-        key = secrets.token_bytes(cipher_class.key_length)
 
-        return key
+        return generate_random_string(cipher_class.key_length)

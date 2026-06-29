@@ -117,7 +117,7 @@ def test_encryptor_can_decrypt_string_messages(encryptor: Encryptor) -> None:
 def test_encryptor_can_generate_keys() -> None:
     key = Encryptor.generate_random_key()
 
-    assert isinstance(key, bytes)
+    assert isinstance(key, str)
     assert len(key) == 32
 
 
