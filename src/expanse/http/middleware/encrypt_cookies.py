@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from expanse.contracts.encryption.encryptor import Encryptor
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.errors import DecryptionError
 from expanse.encryption.errors import MessageDecodeError
 from expanse.http.request import Request
@@ -11,8 +11,8 @@ from expanse.types.http.middleware import RequestHandler
 class EncryptCookies:
     exclude: ClassVar[list[str]] = []
 
-    def __init__(self, encryptor: Encryptor):
-        self._encryptor = encryptor
+    def __init__(self, encryption: EncryptionManager):
+        self._encryption: EncryptionManager = encryption
         self._exclude: list[str] = []
 
     @classmethod
@@ -38,7 +38,7 @@ class EncryptCookies:
             if cookie.value is None:
                 continue
 
-            value = self._encryptor.encrypt(cookie.value)
+            value = self._encryption.encrypt(cookie.value)
             response.cookies[name] = cookie.with_value(value)
 
         return response
@@ -49,7 +49,7 @@ class EncryptCookies:
                 continue
 
             try:
-                decrypted_value = self._encryptor.decrypt(value)
+                decrypted_value = self._encryption.decrypt(value)
                 request.cookies[key] = decrypted_value
             except (MessageDecodeError, DecryptionError):
                 request.cookies[key] = ""

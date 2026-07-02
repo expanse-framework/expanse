@@ -1,4 +1,5 @@
 from pydantic import SecretStr
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -40,6 +41,20 @@ class Config(BaseSettings):
     #
     # This is a comma-separated list of previous encryption keys that were used by the
     # application. This is used to decrypt messages that were encrypted with an older key.
-    previous_keys: SecretStr | None = None
+    previous_keys: SecretStr | list[SecretStr] | None = None
 
     model_config = SettingsConfigDict(env_prefix="app_", env_nested_delimiter="__")
+
+    @field_validator("previous_keys", mode="before")
+    @classmethod
+    def decode_headers(cls, v: str | list[str] | None) -> list[SecretStr] | None:
+        if v is None:
+            return None
+
+        if isinstance(v, list):
+            return [
+                SecretStr(key.strip()) if not isinstance(key, SecretStr) else key
+                for key in v
+            ]
+
+        return [SecretStr(key) for key in v.split(",")]

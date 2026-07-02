@@ -19,7 +19,7 @@ class AES256GCMCipher(BaseCipher):
         from cryptography.hazmat.primitives.ciphers.modes import GCM
 
         iv = self._generate_iv(data)
-        cipher = Cipher(AES(self._secret), GCM(iv), backend=default_backend())
+        cipher = Cipher(AES(self._secret.reveal()), GCM(iv), backend=default_backend())
 
         encryptor = cipher.encryptor()
         encrypted = encryptor.update(data) + encryptor.finalize()
@@ -42,7 +42,7 @@ class AES256GCMCipher(BaseCipher):
         if not auth_tag or len(auth_tag) != 16:
             raise DecryptionError("Invalid tag")
 
-        cipher = Cipher(AES(self._secret), GCM(iv), backend=default_backend())
+        cipher = Cipher(AES(self._secret.reveal()), GCM(iv), backend=default_backend())
 
         decryptor = cipher.decryptor()
 
@@ -59,4 +59,4 @@ class AES256GCMCipher(BaseCipher):
         if not self._deterministic:
             return secrets.token_bytes(self.iv_length)
 
-        return hmac.digest(self._secret, data, "sha256")[: self.iv_length]
+        return hmac.digest(self._secret.reveal(), data, "sha256")[: self.iv_length]
