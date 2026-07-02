@@ -1,6 +1,10 @@
-from pydantic import SecretStr
+from typing import Annotated
+
 from pydantic_settings import BaseSettings
+from pydantic_settings import NoDecode
 from pydantic_settings import SettingsConfigDict
+
+from expanse.support.secret import Secret
 
 
 class Config(BaseSettings):
@@ -8,6 +12,6 @@ class Config(BaseSettings):
     cipher: str = "aes-256-gcm"
 
     # The salt used for encryption key derivation.
-    salt: SecretStr = SecretStr("")
+    salt: Annotated[Secret[str], NoDecode] = Secret("")
 
     model_config = SettingsConfigDict(env_prefix="encryption_")

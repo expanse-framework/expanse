@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from expanse.core.application import Application
 from expanse.encryption.key_generator import KeyGenerator
+from expanse.support.secret import Secret
 
 
 if TYPE_CHECKING:
@@ -20,16 +21,20 @@ class EncryptorFactory:
         from expanse.encryption.key import Key
         from expanse.encryption.key_chain import KeyChain
 
-        secret_key: str = self._app.config.get("app.secret_key", raw=True)
-        previous_keys: str = self._app.config.get("app.previous_keys", raw=True)
+        secret_key: Secret[str] = Secret[str].wrap(
+            self._app.config.get("app.secret_key")
+        )
+        previous_keys: list[str | Secret[str]] = self._app.config.get(
+            "app.previous_keys"
+        )
         cipher: str = self._app.config.get("encryption.cipher")
-        salt: str = self._app.config.get("encryption.salt", raw=True)
+        salt: Secret[str] = Secret[str].wrap(self._app.config.get("encryption.salt"))
 
         key_chain = KeyChain([Key(self._normalize_key(secret_key))])
 
         if previous_keys:
-            for key in previous_keys.split(","):
-                key = key.strip()
+            for raw_key in previous_keys:
+                key = Secret.wrap(raw_key)
 
                 if not key:
                     continue
@@ -43,13 +48,13 @@ class EncryptorFactory:
             compress=compress,
         )
 
-    def _normalize_key(self, key: str) -> bytes:
+    def _normalize_key(self, key: Secret[str]) -> Secret[bytes]:
         from expanse.encryption.errors import MissingSecretKeyError
 
-        if not key:
+        if not key.reveal():
             raise MissingSecretKeyError()
 
-        if key.startswith("base64:"):
-            return base64.urlsafe_b64decode(key[7:])
+        if key.reveal().startswith("base64:"):
+            return Secret(base64.urlsafe_b64decode(key.reveal()[7:]))
 
-        return key.encode()
+        return Secret(key.reveal().encode())
