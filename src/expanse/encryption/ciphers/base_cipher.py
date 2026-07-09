@@ -19,7 +19,11 @@ class BaseCipher(ABC):
         self._deterministic = deterministic
 
     @abstractmethod
-    def encrypt(self, data: bytes) -> Message: ...
+    def encrypt(
+        self, data: bytes, *, additional_data: bytes | None = None
+    ) -> Message: ...
 
     @abstractmethod
-    def decrypt(self, message: Message) -> bytes: ...
+    def decrypt(
+        self, message: Message, *, additional_data: bytes | None = None
+    ) -> bytes: ...

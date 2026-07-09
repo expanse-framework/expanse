@@ -11,6 +11,7 @@ from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
 from expanse.encryption.utils import generate_random_string
+from expanse.support.secret import Secret
 
 
 class Cipher(Enum):
@@ -25,9 +26,10 @@ class Encryptor(EncryptorContract):
     def __init__(
         self,
         key_chain: KeyChain,
-        key_generator: KeyGenerator,
         cipher: Cipher = Cipher.AES_256_GCM,
         *,
+        salt: Secret[bytes] | bytes | None = None,
+        purpose: bytes | None = None,
         compress: bool = True,
     ) -> None:
         self._key_chain = key_chain
@@ -35,7 +37,10 @@ class Encryptor(EncryptorContract):
         self._cipher = cipher
         self._compress = compress
         self._compressor = ZlibCompressor()
-        self._key_generator = key_generator
+        self._key_generator = KeyGenerator(
+            Secret[bytes].wrap(salt) if salt is not None else None, purpose=purpose
+        )
+        self._purpose = purpose
 
     def has_compression(self) -> bool:
         return self._compress
@@ -78,7 +83,9 @@ class Encryptor(EncryptorContract):
         if self._compress:
             encoded = self._compressor.compress(encoded)
 
-        encrypted = cipher.encrypt(encoded)
+        encrypted = cipher.encrypt(
+            encoded, additional_data=self._build_additional_data()
+        )
         if self._compress:
             encrypted.headers["z"] = 1
 
@@ -101,25 +108,43 @@ class Encryptor(EncryptorContract):
 
         for key in self._key_chain:
             try:
-                return self._decrypt(message, key)
+                return self._decrypt(
+                    message,
+                    key,
+                    additional_data=self._build_additional_data(
+                        compress=bool(message.headers.get("z"))
+                    ),
+                )
             except DecryptionError:
                 continue
 
         raise DecryptionError("Unable to decrypt message")
 
-    def _decrypt(self, message: Message, key: Key) -> str:
+    def _decrypt(
+        self, message: Message, key: Key, additional_data: bytes | None
+    ) -> str:
         cipher_class = self.CIPHERS[self._cipher]
 
         key = self._key_generator.generate_key(key, key_size=cipher_class.key_length)
 
         cipher = cipher_class(key.value)
 
-        decrypted = cipher.decrypt(message)
+        decrypted = cipher.decrypt(message, additional_data=additional_data)
 
         if message.headers.get("z"):
             decrypted = self._compressor.decompress(decrypted)
 
         return decrypted.decode()
+
+    def _build_additional_data(self, compress: bool | None = None) -> bytes:
+        if compress is None:
+            compress = self._compress
+
+        additional_data: bytes = b"1" if compress else b"0"
+        if self._purpose:
+            additional_data += self._purpose
+
+        return additional_data
 
     @classmethod
     def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> str:

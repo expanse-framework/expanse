@@ -18,7 +18,7 @@ class EncryptionManager:
         :return: The encrypted data as a base64-encoded string.
         """
         encryptor = self._factory.make(
-            compress=compress, label=purpose.encode() if purpose else None
+            compress=compress, purpose=purpose.encode() if purpose else None
         )
 
         return encryptor.encrypt(value)
@@ -33,7 +33,7 @@ class EncryptionManager:
         :return: The decrypted data as a string.
         """
         encryptor = self._factory.make(
-            compress=True, label=purpose.encode() if purpose else None
+            compress=True, purpose=purpose.encode() if purpose else None
         )
 
         return encryptor.decrypt(value)

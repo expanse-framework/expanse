@@ -28,15 +28,13 @@ def key_generator() -> KeyGenerator:
 
 
 @pytest.fixture
-def encryptor(key_chain: KeyChain, key_generator: KeyGenerator) -> Encryptor:
-    return Encryptor(key_chain, key_generator)
+def encryptor(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, salt=Secret(SALT))
 
 
 @pytest.fixture
-def encryptor_without_compression(
-    key_chain: KeyChain, key_generator: KeyGenerator
-) -> Encryptor:
-    return Encryptor(key_chain, key_generator, compress=False)
+def encryptor_without_compression(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, salt=Secret(SALT), compress=False)
 
 
 def test_encryptor_can_encrypt_data(
@@ -122,30 +120,28 @@ def test_encryptor_can_generate_keys() -> None:
     assert len(key) == 32
 
 
-def test_encryptor_iterates_over_keys_to_decrypt(key_generator: KeyGenerator) -> None:
+def test_encryptor_iterates_over_keys_to_decrypt() -> None:
     key_chain = KeyChain([Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET), Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     decrypted = encryptor.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"
 
 
-def test_encryptor_raises_an_error_if_it_can_not_decrypt_message(
-    key_generator: KeyGenerator,
-) -> None:
+def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
     key_chain = KeyChain([Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     with pytest.raises(DecryptionError):
         encryptor.decrypt(encrypted_string)

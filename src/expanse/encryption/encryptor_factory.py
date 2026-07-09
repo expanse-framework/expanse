@@ -3,7 +3,6 @@ import base64
 from typing import TYPE_CHECKING
 
 from expanse.core.application import Application
-from expanse.encryption.key_generator import KeyGenerator
 from expanse.support.secret import Secret
 
 
@@ -15,7 +14,7 @@ class EncryptorFactory:
     def __init__(self, app: Application) -> None:
         self._app = app
 
-    def make(self, compress: bool = True, label: bytes | None = None) -> "Encryptor":
+    def make(self, compress: bool = True, purpose: bytes | None = None) -> "Encryptor":
         from expanse.encryption.encryptor import Cipher
         from expanse.encryption.encryptor import Encryptor
         from expanse.encryption.key import Key
@@ -43,8 +42,9 @@ class EncryptorFactory:
 
         return Encryptor(
             key_chain,
-            KeyGenerator(self._normalize_key(salt), label=label),
             Cipher(cipher),
+            salt=self._normalize_key(salt),
+            purpose=purpose,
             compress=compress,
         )
 

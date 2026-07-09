@@ -31,13 +31,13 @@ def test_encryptor_factory_can_create_encryptor_without_compression(
 def test_encryptor_factory_can_create_encryptor_with_specific_labels(
     factory: EncryptorFactory,
 ) -> None:
-    encryptor = factory.make(label=b"test-label")
-    encryptor2 = factory.make(label=b"test-label-2")
+    encryptor = factory.make(purpose=b"test-label")
+    encryptor2 = factory.make(purpose=b"test-label-2")
 
     with pytest.raises(DecryptionError):
         encryptor.decrypt(encryptor2.encrypt("Hello, World!"))
 
     assert (
-        encryptor.decrypt(factory.make(label=b"test-label").encrypt("Hello, World!"))
+        encryptor.decrypt(factory.make(purpose=b"test-label").encrypt("Hello, World!"))
         == "Hello, World!"
     )

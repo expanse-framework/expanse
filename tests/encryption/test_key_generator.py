@@ -33,9 +33,9 @@ def test_derived_key_is_different_if_salt_is_different() -> None:
 
 
 def test_derived_key_is_different_if_label_is_different() -> None:
-    key = KeyGenerator(Secret(SALT), label=b"foo").generate_key(Key(SECRET))
-    key2 = KeyGenerator(Secret(SALT), label=b"bar").generate_key(Key(SECRET))
-    key3 = KeyGenerator(Secret(SALT), label=b"foo").generate_key(Key(SECRET))
+    key = KeyGenerator(Secret(SALT), purpose=b"foo").generate_key(Key(SECRET))
+    key2 = KeyGenerator(Secret(SALT), purpose=b"bar").generate_key(Key(SECRET))
+    key3 = KeyGenerator(Secret(SALT), purpose=b"foo").generate_key(Key(SECRET))
 
     assert key.value.reveal() != key2.value.reveal()
     assert key.value.reveal() == key3.value.reveal()
