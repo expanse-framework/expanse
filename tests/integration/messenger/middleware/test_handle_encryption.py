@@ -26,7 +26,7 @@ async def test_middleware_handles_encryption_and_decryption_properly(
     app.config["app.secret_key"] = "k" * 32
     app.config["encryption"] = {
         "cipher": "aes-256-gcm",
-        "salt": "salt",
+        "salt": "s" * 32,
     }
     encryption = EncryptorFactory(app)
     serializer = Serializer()
@@ -62,7 +62,7 @@ async def test_middleware_does_not_encrypt_envelope_without_sensitive_stamp(
     app.config["app.secret_key"] = "k" * 32
     app.config["encryption"] = {
         "cipher": "aes-256-gcm",
-        "salt": "salt",
+        "salt": "s" * 32,
     }
     encryption = EncryptorFactory(app)
     serializer = Serializer()

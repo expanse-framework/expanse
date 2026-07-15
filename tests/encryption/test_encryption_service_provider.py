@@ -1,7 +1,7 @@
+from expanse.contracts.encryption.encryptor_factory import EncryptorFactory
 from expanse.core.application import Application
 from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryption_service_provider import EncryptionServiceProvider
-from expanse.encryption.encryptor_factory import EncryptorFactory
 
 
 async def test_service_provider_registers_encryptor_factory_and_encryptor(

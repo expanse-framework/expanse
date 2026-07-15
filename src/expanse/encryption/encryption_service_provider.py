@@ -10,10 +10,13 @@ if TYPE_CHECKING:
 
 class EncryptionServiceProvider(ServiceProvider):
     async def register(self) -> None:
+        from expanse.contracts.encryption.encryptor_factory import (
+            EncryptorFactory as EncryptorFactoryContract,
+        )
         from expanse.encryption.encryption_manager import EncryptionManager
         from expanse.encryption.encryptor_factory import EncryptorFactory
 
-        self._container.singleton(EncryptorFactory)
+        self._container.singleton(EncryptorFactoryContract, EncryptorFactory)
         self._container.singleton(EncryptionManager)
 
     async def boot(self) -> None:

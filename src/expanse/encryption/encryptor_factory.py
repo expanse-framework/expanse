@@ -2,6 +2,9 @@ import base64
 
 from typing import TYPE_CHECKING
 
+from expanse.contracts.encryption.encryptor_factory import (
+    EncryptorFactory as EncryptorFactoryContract,
+)
 from expanse.core.application import Application
 from expanse.support.secret import Secret
 
@@ -10,7 +13,7 @@ if TYPE_CHECKING:
     from expanse.encryption.encryptor import Encryptor
 
 
-class EncryptorFactory:
+class EncryptorFactory(EncryptorFactoryContract):
     MIN_KEY_LENGTH: int = 32
 
     def __init__(self, app: Application) -> None:

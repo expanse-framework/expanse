@@ -1,4 +1,4 @@
-from expanse.encryption.encryptor_factory import EncryptorFactory
+from expanse.contracts.encryption.encryptor_factory import EncryptorFactory
 
 
 class EncryptionManager:
