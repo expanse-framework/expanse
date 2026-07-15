@@ -1,8 +1,7 @@
 import secrets
-import string
 
 
-_ALPHABET = string.ascii_lowercase + string.ascii_uppercase + string.digits
+_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$%&*-_+"
 
 
 def generate_random_string(size: int = 32) -> str:
