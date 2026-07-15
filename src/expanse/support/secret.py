@@ -70,15 +70,14 @@ class Secret[T]:
         if not isinstance(other, Secret):
             return NotImplemented
 
-        other_value = other.reveal()
-        if (
-            not isinstance(self.__value, (str, bytes))
-            or not isinstance(other_value, (str, bytes))
-            or type(self.__value) is not type(other_value)
-        ):
-            return self.__value == other_value
+        self_value: Any = self.__value
+        other_value: Any = other.reveal()
+        if isinstance(self_value, str) and isinstance(other_value, str):
+            return secrets.compare_digest(self_value, other_value)
+        if isinstance(self_value, bytes) and isinstance(other_value, bytes):
+            return secrets.compare_digest(self_value, other_value)
 
-        return secrets.compare_digest(self.__value, other_value)
+        return bool(self_value == other_value)
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -88,6 +87,6 @@ class Secret[T]:
         args = get_args(source)
         schema = handler.generate_schema(args[0])
         non_instance_schema = core_schema.no_info_after_validator_function(
-            Secret[args[0]].wrap, schema
+            cls.wrap, schema
         )
         return core_schema.union_schema([instance_schema, non_instance_schema])

@@ -10,9 +10,11 @@ _ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$%&
 
 class KeyGenerator:
     def __init__(
-        self, salt: Secret[bytes] | None = None, purpose: bytes | None = None
+        self, salt: Secret[bytes] | bytes | None = None, purpose: bytes | None = None
     ) -> None:
-        self._salt: Secret[bytes] | None = salt
+        self._salt: Secret[bytes] | None = (
+            Secret[bytes].wrap(salt) if salt is not None else None
+        )
         self._purpose: bytes | None = purpose
 
     def generate_key(self, secret_key: Key, key_size: int = 32) -> Key:

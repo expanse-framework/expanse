@@ -33,7 +33,7 @@ class EncryptorFactory:
 
         if previous_keys:
             for raw_key in previous_keys:
-                key = Secret.wrap(raw_key)
+                key = Secret[str].wrap(raw_key)
 
                 if not key:
                     continue

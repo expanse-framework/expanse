@@ -9,7 +9,6 @@ from expanse.contracts.routing.router import Router as RouterContract
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
-from expanse.encryption.key_generator import KeyGenerator
 from expanse.http.middleware.encrypt_cookies import EncryptCookies
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -27,7 +26,7 @@ def key_chain() -> KeyChain:
 
 @pytest.fixture
 def encryptor(key_chain: KeyChain) -> Encryptor:
-    return Encryptor(key_chain, KeyGenerator(SALT))
+    return Encryptor(key_chain, salt=SALT)
 
 
 @pytest.fixture
