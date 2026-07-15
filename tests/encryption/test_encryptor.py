@@ -134,6 +134,28 @@ def test_encryptor_iterates_over_keys_to_decrypt() -> None:
     assert decrypted == "Hello, World!"
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"iv": b"x" * 12},
+        {"at": b"x" * 16},
+        {"iv": b"short", "at": b"x" * 16},
+        {"iv": b"x" * 12, "at": b"short"},
+        {"iv": 42, "at": b"x" * 16},
+        {"iv": b"x" * 12, "at": 42},
+    ],
+)
+def test_encryptor_rejects_messages_with_invalid_headers(
+    encryptor: Encryptor, headers: dict
+) -> None:
+    message = encryptor.encrypt_raw("Hello, World!")
+    tampered = Message(message.payload, headers)
+
+    with pytest.raises(DecryptionError):
+        encryptor.decrypt(tampered)
+
+
 def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
     key_chain = KeyChain([Key(SECRET2)])
     encryptor = Encryptor(key_chain, salt=Secret(SALT))

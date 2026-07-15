@@ -3,6 +3,14 @@ class MissingSecretKeyError(RuntimeError):
         super().__init__(message)
 
 
+class InvalidSecretKeyError(RuntimeError):
+    def __init__(
+        self,
+        message: str = "Encryption keys and salts must be at least 32 bytes long.",
+    ):
+        super().__init__(message)
+
+
 class GenericEncryptionError(Exception): ...
 
 

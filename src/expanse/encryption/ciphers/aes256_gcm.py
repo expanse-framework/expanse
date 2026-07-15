@@ -41,11 +41,14 @@ class AES256GCMCipher(BaseCipher):
         from cryptography.hazmat.primitives.ciphers.modes import GCM
 
         encrypted_data = message.payload
-        iv = message.headers["iv"]
-        auth_tag = message.headers["at"]
+        iv = message.headers.get("iv")
+        auth_tag = message.headers.get("at")
 
-        if not auth_tag or len(auth_tag) != 16:
+        if not isinstance(auth_tag, bytes) or len(auth_tag) != 16:
             raise DecryptionError("Invalid tag")
+
+        if not isinstance(iv, bytes) or len(iv) != self.iv_length:
+            raise DecryptionError("Invalid initialization vector")
 
         cipher = Cipher(AES(self._secret.reveal()), GCM(iv), backend=default_backend())
 

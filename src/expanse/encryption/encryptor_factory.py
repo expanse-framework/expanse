@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class EncryptorFactory:
+    MIN_KEY_LENGTH: int = 32
+
     def __init__(self, app: Application) -> None:
         self._app = app
 
@@ -23,8 +25,8 @@ class EncryptorFactory:
         secret_key: Secret[str] = Secret[str].wrap(
             self._app.config.get("app.secret_key")
         )
-        previous_keys: list[str | Secret[str]] = self._app.config.get(
-            "app.previous_keys"
+        previous_keys: str | Secret[str] | list[str | Secret[str]] | None = (
+            self._app.config.get("app.previous_keys")
         )
         cipher: str = self._app.config.get("encryption.cipher")
         salt: Secret[str] = Secret[str].wrap(self._app.config.get("encryption.salt"))
@@ -32,13 +34,19 @@ class EncryptorFactory:
         key_chain = KeyChain([Key(self._normalize_key(secret_key))])
 
         if previous_keys:
-            for raw_key in previous_keys:
-                key = Secret[str].wrap(raw_key)
+            raw_keys: list[str | Secret[str]]
+            if isinstance(previous_keys, str | Secret):
+                raw_keys = list(Secret[str].wrap(previous_keys).reveal().split(","))
+            else:
+                raw_keys = previous_keys
+
+            for raw_key in raw_keys:
+                key = Secret[str].wrap(raw_key).reveal().strip()
 
                 if not key:
                     continue
 
-                key_chain.add(Key(self._normalize_key(key)))
+                key_chain.add(Key(self._normalize_key(Secret(key))))
 
         return Encryptor(
             key_chain,
@@ -49,12 +57,20 @@ class EncryptorFactory:
         )
 
     def _normalize_key(self, key: Secret[str]) -> Secret[bytes]:
+        from expanse.encryption.errors import InvalidSecretKeyError
         from expanse.encryption.errors import MissingSecretKeyError
 
         if not key.reveal():
             raise MissingSecretKeyError()
 
         if key.reveal().startswith("base64:"):
-            return Secret(base64.urlsafe_b64decode(key.reveal()[7:]))
+            normalized = base64.urlsafe_b64decode(key.reveal()[7:])
+        else:
+            normalized = key.reveal().encode()
 
-        return Secret(key.reveal().encode())
+        # HKDF stretches short keys to the cipher's key size but adds no entropy,
+        # so weak keys must be rejected outright.
+        if len(normalized) < self.MIN_KEY_LENGTH:
+            raise InvalidSecretKeyError()
+
+        return Secret(normalized)
