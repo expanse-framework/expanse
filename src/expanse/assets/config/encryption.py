@@ -14,4 +14,9 @@ class Config(BaseSettings):
     # The salt used for encryption key derivation.
     salt: Annotated[Secret[str], NoDecode] = Secret("")
 
+    # Whether to store key references in the encrypted message.
+    # This is useful for key rotation, as it allows the decryptor
+    # to determine which key was used to encrypt the message.
+    store_key_references: bool = False
+
     model_config = SettingsConfigDict(env_prefix="encryption_")

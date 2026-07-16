@@ -167,3 +167,18 @@ def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
 
     with pytest.raises(DecryptionError):
         encryptor.decrypt(encrypted_string)
+
+
+def test_encryptor_can_store_key_references() -> None:
+    key_chain = KeyChain([Key(SECRET)])
+    encryptor = Encryptor(key_chain, salt=Secret(SALT), store_key_references=True)
+
+    encrypted_string = encryptor.encrypt("Hello, World!")
+    message = encryptor.encrypt_raw("Hello, World!")
+
+    assert "k" in message.headers
+    assert message.headers["k"] == key_chain.latest.id
+
+    decrypted = encryptor.decrypt(encrypted_string)
+
+    assert decrypted == "Hello, World!"

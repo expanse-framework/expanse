@@ -57,6 +57,9 @@ class EncryptorFactory(EncryptorFactoryContract):
             salt=self._normalize_key(salt),
             purpose=purpose,
             compress=compress,
+            store_key_references=self._app.config.get(
+                "encryption.store_key_references", False
+            ),
         )
 
     def _normalize_key(self, key: Secret[str]) -> Secret[bytes]:

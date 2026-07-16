@@ -12,7 +12,7 @@ class Key:
 
     @property
     def id(self) -> str:
-        return hashlib.sha1(self._value.reveal()).hexdigest()[:4]
+        return hashlib.sha256(self._value.reveal()).hexdigest()[:8]
 
     @property
     def value(self) -> Secret[bytes]:

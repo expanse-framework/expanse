@@ -31,6 +31,7 @@ class Encryptor(EncryptorContract):
         salt: Secret[bytes] | bytes | None = None,
         purpose: bytes | None = None,
         compress: bool = True,
+        store_key_references: bool = False,
     ) -> None:
         self._key_chain = key_chain
         self._secret_key = key_chain.latest
@@ -41,6 +42,7 @@ class Encryptor(EncryptorContract):
             Secret[bytes].wrap(salt) if salt is not None else None, purpose=purpose
         )
         self._purpose = purpose
+        self._store_key_references: bool = store_key_references
 
     def has_compression(self) -> bool:
         return self._compress
@@ -84,10 +86,14 @@ class Encryptor(EncryptorContract):
             encoded = self._compressor.compress(encoded)
 
         encrypted = cipher.encrypt(
-            encoded, additional_data=self._build_additional_data()
+            encoded,
+            additional_data=self._build_additional_data(kid=self._secret_key.id),
         )
         if self._compress:
             encrypted.headers["z"] = 1
+
+        if self._store_key_references:
+            encrypted.headers["k"] = self._secret_key.id
 
         return encrypted
 
@@ -106,14 +112,30 @@ class Encryptor(EncryptorContract):
         if isinstance(message, str):
             message = Message.decode(message)
 
+        if kid := message.headers.get("k"):
+            key = self._key_chain.find(kid.decode())
+
+            if key is None:
+                raise DecryptionError(f"Key with id '{kid}' not found in key chain")
+
+            return self._decrypt(
+                message,
+                key,
+                additional_data=self._build_additional_data(
+                    compress=bool(message.headers.get("z")),
+                    kid=kid.decode(),
+                ),
+            )
+
+        additional_data = self._build_additional_data(
+            compress=bool(message.headers.get("z"))
+        )
         for key in self._key_chain:
             try:
                 return self._decrypt(
                     message,
                     key,
-                    additional_data=self._build_additional_data(
-                        compress=bool(message.headers.get("z"))
-                    ),
+                    additional_data=additional_data,
                 )
             except DecryptionError:
                 continue
@@ -136,15 +158,21 @@ class Encryptor(EncryptorContract):
 
         return decrypted.decode()
 
-    def _build_additional_data(self, compress: bool | None = None) -> bytes:
+    def _build_additional_data(
+        self, compress: bool | None = None, kid: str | None = None
+    ) -> bytes:
         if compress is None:
             compress = self._compress
 
-        additional_data: bytes = b"1" if compress else b"0"
-        if self._purpose:
-            additional_data += self._purpose
+        additional_data: list[bytes] = [b"1" if compress else b"0"]
 
-        return additional_data
+        if self._store_key_references and kid is not None:
+            additional_data.append(kid.encode())
+
+        if self._purpose:
+            additional_data.append(self._purpose)
+
+        return b"\x00".join(additional_data)
 
     @classmethod
     def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> str:
