@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hmac
-import secrets
 
 from expanse.encryption.ciphers.base_cipher import BaseCipher
 from expanse.encryption.errors import DecryptionError
@@ -67,7 +66,4 @@ class AES256GCMCipher(BaseCipher):
         return decrypted
 
     def _generate_iv(self, data: bytes) -> bytes:
-        if not self._deterministic:
-            return secrets.token_bytes(self.iv_length)
-
         return hmac.digest(self._secret.reveal(), data, "sha256")[: self.iv_length]
