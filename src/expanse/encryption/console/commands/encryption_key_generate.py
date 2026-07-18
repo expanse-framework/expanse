@@ -1,4 +1,3 @@
-import base64
 import re
 
 from typing import ClassVar
@@ -10,6 +9,7 @@ from expanse.console.commands.command import Command
 from expanse.core.application import Application
 from expanse.encryption.encryptor import Cipher
 from expanse.encryption.encryptor import Encryptor
+from expanse.support.secret import Secret
 
 
 KEYS: dict[str, dict[str, str]] = {
@@ -45,10 +45,7 @@ class EncryptionKeyGenerateCommand(Command):
         return 0
 
     async def _generate_key(self, app: Application, key_name: str) -> int:
-        raw_key = Encryptor.generate_random_key(
-            Cipher(app.config.get("encryption.cipher"))
-        )
-        key = f"base64:{base64.urlsafe_b64encode(raw_key).decode()}"
+        key = Encryptor.generate_random_key(Cipher(app.config.get("encryption.cipher")))
 
         if self.option("show"):
             self.line("")
@@ -66,9 +63,10 @@ class EncryptionKeyGenerateCommand(Command):
         return 0
 
     async def _replace_key(self, app: Application, key: str, key_name: str) -> bool:
-        existing_key: str | None = app.config.get(KEYS[key_name]["config"], raw=True)
-
-        if existing_key and not self.confirm(
+        existing_key: Secret[str] = Secret[str].wrap(
+            app.config.get(KEYS[key_name]["config"], "")
+        )
+        if existing_key.reveal() and not self.confirm(
             f"Do you want to replace the existing application {key_name}?"
         ):
             return False
@@ -85,7 +83,7 @@ class EncryptionKeyGenerateCommand(Command):
         content = env_file.read_text()
 
         escaped = re.escape(
-            f"={app.config.get(KEYS[key_name]['config'], '', raw=True)}"
+            f"={Secret[str].wrap(app.config.get(KEYS[key_name]['config'], '')).reveal()}"
         )
 
         new_content = re.sub(

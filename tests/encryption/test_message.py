@@ -1,3 +1,6 @@
+import pytest
+
+from expanse.encryption.errors import MessageDecodeError
 from expanse.encryption.message import Message
 
 
@@ -39,6 +42,25 @@ def test_message_can_be_loaded_from_json_encoded_data() -> None:
 
     assert message.payload == b"payload"
     assert message.headers == {"key": b"value", "foo": 42}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "not json",
+        "[1, 2, 3]",
+        '"a string"',
+        '{"h": {}}',
+        '{"p": "cGF5bG9hZA=="}',
+        '{"p": 42, "h": {}}',
+        '{"p": "cGF5bG9hZA==", "h": []}',
+        '{"p": "invalid base64", "h": {}}',
+        '{"p": "cGF5bG9hZA==", "h": {"iv": "invalid base64"}}',
+    ],
+)
+def test_message_load_rejects_malformed_data(value: str) -> None:
+    with pytest.raises(MessageDecodeError):
+        Message.load(value)
 
 
 def test_message_can_be_decoded_from_base64_encoded_data() -> None:

@@ -4,12 +4,14 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
+from expanse.contracts.encryption.encryptor_factory import (
+    EncryptorFactory as EncryptorFactoryContract,
+)
 from expanse.contracts.routing.router import Router as RouterContract
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
-from expanse.encryption.key_generator import KeyGenerator
 from expanse.http.middleware.encrypt_cookies import EncryptCookies
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -20,20 +22,31 @@ SECRET = b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb"
 SALT = b"73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"
 
 
+class EncryptorFactory(EncryptorFactoryContract):
+    def __init__(self, key_chain: KeyChain, salt: bytes) -> None:
+        self._key_chain = key_chain
+        self._salt = salt
+
+    def make(self, compress: bool = True, purpose: bytes | None = None) -> "Encryptor":
+        return Encryptor(
+            self._key_chain, salt=self._salt, purpose=purpose, compress=compress
+        )
+
+
 @pytest.fixture
 def key_chain() -> KeyChain:
     return KeyChain([Key(SECRET)])
 
 
 @pytest.fixture
-def encryptor(key_chain: KeyChain) -> Encryptor:
-    return Encryptor(key_chain, KeyGenerator(SALT))
+def encryption(key_chain: KeyChain) -> EncryptionManager:
+    return EncryptionManager(EncryptorFactory(key_chain, SALT))
 
 
 @pytest.fixture
-def container(encryptor: Encryptor) -> Container:
+def container(encryption: EncryptionManager) -> Container:
     container = Container()
-    container.instance(EncryptorContract, encryptor)
+    container.instance(EncryptionManager, encryption)
 
     return container
 
@@ -44,9 +57,9 @@ def router() -> RouterContract:
 
 
 @pytest.fixture
-def encrypt(encryptor: Encryptor) -> Callable[[str], str]:
+def encrypt(encryption: EncryptionManager) -> Callable[[str], str]:
     def _encrypt(value: str) -> str:
-        return encryptor.encrypt(value)
+        return encryption.encrypt(value)
 
     return _encrypt
 

@@ -1,5 +1,3 @@
-import secrets
-
 from enum import Enum
 from typing import ClassVar
 
@@ -12,6 +10,8 @@ from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
+from expanse.encryption.utils import generate_random_string
+from expanse.support.secret import Secret
 
 
 class Cipher(Enum):
@@ -26,17 +26,23 @@ class Encryptor(EncryptorContract):
     def __init__(
         self,
         key_chain: KeyChain,
-        key_generator: KeyGenerator,
         cipher: Cipher = Cipher.AES_256_GCM,
         *,
+        salt: Secret[bytes] | bytes | None = None,
+        purpose: bytes | None = None,
         compress: bool = True,
+        store_key_references: bool = False,
     ) -> None:
         self._key_chain = key_chain
         self._secret_key = key_chain.latest
         self._cipher = cipher
         self._compress = compress
         self._compressor = ZlibCompressor()
-        self._key_generator = key_generator
+        self._key_generator = KeyGenerator(
+            Secret[bytes].wrap(salt) if salt is not None else None, purpose=purpose
+        )
+        self._purpose = purpose
+        self._store_key_references: bool = store_key_references
 
     def has_compression(self) -> bool:
         return self._compress
@@ -79,9 +85,15 @@ class Encryptor(EncryptorContract):
         if self._compress:
             encoded = self._compressor.compress(encoded)
 
-        encrypted = cipher.encrypt(encoded)
+        encrypted = cipher.encrypt(
+            encoded,
+            additional_data=self._build_additional_data(kid=self._secret_key.id),
+        )
         if self._compress:
             encrypted.headers["z"] = 1
+
+        if self._store_key_references:
+            encrypted.headers["k"] = self._secret_key.id
 
         return encrypted
 
@@ -100,31 +112,70 @@ class Encryptor(EncryptorContract):
         if isinstance(message, str):
             message = Message.decode(message)
 
+        if kid := message.headers.get("k"):
+            key = self._key_chain.find(kid.decode())
+
+            if key is None:
+                raise DecryptionError(f"Key with id '{kid}' not found in key chain")
+
+            return self._decrypt(
+                message,
+                key,
+                additional_data=self._build_additional_data(
+                    compress=bool(message.headers.get("z")),
+                    kid=kid.decode(),
+                ),
+            )
+
+        additional_data = self._build_additional_data(
+            compress=bool(message.headers.get("z"))
+        )
         for key in self._key_chain:
             try:
-                return self._decrypt(message, key)
+                return self._decrypt(
+                    message,
+                    key,
+                    additional_data=additional_data,
+                )
             except DecryptionError:
                 continue
 
         raise DecryptionError("Unable to decrypt message")
 
-    def _decrypt(self, message: Message, key: Key) -> str:
+    def _decrypt(
+        self, message: Message, key: Key, additional_data: bytes | None
+    ) -> str:
         cipher_class = self.CIPHERS[self._cipher]
 
         key = self._key_generator.generate_key(key, key_size=cipher_class.key_length)
 
         cipher = cipher_class(key.value)
 
-        decrypted = cipher.decrypt(message)
+        decrypted = cipher.decrypt(message, additional_data=additional_data)
 
         if message.headers.get("z"):
             decrypted = self._compressor.decompress(decrypted)
 
         return decrypted.decode()
 
-    @classmethod
-    def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> bytes:
-        cipher_class = cls.CIPHERS[cipher]
-        key = secrets.token_bytes(cipher_class.key_length)
+    def _build_additional_data(
+        self, compress: bool | None = None, kid: str | None = None
+    ) -> bytes:
+        if compress is None:
+            compress = self._compress
 
-        return key
+        additional_data: list[bytes] = [b"1" if compress else b"0"]
+
+        if self._store_key_references and kid is not None:
+            additional_data.append(kid.encode())
+
+        if self._purpose:
+            additional_data.append(self._purpose)
+
+        return b"\x00".join(additional_data)
+
+    @classmethod
+    def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> str:
+        cipher_class = cls.CIPHERS[cipher]
+
+        return generate_random_string(cipher_class.key_length)

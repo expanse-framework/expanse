@@ -1,6 +1,10 @@
-from pydantic import SecretStr
+from typing import Annotated
+
 from pydantic_settings import BaseSettings
+from pydantic_settings import NoDecode
 from pydantic_settings import SettingsConfigDict
+
+from expanse.support.secret import Secret
 
 
 class Config(BaseSettings):
@@ -34,12 +38,14 @@ class Config(BaseSettings):
     # This key is used by the application for encryption and should be set
     # to a random, 32-character string or a base64-encoded 32 bytes prefixed with `base64:`.
     # This must be set prior to deploying the application.
-    secret_key: SecretStr = SecretStr("")
+    secret_key: Annotated[Secret[str], NoDecode] = Secret("")
 
     # Previous encryption keys
     #
     # This is a comma-separated list of previous encryption keys that were used by the
     # application. This is used to decrypt messages that were encrypted with an older key.
-    previous_keys: SecretStr | None = None
+    previous_keys: (
+        Annotated[Secret[str], NoDecode] | list[Annotated[Secret[str], NoDecode]] | None
+    ) = None
 
     model_config = SettingsConfigDict(env_prefix="app_", env_nested_delimiter="__")

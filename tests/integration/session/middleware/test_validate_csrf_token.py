@@ -2,18 +2,41 @@ import pytest
 
 from treat.mock import Mockery
 
-from expanse.contracts.encryption.encryptor import Encryptor as EncryptorContract
+from expanse.contracts.encryption.encryptor_factory import (
+    EncryptorFactory as EncryptorFactoryContract,
+)
 from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
-from expanse.encryption.key_generator import KeyGenerator
 from expanse.http.response import Response
 from expanse.session.middleware.load_session import LoadSession
 from expanse.session.middleware.validate_csrf_token import ValidateCSRFToken
 from expanse.session.session import HTTPSession
 from expanse.testing.client import TestClient
+
+
+class EncryptorFactory(EncryptorFactoryContract):
+    def __init__(self, key_chain: KeyChain, salt: bytes) -> None:
+        self._key_chain = key_chain
+        self._salt = salt
+
+    def make(self, compress: bool = True, purpose: bytes | None = None) -> "Encryptor":
+        return Encryptor(
+            self._key_chain, salt=self._salt, purpose=purpose, compress=compress
+        )
+
+
+@pytest.fixture
+def key_chain() -> KeyChain:
+    return KeyChain([Key(b"s" * 32)])
+
+
+@pytest.fixture
+def encryption(key_chain: KeyChain) -> EncryptionManager:
+    return EncryptionManager(EncryptorFactory(key_chain, b"s" * 32))
 
 
 @pytest.fixture(autouse=True)
@@ -91,10 +114,9 @@ async def test_middleware_retrieves_token_from_query_string(
 
 
 async def test_middleware_retrieves_token_from_xsrf_header(
-    client: TestClient, router: Router, mockery: Mockery
+    client: TestClient, router: Router, mockery: Mockery, encryption: EncryptionManager
 ) -> None:
-    encryptor = Encryptor(KeyChain([Key(b"b" * 32)]), KeyGenerator(b"s" * 32))
-    client.app.container.instance(EncryptorContract, encryptor)
+    client.app.container.instance(EncryptionManager, encryption)
 
     mockery.mock(HTTPSession).should_receive("_generate_csrf_token").and_return("foo")
 
@@ -103,7 +125,7 @@ async def test_middleware_retrieves_token_from_xsrf_header(
     response = client.post(
         "/",
         json={},
-        headers={"X-XSRF-TOKEN": encryptor.encrypt("foo")},
+        headers={"X-XSRF-TOKEN": encryption.encrypt("foo")},
     )
 
     assert response.status_code == 200

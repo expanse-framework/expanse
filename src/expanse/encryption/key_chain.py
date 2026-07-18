@@ -5,7 +5,7 @@ from expanse.encryption.key import Key
 
 class KeyChain:
     def __init__(self, keys: list[Key]):
-        self._keys = keys
+        self._keys: list[Key] = keys
 
     @property
     def latest(self) -> Key:
@@ -13,6 +13,13 @@ class KeyChain:
 
     def add(self, key: Key):
         self._keys.append(key)
+
+    def find(self, key_id: str) -> Key | None:
+        for key in self._keys:
+            if key.id == key_id:
+                return key
+
+        return None
 
     def __iter__(self) -> Iterator[Key]:
         return iter(self._keys)

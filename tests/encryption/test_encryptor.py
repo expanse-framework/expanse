@@ -9,6 +9,7 @@ from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
+from expanse.support.secret import Secret
 
 
 SECRET = b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb"
@@ -23,19 +24,17 @@ def key_chain() -> KeyChain:
 
 @pytest.fixture
 def key_generator() -> KeyGenerator:
-    return KeyGenerator(SALT)
+    return KeyGenerator(Secret(SALT))
 
 
 @pytest.fixture
-def encryptor(key_chain: KeyChain, key_generator: KeyGenerator) -> Encryptor:
-    return Encryptor(key_chain, key_generator)
+def encryptor(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, salt=Secret(SALT))
 
 
 @pytest.fixture
-def encryptor_without_compression(
-    key_chain: KeyChain, key_generator: KeyGenerator
-) -> Encryptor:
-    return Encryptor(key_chain, key_generator, compress=False)
+def encryptor_without_compression(key_chain: KeyChain) -> Encryptor:
+    return Encryptor(key_chain, salt=Secret(SALT), compress=False)
 
 
 def test_encryptor_can_encrypt_data(
@@ -117,34 +116,69 @@ def test_encryptor_can_decrypt_string_messages(encryptor: Encryptor) -> None:
 def test_encryptor_can_generate_keys() -> None:
     key = Encryptor.generate_random_key()
 
-    assert isinstance(key, bytes)
+    assert isinstance(key, str)
     assert len(key) == 32
 
 
-def test_encryptor_iterates_over_keys_to_decrypt(key_generator: KeyGenerator) -> None:
+def test_encryptor_iterates_over_keys_to_decrypt() -> None:
     key_chain = KeyChain([Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET), Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     decrypted = encryptor.decrypt(encrypted_string)
 
     assert decrypted == "Hello, World!"
 
 
-def test_encryptor_raises_an_error_if_it_can_not_decrypt_message(
-    key_generator: KeyGenerator,
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"iv": b"x" * 12},
+        {"at": b"x" * 16},
+        {"iv": b"short", "at": b"x" * 16},
+        {"iv": b"x" * 12, "at": b"short"},
+        {"iv": 42, "at": b"x" * 16},
+        {"iv": b"x" * 12, "at": 42},
+    ],
+)
+def test_encryptor_rejects_messages_with_invalid_headers(
+    encryptor: Encryptor, headers: dict
 ) -> None:
+    message = encryptor.encrypt_raw("Hello, World!")
+    tampered = Message(message.payload, headers)
+
+    with pytest.raises(DecryptionError):
+        encryptor.decrypt(tampered)
+
+
+def test_encryptor_raises_an_error_if_it_can_not_decrypt_message() -> None:
     key_chain = KeyChain([Key(SECRET2)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     encrypted_string = encryptor.encrypt("Hello, World!")
 
     key_chain = KeyChain([Key(SECRET)])
-    encryptor = Encryptor(key_chain, key_generator)
+    encryptor = Encryptor(key_chain, salt=Secret(SALT))
 
     with pytest.raises(DecryptionError):
         encryptor.decrypt(encrypted_string)
+
+
+def test_encryptor_can_store_key_references() -> None:
+    key_chain = KeyChain([Key(SECRET)])
+    encryptor = Encryptor(key_chain, salt=Secret(SALT), store_key_references=True)
+
+    encrypted_string = encryptor.encrypt("Hello, World!")
+    message = encryptor.encrypt_raw("Hello, World!")
+
+    assert "k" in message.headers
+    assert message.headers["k"] == key_chain.latest.id
+
+    decrypted = encryptor.decrypt(encrypted_string)
+
+    assert decrypted == "Hello, World!"

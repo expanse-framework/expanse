@@ -7,18 +7,22 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from expanse.encryption.message import Message
+    from expanse.support.secret import Secret
 
 
 class BaseCipher(ABC):
     key_length: int
     iv_length: int
 
-    def __init__(self, secret: bytes, deterministic: bool = False) -> None:
+    def __init__(self, secret: Secret[bytes]) -> None:
         self._secret = secret
-        self._deterministic = deterministic
 
     @abstractmethod
-    def encrypt(self, data: bytes) -> Message: ...
+    def encrypt(
+        self, data: bytes, *, additional_data: bytes | None = None
+    ) -> Message: ...
 
     @abstractmethod
-    def decrypt(self, message: Message) -> bytes: ...
+    def decrypt(
+        self, message: Message, *, additional_data: bytes | None = None
+    ) -> bytes: ...

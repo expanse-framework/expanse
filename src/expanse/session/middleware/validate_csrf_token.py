@@ -1,8 +1,8 @@
 import hmac
 import time
 
-from expanse.contracts.encryption.encryptor import Encryptor
 from expanse.core.application import Application
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.http.cookie import SameSite
 from expanse.http.request import Request
 from expanse.http.response import Response
@@ -13,9 +13,9 @@ from expanse.types.http.middleware import RequestHandler
 class ValidateCSRFToken:
     add_xsrf_cookie: bool = True
 
-    def __init__(self, app: Application, encryptor: Encryptor) -> None:
+    def __init__(self, app: Application, encryption: EncryptionManager) -> None:
         self._app = app
-        self._encryptor = encryptor
+        self._encryption: EncryptionManager = encryption
 
     async def handle(self, request: Request, next_: RequestHandler) -> Response:
         if request.method in {
@@ -51,7 +51,7 @@ class ValidateCSRFToken:
 
         if not token and (header := request.headers.get("X-XSRF-TOKEN")):
             try:
-                token = self._encryptor.decrypt(header)
+                token = self._encryption.decrypt(header)
             except Exception:
                 token = ""
 
@@ -62,10 +62,13 @@ class ValidateCSRFToken:
 
         assert request.session is not None
 
-        if not response.cookies.get("XSRF-TOKEN"):
+        if (
+            not response.cookies.get("XSRF-TOKEN")
+            and request.session.csrf_token is not None
+        ):
             response.with_cookie(
                 "XSRF-TOKEN",
-                request.session.csrf_token,
+                self._encryption.encrypt(request.session.csrf_token),
                 expires=time.time() + config["lifetime"] * 60,
                 path=config["path"],
                 domain=config["domain"],

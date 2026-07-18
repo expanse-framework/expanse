@@ -27,10 +27,20 @@ class Message:
         except json.JSONDecodeError:
             raise MessageDecodeError("Invalid message format")
 
-        return cls(
-            b64decode(content["p"]),
-            cls._load_headers(content["h"]),
-        )
+        if (
+            not isinstance(content, dict)
+            or not isinstance(content.get("p"), str)
+            or not isinstance(content.get("h"), dict)
+        ):
+            raise MessageDecodeError("Invalid message format")
+
+        try:
+            return cls(
+                b64decode(content["p"]),
+                cls._load_headers(content["h"]),
+            )
+        except (ValueError, TypeError):
+            raise MessageDecodeError("Invalid message format")
 
     @classmethod
     def decode(cls, value: str) -> "Message":
