@@ -44,4 +44,4 @@ class MessageBus(MessageBusContract):
             ]
         )
 
-        return await pipeline.send(envelope).to(transport.send)
+        return await pipeline.send(envelope).to(transport.send).run()

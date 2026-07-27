@@ -49,4 +49,9 @@ class JobDispatcher:
 
             stamps.append(TransportStamp(transport))
 
+        if job.options.get("unique", False):
+            from expanse.messenger.stamps.unique import UniqueStamp
+
+            stamps.append(UniqueStamp())
+
         return stamps
