@@ -7,6 +7,7 @@ from expanse.jobs.core.job_dispatcher import JobDispatcher
 from expanse.jobs.stamps.job import JobStamp
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport import TransportStamp
+from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.support._utils import class_to_name
 
 
@@ -131,3 +132,29 @@ def test_prepare_does_not_mutate_job_options() -> None:
     stamp = dispatcher.prepare(job).stamp(DelayStamp)
     assert stamp is not None
     assert stamp.delay == 5 * 1000
+
+
+def test_prepare_with_no_options_has_no_unique_stamp() -> None:
+    dispatcher = JobDispatcher()
+    job = MyJob(Payload("hello"))
+    envelope = dispatcher.prepare(job)
+
+    assert not envelope.has_stamp(UniqueStamp)
+
+
+def test_prepare_with_unique_false_does_not_add_unique_stamp() -> None:
+    dispatcher = JobDispatcher()
+    job = MyJob(Payload("hello"))
+    job.options["unique"] = False
+    envelope = dispatcher.prepare(job)
+
+    assert not envelope.has_stamp(UniqueStamp)
+
+
+def test_prepare_with_unique_true_adds_unique_stamp() -> None:
+    dispatcher = JobDispatcher()
+    job = MyJob(Payload("hello"))
+    job.options["unique"] = True
+    envelope = dispatcher.prepare(job)
+
+    assert envelope.has_stamp(UniqueStamp)

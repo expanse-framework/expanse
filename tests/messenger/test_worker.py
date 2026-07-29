@@ -13,8 +13,12 @@ from unittest.mock import patch
 
 import pytest
 
+from expanse.cache.asynchronous.cache import Cache
+from expanse.cache.asynchronous.stores.memory import MemoryStore
+from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemoryStore
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
@@ -25,6 +29,7 @@ from expanse.logging.filters.context import ContextFilter
 from expanse.logging.utils import _set_context
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
+from expanse.messenger.locks.unique import UniqueLock
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.middleware.propagate_context import PropagateContext
 from expanse.messenger.registry import Registry
@@ -38,6 +43,7 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
+from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
@@ -967,3 +973,139 @@ async def test_log_context_is_not_shared_between_messages(
     assert logs[0].context["request_id"] == "123456"
     assert logs[1].context["request_id"] == "987654"
     assert not hasattr(logs[2].context, "context")
+
+
+@pytest.fixture()
+def cache() -> Cache:
+    return Cache("test", MemoryStore(SyncMemoryStore()))
+
+
+async def test_worker_releases_unique_lock_after_successful_handling(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    container: Container,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    async def handler(_message: WorkerMessage) -> None:
+        pass
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    await transport.send(envelope)
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    # The lock should have been released, so it can be acquired again.
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is True
+
+
+async def test_worker_does_not_release_unique_lock_on_retry(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    container: Container,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("transient")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    await transport.send(envelope)
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    # The retry strategy re-sends the envelope, so the lock is not released
+    # while the message is still in-flight.
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is False
+
+
+async def test_worker_releases_unique_lock_when_retries_are_exhausted(
+    transport_manager: TransportManager,
+    retry_strategy_manager: RetryStrategyManager,
+    middleware_stack: MiddlewareStack,
+    container: Container,
+    registry: Registry,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    config_without_retry = Config(
+        {
+            "messenger": {
+                "transport": "memory",
+                "failure_transport": "failed",
+                "transports": {
+                    "memory": {"driver": "memory"},
+                    "failed": {"driver": "memory"},
+                },
+            }
+        }
+    )
+    worker = Worker(
+        transport_manager,
+        retry_strategy_manager,
+        config_without_retry,
+        middleware_stack,
+        container,
+        registry,
+    )
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("no retry configured")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    await transport.send(envelope)
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is True
+
+
+async def test_worker_does_not_release_when_envelope_has_no_unique_stamp(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    container: Container,
+) -> None:
+    # If the Cache is never resolved from the container, no exception is raised,
+    # which means the worker did not attempt to release a lock.
+    async def handler(_message: WorkerMessage) -> None:
+        pass
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="no-unique")))
+    registry.register_handler(handler)
+
+    # Note: no Cache bound in the container. If _release_unique_lock is invoked
+    # for this envelope, container.get(Cache) would raise.
+    await worker.run(limit=1)

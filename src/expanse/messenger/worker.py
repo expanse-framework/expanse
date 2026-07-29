@@ -5,6 +5,7 @@ from typing import Any
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.cache.asynchronous.cache import Cache
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
@@ -16,6 +17,7 @@ from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.exceptions import UnsupportedRetryStrategyError
+from expanse.messenger.locks.unique import UniqueLock
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy import RetryStrategy
@@ -27,6 +29,7 @@ from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
+from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support._utils import string_to_class
 from expanse.support.asynchronous.pipeline import Pipeline
@@ -123,6 +126,8 @@ class Worker:
 
                         self._keep_alives.pop(id(envelope.open()), None)
 
+                        await self._release_unique_lock(envelope)
+
                         continue
 
                     delay = retry_strategy.retry_delay(envelope, e)
@@ -172,8 +177,69 @@ class Worker:
             await transport.keep_alive(envelope, duration)
 
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
+        async def _handle(envelope: Envelope) -> Envelope:
+            message = envelope.open()
+            errors: dict[str, Exception] = {}
+            if stamp := envelope.stamp(JobStamp):
+                # If the envelope is marked with the JobStamp,
+                # we skip the registry and handle it directly.
+                job_class = string_to_class(stamp.job)
+                job = job_class(message)
+                if not isinstance(job, SyncJob | AsyncJob):
+                    raise TypeError(
+                        f"Expected job of type 'Job', got '{type(job).__name__}'"
+                    )
+
+                try:
+                    token = self._isolate_log_context()
+                    try:
+                        await self._container.call(job.execute)
+                    finally:
+                        self._restore_log_context(token)
+
+                    envelope = envelope.with_stamps(
+                        HandledStamp(
+                            handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
+                        )
+                    )
+                except Exception as e:
+                    errors[
+                        f"{job_class.__module__}.{job_class.__qualname__}.execute"
+                    ] = e
+
+                if errors:
+                    raise MessageHandlingFailedError(envelope=envelope, errors=errors)
+
+                return envelope
+
+            handlers = self._registry.get_handlers(message.__class__)
+
+            for handler in handlers:
+                if self._has_already_been_handled(envelope, handler):
+                    continue
+
+                try:
+                    token = self._isolate_log_context()
+                    try:
+                        await self._container.call(handler, message)
+                    finally:
+                        self._restore_log_context(token)
+
+                    envelope = envelope.with_stamps(
+                        HandledStamp(
+                            handler=f"{handler.__module__}.{handler.__qualname__}"
+                        )
+                    )
+                except Exception as e:
+                    errors[f"{handler.__module__}.{handler.__qualname__}"] = e
+
+            if errors:
+                raise MessageHandlingFailedError(envelope=envelope, errors=errors)
+
+            return envelope
+
         # Build the middleware pipeline and process the envelope through it.
-        envelope = await (
+        return await (
             Pipeline[Envelope, Envelope]()
             .use(
                 [
@@ -182,67 +248,17 @@ class Worker:
                 ]
             )
             .send(envelope.with_stamps(ReceivedStamp()))
-            .to(self._get_envelope)
+            .to(_handle)
+            .then(self._after_handling_envelope)
+            .run()
         )
 
-        message = envelope.open()
-        errors: dict[str, Exception] = {}
-        if stamp := envelope.stamp(JobStamp):
-            # If the envelope is marked with the JobStamp,
-            # we skip the registry and handle it directly.
-            job_class = string_to_class(stamp.job)
-            job = job_class(message)
-            if not isinstance(job, SyncJob | AsyncJob):
-                raise TypeError(
-                    f"Expected job of type 'Job', got '{type(job).__name__}'"
-                )
+    async def _after_handling_envelope(self, envelope: Envelope) -> None:
+        await self._release_unique_lock(envelope)
 
-            try:
-                token = self._isolate_log_context()
-                try:
-                    await self._container.call(job.execute)
-                finally:
-                    self._restore_log_context(token)
-
-                envelope = envelope.with_stamps(
-                    HandledStamp(
-                        handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
-                    )
-                )
-            except Exception as e:
-                errors[f"{job_class.__module__}.{job_class.__qualname__}.execute"] = e
-
-            if errors:
-                raise MessageHandlingFailedError(envelope=envelope, errors=errors)
-
-            return envelope
-
-        handlers = self._registry.get_handlers(message.__class__)
-
-        for handler in handlers:
-            if self._has_already_been_handled(envelope, handler):
-                continue
-
-            try:
-                token = self._isolate_log_context()
-                try:
-                    await self._container.call(handler, message)
-                finally:
-                    self._restore_log_context(token)
-
-                envelope = envelope.with_stamps(
-                    HandledStamp(handler=f"{handler.__module__}.{handler.__qualname__}")
-                )
-            except Exception as e:
-                errors[f"{handler.__module__}.{handler.__qualname__}"] = e
-
-        if errors:
-            raise MessageHandlingFailedError(envelope=envelope, errors=errors)
-
-        return envelope
-
-    async def _get_envelope(self, envelope: Envelope) -> Envelope:
-        return envelope
+    async def _release_unique_lock(self, envelope: Envelope) -> None:
+        if envelope.has_stamp(UniqueStamp):
+            await UniqueLock(await self._container.get(Cache)).release(envelope)
 
     def _has_already_been_handled(
         self, envelope: Envelope, handler: MessageHandler
