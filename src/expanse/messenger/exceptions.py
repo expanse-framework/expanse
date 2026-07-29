@@ -25,6 +25,14 @@ class MessageDecodingFailedError(SerializerError):
     """
 
 
+class UntrustedMessageTypeError(MessageDecodingFailedError):
+    """
+    Raised when decoding a payload whose embedded type name has not been
+    explicitly trusted, to prevent instantiating arbitrary classes from
+    data coming from a transport.
+    """
+
+
 class UnrecoverableMessageHandlingError(Exception):
     """
     Raised to notify the worker that a message handling error is unrecoverable.

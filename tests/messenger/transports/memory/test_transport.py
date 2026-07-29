@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
@@ -16,7 +17,8 @@ class FooMessage:
 
 
 def make_transport() -> MemoryTransport:
-    return MemoryTransport()
+    serializer = Serializer()
+    return MemoryTransport(serializer)
 
 
 async def test_send_stamps_envelope_with_transport_message_id() -> None:

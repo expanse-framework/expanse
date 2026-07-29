@@ -11,16 +11,22 @@ from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
+from expanse.messenger.trusted_collection import TrustedCollection
 
 
 class TransportManager:
     def __init__(
-        self, container: Container, config: Config, registry: Registry
+        self,
+        container: Container,
+        config: Config,
+        registry: Registry,
+        trusted_collection: TrustedCollection | None = None,
     ) -> None:
         self._container: Container = container
         self._registry: Registry = registry
         self._config: Config = config
         self._transports: dict[str, Transport] = {}
+        self._trusted_collection: TrustedCollection | None = trusted_collection
 
     async def transport(self, name: str | None = None) -> Transport:
         if name is None:
@@ -76,16 +82,20 @@ class TransportManager:
         return SyncTransport(self._container, self._registry)
 
     def _create_memory_transport(self, config: dict[str, Any]) -> Transport:
-        return MemoryTransport()
+        from expanse.messenger.serializer import Serializer
+
+        return MemoryTransport(Serializer(trusted_collection=self._trusted_collection))
 
     async def _create_database_transport(self, config: dict[str, Any]) -> Transport:
         from expanse.database.database_manager import AsyncDatabaseManager
+        from expanse.messenger.serializer import Serializer
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
         from expanse.messenger.transports.database.transport import DatabaseTransport
 
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),
             await self._container.get(AsyncDatabaseManager),
+            Serializer(trusted_collection=self._trusted_collection),
         )
 
     async def _create_redis_transport(self, raw_config: dict[str, Any]) -> Transport:
@@ -97,4 +107,8 @@ class TransportManager:
         config = RedisTransportConfig.model_validate(raw_config)
         redis = await self._container.get(RedisManager)
 
-        return RedisTransport(redis.connection(config.connection), config, Serializer())
+        return RedisTransport(
+            redis.connection(config.connection),
+            config,
+            Serializer(trusted_collection=self._trusted_collection),
+        )

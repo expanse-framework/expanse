@@ -9,6 +9,7 @@ from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.encrypted import EncryptedStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
+from expanse.messenger.trusted_collection import TrustedCollection
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,7 @@ async def test_middleware_handles_encryption_and_decryption_properly(
         "salt": "s" * 32,
     }
     encryption = EncryptorFactory(app)
-    serializer = Serializer()
+    serializer = Serializer(trusted_collection=TrustedCollection([MyMessage]))
     middleware = HandleEncryption(encryption, serializer)
 
     envelope = Envelope.wrap(

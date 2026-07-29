@@ -46,6 +46,7 @@ from expanse.messenger.stamps.transport_message_id import TransportMessageIdStam
 from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.messenger.worker import Worker
 from expanse.support._utils import class_to_name
 
@@ -127,6 +128,10 @@ class ProcessJobWithDep(AsyncJob[WorkerMessage]):
 @dataclass
 class NotAJob:
     payload: WorkerMessage
+    instantiations: ClassVar[list[WorkerMessage]] = []
+
+    def __post_init__(self) -> None:
+        NotAJob.instantiations.append(self.payload)
 
 
 def context_setter_handler(message: WorkerMessage, context: Context) -> None:
@@ -157,7 +162,8 @@ def middleware_stack() -> MiddlewareStack:
 
 @pytest.fixture()
 def registry() -> Registry:
-    return Registry()
+    registry = Registry()
+    return registry
 
 
 @pytest.fixture()
@@ -202,7 +208,9 @@ def config() -> Config:
 
 @pytest.fixture()
 def transport_manager(
-    container: Container, config: Config, registry: Registry
+    container: Container,
+    config: Config,
+    registry: Registry,
 ) -> TransportManager:
     return TransportManager(container, config, registry)
 
@@ -380,6 +388,8 @@ async def test_worker_routes_invalid_job_class_to_failure_transport(
 ) -> None:
     # A JobStamp pointing to a class that is not a Job subclass raises TypeError,
     # which is caught by the failure machinery and sent to the failure transport.
+    NotAJob.instantiations.clear()
+
     config_no_retry = Config(
         {
             "messenger": {
@@ -412,6 +422,11 @@ async def test_worker_routes_invalid_job_class_to_failure_transport(
     )
 
     await worker.run(limit=1)
+
+    # The class must be rejected before being constructed, not after: a
+    # non-Job class named by an (attacker-reachable) JobStamp should never
+    # be instantiated with the message payload.
+    assert NotAJob.instantiations == []
 
     assert len(failure_transport.sent) == 1
     sent_stamp = failure_transport.sent[0].stamp(SentToFailureTransportStamp)
@@ -714,7 +729,7 @@ def _make_keep_alive_worker(
             }
         }
     )
-    tm = TransportManager(container, cfg, registry)
+    tm = TransportManager(container, cfg, registry, registry._trusted_collection)
     tm._transports["keep_alive"] = fake_transport
     worker = Worker(
         tm,
@@ -1005,6 +1020,36 @@ async def test_worker_releases_unique_lock_after_successful_handling(
     await worker.run(limit=1)
 
     # The lock should have been released, so it can be acquired again.
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is True
+
+
+async def test_worker_releases_unique_lock_on_unrecoverable_failure(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    container: Container,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    async def handler(_message: WorkerMessage) -> None:
+        raise UnrecoverableMessageHandlingError("permanent failure")
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    await transport.send(envelope)
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    # An unrecoverable failure discards the message for good, so the lock
+    # must be released rather than left orphaned.
     other = UniqueLock(cache)
     assert await other.acquire(envelope) is True
 

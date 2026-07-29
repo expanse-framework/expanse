@@ -1,11 +1,21 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
+from typing import override
 
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import MessageEncodingFailedError
+from expanse.messenger.exceptions import UntrustedMessageTypeError
+from expanse.messenger.registry import (
+    Registry,  # noqa: TC001 (needed at runtime: the container resolves constructor dependencies via `get_type_hints`, which requires this name to be a real module attribute, not TYPE_CHECKING-only)
+)
+from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.serialization.serialization_manager import SerializationManager
+from expanse.support._utils import class_to_name
 from expanse.types.messenger import Encoded
 from expanse.types.messenger import EncodedEnvelope
 from expanse.types.messenger import Stamp
@@ -20,14 +30,22 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class Serializer:
+class Serializer(SerializerContract):
+    """
+    Encodes and decodes envelopes for transport.
+    """
+
     def __init__(
-        self, serialization_manager: SerializationManager | None = None
+        self,
+        serialization_manager: SerializationManager | None = None,
+        trusted_collection: TrustedCollection | None = None,
     ) -> None:
         self._serialization_manager: SerializationManager = (
             serialization_manager or SerializationManager()
         )
+        self._trusted_collection: TrustedCollection | None = trusted_collection
 
+    @override
     def encode(self, envelope: Envelope) -> EncodedEnvelope:
         message = envelope.open()
         body = self._encode(message)
@@ -39,9 +57,10 @@ class Serializer:
 
         return EncodedEnvelope(body=body, headers=headers)
 
-    def decode(self, encoded: EncodedEnvelope) -> Envelope:
-        message = self._decode(encoded["body"])
-        raw_stamps: list[Encoded] = encoded["headers"].get("stamps", [])
+    @override
+    def decode(self, encoded_envelope: EncodedEnvelope) -> Envelope:
+        message = self._decode(encoded_envelope["body"])
+        raw_stamps: list[Encoded] = encoded_envelope["headers"].get("stamps", [])
         stamps: list[Stamp] = []
         for raw_stamp in raw_stamps:
             stamp: Stamp = self._decode(raw_stamp)
@@ -62,6 +81,11 @@ class Serializer:
             ) from e
 
     def _decode(self, data: Encoded) -> Any:
+        if not self._is_trusted(data["t"]):
+            raise UntrustedMessageTypeError(
+                f"Message of type '{data['t']}' is not trusted. Add it to the trusted collection."
+            )
+
         serializer = self._serialization_manager.serializer(data["s"])
 
         try:
@@ -70,3 +94,9 @@ class Serializer:
             raise MessageDecodingFailedError(
                 f"Failed to decode message of type {data['t']}"
             ) from e
+
+    def _is_trusted(self, type_name: str) -> bool:
+        if self._trusted_collection is None:
+            return True
+
+        return self._trusted_collection.is_trusted_name(type_name)

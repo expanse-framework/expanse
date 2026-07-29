@@ -38,7 +38,8 @@ def config() -> Config:
 
 @pytest.fixture()
 def registry() -> Registry:
-    return Registry()
+    registry = Registry()
+    return registry
 
 
 @pytest.fixture()

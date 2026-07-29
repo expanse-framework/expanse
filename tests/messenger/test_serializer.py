@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 
 import msgspec
+import pytest
 
 from pydantic import BaseModel
 
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import UntrustedMessageTypeError
 from expanse.messenger.serializer import Serializer
+from expanse.messenger.trusted_collection import TrustedCollection
 
 
 @dataclass
@@ -101,3 +104,13 @@ def test_serializer_serializes_envelope_with_stamps() -> None:
     stamp = decoded_envelope.stamp(MyStamp)
     assert isinstance(stamp, MyStamp)
     assert stamp.value == "test"
+
+
+def test_serializer_refuses_to_decode_an_untrusted_type() -> None:
+    serializer = Serializer(trusted_collection=TrustedCollection())
+
+    envelope = Envelope.wrap(Foo(foo="bar"))
+    encoded_envelope = serializer.encode(envelope)
+
+    with pytest.raises(UntrustedMessageTypeError):
+        serializer.decode(encoded_envelope)

@@ -5,9 +5,9 @@ from collections.abc import AsyncIterator
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
+from expanse.contracts.messenger.serializer import Serializer
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig

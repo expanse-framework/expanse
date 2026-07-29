@@ -110,6 +110,8 @@ class Worker:
 
                             self._keep_alives.pop(id(envelope.open()), None)
 
+                            await self._release_unique_lock(envelope)
+
                             continue
 
                     # If there were errors during message handling, we consider the message as not handled.
@@ -184,11 +186,15 @@ class Worker:
                 # If the envelope is marked with the JobStamp,
                 # we skip the registry and handle it directly.
                 job_class = string_to_class(stamp.job)
+                if not (
+                    isinstance(job_class, type)
+                    and issubclass(job_class, SyncJob | AsyncJob)
+                ):
+                    # Checked before instantiation: `stamp.job` names a class
+                    # resolved from message data, so construct it only once
+                    # we know it's actually a Job.
+                    raise TypeError(f"Expected job of type 'Job', got '{job_class!r}'")
                 job = job_class(message)
-                if not isinstance(job, SyncJob | AsyncJob):
-                    raise TypeError(
-                        f"Expected job of type 'Job', got '{type(job).__name__}'"
-                    )
 
                 try:
                     token = self._isolate_log_context()
