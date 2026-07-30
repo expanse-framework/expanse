@@ -73,3 +73,18 @@ def unique() -> Callable[[JobT], JobT]:
         return cls
 
     return decorator
+
+
+def sensitive() -> Callable[[JobT], JobT]:
+    """
+    Class decorator marking a job as sensitive.
+    """
+
+    def decorator(cls: JobT) -> JobT:
+        options = _options_of(cls)
+        options["sensitive"] = True
+        cls.options = options
+
+        return cls
+
+    return decorator
