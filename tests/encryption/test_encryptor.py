@@ -7,7 +7,6 @@ from expanse.encryption.encryptor import Encryptor
 from expanse.encryption.errors import DecryptionError
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
-from expanse.encryption.key_generator import KeyGenerator
 from expanse.encryption.message import Message
 from expanse.support.secret import Secret
 
@@ -20,11 +19,6 @@ SALT = b"73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"
 @pytest.fixture
 def key_chain() -> KeyChain:
     return KeyChain([Key(SECRET)])
-
-
-@pytest.fixture
-def key_generator() -> KeyGenerator:
-    return KeyGenerator(Secret(SALT))
 
 
 @pytest.fixture

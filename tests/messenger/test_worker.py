@@ -46,7 +46,6 @@ from expanse.messenger.stamps.transport_message_id import TransportMessageIdStam
 from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
-from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.messenger.worker import Worker
 from expanse.support._utils import class_to_name
 
@@ -729,7 +728,7 @@ def _make_keep_alive_worker(
             }
         }
     )
-    tm = TransportManager(container, cfg, registry, registry._trusted_collection)
+    tm = TransportManager(container, cfg, registry)
     tm._transports["keep_alive"] = fake_transport
     worker = Worker(
         tm,

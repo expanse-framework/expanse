@@ -12,18 +12,12 @@ from sqlalchemy import text
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransportError
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
 from expanse.messenger.transports.database.transport import DatabaseTransport
-from expanse.messenger.trusted_collection import TrustedCollection
 from tests.integration.messenger.fixtures.messages import DatabaseMessage
-
-
-@pytest.fixture()
-def trusted_collection() -> TrustedCollection:
-    return TrustedCollection().trust(DatabaseMessage)
 
 
 if TYPE_CHECKING:
@@ -37,10 +31,7 @@ pytestmark = pytest.mark.db
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_can_send_a_message(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
 
@@ -48,9 +39,7 @@ async def test_transport_can_send_a_message(
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     envelope = Envelope.wrap(DatabaseMessage(value="hello"))
     result = await transport.send(envelope)
@@ -70,10 +59,7 @@ async def test_transport_can_send_a_message(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_can_receive_a_message(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
 
@@ -81,9 +67,7 @@ async def test_transport_can_receive_a_message(
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     message = DatabaseMessage(value="receive-me")
     await transport.send(Envelope.wrap(message))
@@ -102,10 +86,7 @@ async def test_transport_can_receive_a_message(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_does_not_receive_delayed_messages(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
 
@@ -113,9 +94,7 @@ async def test_transport_does_not_receive_delayed_messages(
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     delayed_envelope = Envelope.wrap(DatabaseMessage(value="delayed")).with_stamps(
         DelayStamp(delay=60_000)
@@ -130,10 +109,7 @@ async def test_transport_does_not_receive_delayed_messages(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_can_acknowledge_a_message(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
 
@@ -141,9 +117,7 @@ async def test_transport_can_acknowledge_a_message(
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="ack-me")))
 
@@ -163,10 +137,7 @@ async def test_transport_can_acknowledge_a_message(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_can_reject_a_message(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
 
@@ -174,9 +145,7 @@ async def test_transport_can_reject_a_message(
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="reject-me")))
 
@@ -196,19 +165,14 @@ async def test_transport_can_reject_a_message(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_keep_alive_updates_delivered_at(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
     command_tester.command("db migrate").run()
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="keep-alive")))
     envelopes = [e async for e in transport.receive()]
@@ -244,10 +208,7 @@ async def test_transport_keep_alive_updates_delivered_at(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_keep_alive_prevents_redelivery(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     """A message whose delivered_at has expired is redelivered, but keep_alive resets it."""
     app.config["database"]["default"] = name
@@ -256,9 +217,7 @@ async def test_transport_keep_alive_prevents_redelivery(
     db = await app.container.get(AsyncDatabaseManager)
     # Very short redelivery timeout so we can simulate expiry via a direct SQL update
     config = DatabaseTransportConfig(connection=name, redelivery_timeout=10)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="alive")))
     envelopes = [e async for e in transport.receive()]
@@ -292,19 +251,14 @@ async def test_transport_keep_alive_prevents_redelivery(
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_keep_alive_raises_when_duration_exceeds_redelivery_timeout(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
     command_tester.command("db migrate").run()
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name, redelivery_timeout=60)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="too-long")))
     envelopes = [e async for e in transport.receive()]
@@ -317,19 +271,14 @@ async def test_transport_keep_alive_raises_when_duration_exceeds_redelivery_time
 @pytest.mark.usefixtures("setup_databases")
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
 async def test_transport_keep_alive_is_noop_for_envelope_without_message_id_stamp(
-    app: Application,
-    name: str,
-    command_tester: CommandTester,
-    trusted_collection: TrustedCollection,
+    app: Application, name: str, command_tester: CommandTester
 ) -> None:
     app.config["database"]["default"] = name
     command_tester.command("db migrate").run()
 
     db = await app.container.get(AsyncDatabaseManager)
     config = DatabaseTransportConfig(connection=name)
-    transport = DatabaseTransport(
-        config, db, Serializer(trusted_collection=trusted_collection)
-    )
+    transport = DatabaseTransport(config, db, Serializer())
 
     await transport.send(Envelope.wrap(DatabaseMessage(value="no-stamp")))
 

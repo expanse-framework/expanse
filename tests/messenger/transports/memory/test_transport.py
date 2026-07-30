@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport

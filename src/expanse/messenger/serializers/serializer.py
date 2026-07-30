@@ -9,13 +9,7 @@ from expanse.contracts.messenger.serializer import Serializer as SerializerContr
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import MessageEncodingFailedError
-from expanse.messenger.exceptions import UntrustedMessageTypeError
-from expanse.messenger.registry import (
-    Registry,  # noqa: TC001 (needed at runtime: the container resolves constructor dependencies via `get_type_hints`, which requires this name to be a real module attribute, not TYPE_CHECKING-only)
-)
-from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.serialization.serialization_manager import SerializationManager
-from expanse.support._utils import class_to_name
 from expanse.types.messenger import Encoded
 from expanse.types.messenger import EncodedEnvelope
 from expanse.types.messenger import Stamp
@@ -36,14 +30,11 @@ class Serializer(SerializerContract):
     """
 
     def __init__(
-        self,
-        serialization_manager: SerializationManager | None = None,
-        trusted_collection: TrustedCollection | None = None,
+        self, serialization_manager: SerializationManager | None = None
     ) -> None:
         self._serialization_manager: SerializationManager = (
             serialization_manager or SerializationManager()
         )
-        self._trusted_collection: TrustedCollection | None = trusted_collection
 
     @override
     def encode(self, envelope: Envelope) -> EncodedEnvelope:
@@ -81,11 +72,6 @@ class Serializer(SerializerContract):
             ) from e
 
     def _decode(self, data: Encoded) -> Any:
-        if not self._is_trusted(data["t"]):
-            raise UntrustedMessageTypeError(
-                f"Message of type '{data['t']}' is not trusted. Add it to the trusted collection."
-            )
-
         serializer = self._serialization_manager.serializer(data["s"])
 
         try:
@@ -94,9 +80,3 @@ class Serializer(SerializerContract):
             raise MessageDecodingFailedError(
                 f"Failed to decode message of type {data['t']}"
             ) from e
-
-    def _is_trusted(self, type_name: str) -> bool:
-        if self._trusted_collection is None:
-            return True
-
-        return self._trusted_collection.is_trusted_name(type_name)

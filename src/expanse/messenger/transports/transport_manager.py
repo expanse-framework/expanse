@@ -11,22 +11,16 @@ from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
-from expanse.messenger.trusted_collection import TrustedCollection
 
 
 class TransportManager:
     def __init__(
-        self,
-        container: Container,
-        config: Config,
-        registry: Registry,
-        trusted_collection: TrustedCollection | None = None,
+        self, container: Container, config: Config, registry: Registry
     ) -> None:
         self._container: Container = container
         self._registry: Registry = registry
         self._config: Config = config
         self._transports: dict[str, Transport] = {}
-        self._trusted_collection: TrustedCollection | None = trusted_collection
 
     async def transport(self, name: str | None = None) -> Transport:
         if name is None:
@@ -68,7 +62,7 @@ class TransportManager:
             case "sync":
                 return self._create_sync_transport(transport_config)
             case "memory":
-                return self._create_memory_transport(transport_config)
+                return await self._create_memory_transport(transport_config)
             case "database":
                 return await self._create_database_transport(transport_config)
             case "redis":
@@ -81,25 +75,45 @@ class TransportManager:
     def _create_sync_transport(self, config: dict[str, Any]) -> Transport:
         return SyncTransport(self._container, self._registry)
 
-    def _create_memory_transport(self, config: dict[str, Any]) -> Transport:
-        from expanse.messenger.serializer import Serializer
+    async def _create_memory_transport(self, config: dict[str, Any]) -> Transport:
+        from expanse.contracts.messenger.serializer import (
+            Serializer as SerializerContract,
+        )
 
-        return MemoryTransport(Serializer(trusted_collection=self._trusted_collection))
+        if self._container.has(SerializerContract):
+            serializer = await self._container.get(SerializerContract)
+        else:
+            from expanse.messenger.serializers.serializer import Serializer
+
+            serializer = Serializer()
+
+        return MemoryTransport(serializer)
 
     async def _create_database_transport(self, config: dict[str, Any]) -> Transport:
+        from expanse.contracts.messenger.serializer import (
+            Serializer as SerializerContract,
+        )
         from expanse.database.database_manager import AsyncDatabaseManager
-        from expanse.messenger.serializer import Serializer
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
         from expanse.messenger.transports.database.transport import DatabaseTransport
+
+        if self._container.has(SerializerContract):
+            serializer = await self._container.get(SerializerContract)
+        else:
+            from expanse.messenger.serializers.serializer import Serializer
+
+            serializer = Serializer()
 
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),
             await self._container.get(AsyncDatabaseManager),
-            Serializer(trusted_collection=self._trusted_collection),
+            serializer,
         )
 
     async def _create_redis_transport(self, raw_config: dict[str, Any]) -> Transport:
-        from expanse.messenger.serializer import Serializer
+        from expanse.contracts.messenger.serializer import (
+            Serializer as SerializerContract,
+        )
         from expanse.messenger.transports.redis.config import RedisTransportConfig
         from expanse.messenger.transports.redis.transport import RedisTransport
         from expanse.redis.asynchronous.redis_manager import RedisManager
@@ -107,8 +121,15 @@ class TransportManager:
         config = RedisTransportConfig.model_validate(raw_config)
         redis = await self._container.get(RedisManager)
 
+        if self._container.has(SerializerContract):
+            serializer = await self._container.get(SerializerContract)
+        else:
+            from expanse.messenger.serializers.serializer import Serializer
+
+            serializer = Serializer()
+
         return RedisTransport(
             redis.connection(config.connection),
             config,
-            Serializer(trusted_collection=self._trusted_collection),
+            serializer,
         )

@@ -7,6 +7,9 @@ import pytest
 from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor_factory import EncryptorFactory
 from expanse.encryption.errors import DecryptionError
+from expanse.encryption.key import Key
+from expanse.encryption.key_chain import KeyChain
+from expanse.support.secret import Secret
 
 
 if TYPE_CHECKING:
@@ -15,11 +18,17 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def manager(app: Application) -> EncryptionManager:
-    app.config["app.secret_key"] = "base64:uwyDt6Sezpoa84jCLhvWuLG878Gz3RJvA2_VsNql5EY="
-    app.config["app.previous_keys"] = "MG6cMKYU4q3UTine3OT-UiPX-Zp-Ga10"
-    app.config["encryption.salt"] = "73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"
-
-    return EncryptionManager(EncryptorFactory(app))
+    return EncryptionManager(
+        EncryptorFactory(
+            KeyChain(
+                [
+                    Key(b"27WZmLjo%B7cSGtU1Qsi9foE8x7Y_nWD"),
+                    Key(b"MG6cMKYU4q3UTine3OT-UiPX-Zp-Ga10"),
+                ]
+            ),
+            salt=Secret(b"73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"),
+        )
+    )
 
 
 def test_manager_encrypts_and_decrypts_value(manager: EncryptionManager) -> None:

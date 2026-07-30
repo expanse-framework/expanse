@@ -12,12 +12,11 @@ from expanse.configuration.config import Config
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransportError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig
 from expanse.messenger.transports.redis.transport import RedisTransport
-from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.redis.asynchronous.redis_manager import RedisManager
 
 
@@ -69,7 +68,7 @@ async def redis_transport(redis_connection: RedisConnection) -> RedisTransport:
     return RedisTransport(
         redis_connection,
         transport_config,
-        Serializer(trusted_collection=TrustedCollection().trust(RedisMessage)),
+        Serializer(),
     )
 
 
@@ -172,7 +171,7 @@ async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(trusted_collection=TrustedCollection([RedisMessage])),
+        Serializer(),
     )
 
     await transport.send(Envelope.wrap(RedisMessage(value="pending")))
@@ -202,7 +201,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(trusted_collection=TrustedCollection([RedisMessage])),
+        Serializer(),
     )
     # Consumer B uses idle_time=0 so it can immediately claim consumer A's pending messages
     consumer_b = RedisTransport(
@@ -213,7 +212,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
             consumer="consumer_b",
             idle_time=0,
         ),
-        Serializer(trusted_collection=TrustedCollection([RedisMessage])),
+        Serializer(),
     )
 
     await consumer_a.send(Envelope.wrap(RedisMessage(value="pending")))
@@ -275,7 +274,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(trusted_collection=TrustedCollection().trust(RedisMessage)),
+        Serializer(),
     )
     # consumer_b claims messages idle for ≥100 ms; claim_interval=0 so it always tries
     consumer_b = RedisTransport(
@@ -287,7 +286,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
             idle_time=100,  # ms
             claim_interval=0,
         ),
-        Serializer(trusted_collection=TrustedCollection().trust(RedisMessage)),
+        Serializer(),
     )
 
     await consumer_a.send(Envelope.wrap(RedisMessage(value="alive")))
@@ -318,7 +317,7 @@ async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
             consumer="test_consumer",
             idle_time=60,
         ),
-        Serializer(trusted_collection=TrustedCollection().trust(RedisMessage)),
+        Serializer(),
     )
 
     await transport.send(Envelope.wrap(RedisMessage(value="too-long")))

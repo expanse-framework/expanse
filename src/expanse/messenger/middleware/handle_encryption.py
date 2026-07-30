@@ -8,9 +8,9 @@ from typing import Any
 
 import msgspec
 
-from expanse.encryption.encryptor_factory import EncryptorFactory
+from expanse.contracts.encryption.encryptor_factory import EncryptorFactory
+from expanse.contracts.messenger.serializer import Serializer
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.serializer import Serializer
 from expanse.messenger.stamps.encrypted import EncryptedStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp

@@ -1,9 +1,11 @@
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Any
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.encryption.signer import Signer
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
@@ -20,7 +22,7 @@ from expanse.support.service_provider import ServiceProvider
 
 
 if TYPE_CHECKING:
-    from expanse.contracts.messenger.serializer import Serializer
+    from expanse.contracts.messenger.serializer import Serializer as SerializerContract
     from expanse.core.console.portal import Portal
     from expanse.database.asynchronous.session import AsyncSession
     from expanse.database.synchronous.session import Session
@@ -28,12 +30,14 @@ if TYPE_CHECKING:
 
 class MessengerServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        from expanse.contracts.messenger.serializer import Serializer
+        from expanse.contracts.messenger.serializer import (
+            Serializer as SerializerContract,
+        )
         from expanse.messenger.registry import Registry
 
         self._container.singleton(Registry)
         self._container.singleton(TrustedCollection)
-        self._container.singleton(Serializer, self._create_serializer)
+        self._container.singleton(SerializerContract, self._create_serializer)
         self._container.singleton(RetryStrategyManager)
         self._container.singleton(MiddlewareStack)
         self._container.scoped(TransportManager, self._create_transport_manager)
@@ -59,23 +63,38 @@ class MessengerServiceProvider(ServiceProvider):
             AsyncSession, self._attach_resolved_session_to_transactional_bus
         )
 
-    async def _create_serializer(self, container: Container) -> Serializer:
-        from expanse.messenger.serializer import Serializer
+    async def _create_serializer(self, container: Container) -> "SerializerContract":
+        config = await container.get(Config)
+        messenger_config: dict[str, Any] = config.get("messenger", {})
 
-        serializer = Serializer(
-            await container.get(SerializationManager), await container.get(Registry)
-        )
+        strict: bool = messenger_config.get("strict", False)
+        serializer: SerializerContract
+        if strict:
+            from expanse.messenger.serializers.strict_serializer import StrictSerializer
+
+            serializer = StrictSerializer(
+                await container.get(TrustedCollection),
+                await container.get(SerializationManager),
+            )
+        else:
+            from expanse.messenger.serializers.serializer import Serializer
+
+            serializer = Serializer(await container.get(SerializationManager))
+
+        sign: bool = messenger_config.get("sign", True)
+        if sign:
+            from expanse.messenger.serializers.signing_serializer import (
+                SigningSerializer,
+            )
+
+            return SigningSerializer(serializer, await container.get(Signer))
 
         return serializer
 
     async def _create_transport_manager(
-        self,
-        container: Container,
-        config: Config,
-        registry: Registry,
-        trusted_collection: TrustedCollection,
+        self, container: Container, config: Config, registry: Registry
     ) -> AsyncGenerator[TransportManager, None]:
-        manager = TransportManager(container, config, registry, trusted_collection)
+        manager = TransportManager(container, config, registry)
 
         yield manager
 

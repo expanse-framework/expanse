@@ -3,7 +3,6 @@ from typing import get_type_hints
 
 from expanse.messenger.exceptions import InvalidHandlerError
 from expanse.messenger.trusted_collection import TrustedCollection
-from expanse.support._utils import class_to_name
 from expanse.types.messenger import Message
 from expanse.types.messenger import MessageHandler
 from expanse.types.messenger import MessageT

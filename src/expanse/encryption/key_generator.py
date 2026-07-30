@@ -9,20 +9,23 @@ _ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$%&
 
 
 class KeyGenerator:
-    def __init__(
-        self, salt: Secret[bytes] | bytes | None = None, purpose: bytes | None = None
-    ) -> None:
-        self._salt: Secret[bytes] | None = (
-            Secret[bytes].wrap(salt) if salt is not None else None
-        )
-        self._purpose: bytes | None = purpose
+    @classmethod
+    def generate_key(
+        cls,
+        secret_key: Key,
+        key_size: int = 32,
+        *,
+        salt: Secret[bytes] | bytes | None = None,
+        purpose: bytes | str | None = None,
+    ) -> Key:
+        if isinstance(purpose, str):
+            purpose = purpose.encode()
 
-    def generate_key(self, secret_key: Key, key_size: int = 32) -> Key:
         kdf = HKDF(
             algorithm=hashes.SHA384(),
             length=key_size,
-            salt=self._salt.reveal() if self._salt is not None else None,
-            info=self._purpose,
+            salt=Secret[bytes].wrap(salt).reveal() if salt is not None else None,
+            info=purpose,
         )
 
         return Key(kdf.derive(secret_key.value.reveal()))
