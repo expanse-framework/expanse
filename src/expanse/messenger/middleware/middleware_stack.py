@@ -15,4 +15,4 @@ class MiddlewareStack(BaseMiddlewareStack[Envelope, Envelope]):
         from expanse.messenger.middleware.handle_encryption import HandleEncryption
         from expanse.messenger.middleware.propagate_context import PropagateContext
 
-        return [EnsureUnique, HandleEncryption, PropagateContext]
+        return [EnsureUnique, PropagateContext, HandleEncryption]
