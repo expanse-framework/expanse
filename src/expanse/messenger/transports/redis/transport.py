@@ -7,6 +7,7 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
 )
 from expanse.contracts.messenger.serializer import Serializer
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
@@ -42,12 +43,20 @@ class RedisTransport(KeepAliveTransport):
         async for message in self._connection.get():
             data = json.loads(message["data"])
 
-            envelope = self._serializer.decode(
-                {
-                    "body": json.loads(data["body"]),
-                    "headers": data["headers"],
-                }
-            )
+            try:
+                envelope = self._serializer.decode(
+                    {
+                        "body": json.loads(data["body"]),
+                        "headers": data["headers"],
+                    }
+                )
+            except MessageDecodingFailedError as e:
+                envelope = e.as_envelope().with_stamps(
+                    TransportMessageIdStamp(message["id"])
+                )
+
+                yield envelope
+                continue
 
             yield envelope.with_stamps(TransportMessageIdStamp(message["id"]))
 

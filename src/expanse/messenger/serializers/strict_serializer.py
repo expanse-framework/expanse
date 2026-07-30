@@ -10,7 +10,6 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import MessageEncodingFailedError
 from expanse.messenger.exceptions import UntrustedMessageTypeError
-from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.serialization.serialization_manager import SerializationManager
 from expanse.types.messenger import Encoded
 from expanse.types.messenger import EncodedEnvelope
@@ -18,6 +17,7 @@ from expanse.types.messenger import Stamp
 
 
 if TYPE_CHECKING:
+    from expanse.messenger.trusted_collection import TrustedCollection
     from expanse.serialization.serializers.serializer import (
         Serializer as BaseSerializer,
     )
@@ -57,11 +57,11 @@ class StrictSerializer(SerializerContract):
 
     @override
     def decode(self, encoded_envelope: EncodedEnvelope) -> Envelope:
-        message = self._decode(encoded_envelope["body"])
+        message = self._decode(encoded_envelope["body"], encoded_envelope)
         raw_stamps: list[Encoded] = encoded_envelope["headers"].get("stamps", [])
         stamps: list[Stamp] = []
         for raw_stamp in raw_stamps:
-            stamp: Stamp = self._decode(raw_stamp)
+            stamp: Stamp = self._decode(raw_stamp, encoded_envelope)
             stamps.append(stamp)
 
         return Envelope.wrap(message, stamps)
@@ -78,10 +78,11 @@ class StrictSerializer(SerializerContract):
                 f"Failed to encode message of type {type(obj)}"
             ) from e
 
-    def _decode(self, data: Encoded) -> Any:
+    def _decode(self, data: Encoded, encoded_envelope: EncodedEnvelope) -> Any:
         if not self._is_trusted(data["t"]):
             raise UntrustedMessageTypeError(
-                f"Message of type '{data['t']}' is not trusted. Add it to the trusted collection."
+                f"Message of type '{data['t']}' is not trusted. Add it to the trusted collection.",
+                encoded_envelope=encoded_envelope,
             )
 
         serializer = self._serialization_manager.serializer(data["s"])
@@ -90,7 +91,8 @@ class StrictSerializer(SerializerContract):
             return serializer.decode(data)
         except Exception as e:
             raise MessageDecodingFailedError(
-                f"Failed to decode message of type {data['t']}"
+                f"Failed to decode message of type {data['t']}",
+                encoded_envelope=encoded_envelope,
             ) from e
 
     def _is_trusted(self, type_name: str) -> bool:

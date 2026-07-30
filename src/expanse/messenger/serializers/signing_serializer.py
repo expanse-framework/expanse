@@ -36,17 +36,23 @@ class SigningSerializer(SerializerContract):
         signature: str | None = headers.get("sign")
 
         if signature is None:
-            raise MessageDecodingFailedError("Missing signature in headers")
+            raise MessageDecodingFailedError(
+                "Missing signature in headers", encoded_envelope=encoded_envelope
+            )
 
         try:
             raw_signature = bytes.fromhex(signature)
             unsigned_headers = {k: v for k, v in headers.items() if k != "sign"}
             payload = self._signing_payload(encoded_envelope["body"], unsigned_headers)
         except (TypeError, ValueError, msgspec.EncodeError) as e:
-            raise MessageDecodingFailedError("Malformed signature in headers") from e
+            raise MessageDecodingFailedError(
+                "Malformed signature in headers", encoded_envelope=encoded_envelope
+            ) from e
 
         if not self._signer.verify(payload, raw_signature, purpose=self._PURPOSE):
-            raise MessageDecodingFailedError("Invalid signature")
+            raise MessageDecodingFailedError(
+                "Invalid signature", encoded_envelope=encoded_envelope
+            )
 
         return self._inner_serializer.decode(encoded_envelope)
 

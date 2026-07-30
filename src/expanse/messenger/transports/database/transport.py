@@ -8,6 +8,7 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
@@ -47,12 +48,16 @@ class DatabaseTransport(KeepAliveTransportContract):
         if message_row is None:
             return
 
-        envelope = self._serializer.decode(
-            {
-                "body": json.loads(message_row.body),
-                "headers": json.loads(message_row.headers),
-            }
-        )
+        try:
+            envelope = self._serializer.decode(
+                {
+                    "body": json.loads(message_row.body),
+                    "headers": json.loads(message_row.headers),
+                }
+            )
+        except MessageDecodingFailedError as e:
+            yield e.as_envelope().with_stamps(TransportMessageIdStamp(message_row.id))
+            return
 
         yield envelope.with_stamps(TransportMessageIdStamp(message_row.id))
 

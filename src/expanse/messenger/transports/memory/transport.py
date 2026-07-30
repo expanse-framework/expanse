@@ -9,6 +9,7 @@ from expanse.contracts.messenger.asynchronous.transport import (
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
@@ -53,7 +54,15 @@ class MemoryTransport(TransportContract):
                 message_id not in self._available_at
                 or datetime.now(UTC) >= self._available_at[message_id]
             ):
-                yield self._serializer.decode(encoded_envelope)
+                try:
+                    yield self._serializer.decode(encoded_envelope)
+                except MessageDecodingFailedError as e:
+                    # If decoding fails, make an envelope
+                    yield e.as_envelope().with_stamps(
+                        TransportMessageIdStamp(message_id)
+                    )
+
+                    continue
 
     async def acknowledge(self, envelope: Envelope) -> None:
         encoded_envelope = self._serializer.encode(envelope)

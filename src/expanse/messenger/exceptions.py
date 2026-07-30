@@ -1,4 +1,10 @@
+from typing import TYPE_CHECKING
+
 from expanse.messenger.envelope import Envelope
+
+
+if TYPE_CHECKING:
+    from expanse.types.messenger import EncodedEnvelope
 
 
 class SerializerError(Exception):
@@ -23,6 +29,17 @@ class MessageDecodingFailedError(SerializerError):
     """
     Raised when a message cannot be decoded.
     """
+
+    def __init__(self, message: str, encoded_envelope: "EncodedEnvelope") -> None:
+        super().__init__(message)
+
+        self.encoded_envelope: EncodedEnvelope = encoded_envelope
+
+    def as_envelope(self) -> Envelope:
+        """
+        Returns an envelope containing the original encoded message and the error.
+        """
+        return Envelope.wrap(self)
 
 
 class UntrustedMessageTypeError(MessageDecodingFailedError):

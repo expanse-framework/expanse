@@ -54,8 +54,14 @@ class Serializer(SerializerContract):
         raw_stamps: list[Encoded] = encoded_envelope["headers"].get("stamps", [])
         stamps: list[Stamp] = []
         for raw_stamp in raw_stamps:
-            stamp: Stamp = self._decode(raw_stamp)
-            stamps.append(stamp)
+            try:
+                stamp: Stamp = self._decode(raw_stamp)
+                stamps.append(stamp)
+            except Exception:
+                raise MessageDecodingFailedError(
+                    f"Failed to decode stamp of type {raw_stamp['t']}",
+                    encoded_envelope=encoded_envelope,
+                )
 
         return Envelope.wrap(message, stamps)
 
@@ -74,9 +80,4 @@ class Serializer(SerializerContract):
     def _decode(self, data: Encoded) -> Any:
         serializer = self._serialization_manager.serializer(data["s"])
 
-        try:
-            return serializer.decode(data)
-        except Exception as e:
-            raise MessageDecodingFailedError(
-                f"Failed to decode message of type {data['t']}"
-            ) from e
+        return serializer.decode(data)
