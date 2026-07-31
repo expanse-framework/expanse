@@ -1,5 +1,6 @@
 import asyncio
 import contextvars
+import logging
 
 from typing import Any
 
@@ -29,11 +30,15 @@ from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
+from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support._utils import string_to_class
 from expanse.support.asynchronous.pipeline import Pipeline
 from expanse.types.messenger import MessageHandler
+
+
+logger = logging.getLogger(__name__)
 
 
 class Worker:
@@ -102,6 +107,14 @@ class Worker:
                             isinstance(error, UnrecoverableMessageHandlingError)
                             for error in e.errors.values()
                         ):
+                            logger.error(
+                                "Message handling failed with an unrecoverable error, removing from transport. Error: %s",
+                                e,
+                                extra={
+                                    "message_type": envelope.open().__class__.__name__,
+                                    "error": str(e),
+                                },
+                            )
                             # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
                             await self._send_to_failure_transport(
                                 e.envelope, transport_name=transport_name
@@ -121,6 +134,27 @@ class Worker:
                     if retry_strategy is None or not retry_strategy.should_retry(
                         envelope, exception=e
                     ):
+                        error_message: str
+                        error_message_args: list[Any] = []
+                        redelivery_stamp = envelope.stamp(RedeliveryStamp)
+
+                        if redelivery_stamp is not None:
+                            error_message = "Message handling failed after %s retries, removing from transport. Error: %s"
+                            error_message_args.append(redelivery_stamp.retry_count)
+                        else:
+                            error_message = "Message handling failed, removing from transport. Error: %s"
+
+                        error_message_args.append(e)
+
+                        logger.error(
+                            error_message,
+                            *error_message_args,
+                            extra={
+                                "transport": transport_name,
+                                "message_type": envelope.open().__class__.__name__,
+                                "error": str(e),
+                            },
+                        )
                         await self._send_to_failure_transport(
                             envelope, transport_name=transport_name
                         )
@@ -139,6 +173,16 @@ class Worker:
                         if redelivery_stamp is not None
                         else 0
                     ) + 1
+                    logger.warning(
+                        "Message handling failed, sending for retry %s with a delay of %ss. Error: %s",
+                        retry_count,
+                        delay,
+                        e,
+                        extra={
+                            "message_type": envelope.open().__class__.__name__,
+                            "error": str(e),
+                        },
+                    )
                     await transport.send(
                         envelope.with_stamps(
                             DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
@@ -151,6 +195,19 @@ class Worker:
 
                     continue
 
+                message_id_stamp = envelope.stamp(TransportMessageIdStamp)
+                message_id = message_id_stamp.id if message_id_stamp else None
+                message_class = envelope.open().__class__.__name__
+                logger.info(
+                    "Message %s handled successfully. Acknowledging message to transport.",
+                    message_class,
+                    extra={
+                        "class": message_class,
+                        "message_id": message_id,
+                        "transport": transport_name,
+                    },
+                )
+
                 await transport.acknowledge(envelope)
 
                 self._keep_alives.pop(id(envelope.open()), None)
@@ -162,6 +219,8 @@ class Worker:
         """
         Stop the worker gracefully.
         """
+        logger.info("Stopping worker.")
+
         self._stop_event.set()
 
     async def keep_alive(self, duration: int | None = None) -> None:
@@ -175,6 +234,16 @@ class Worker:
                 raise RuntimeError(
                     f"Transport '{transport_name}' does not support keep-alive functionality."
                 )
+
+            logger.debug(
+                "Keeping message alive",
+                extra={
+                    "transport": transport_name,
+                    "message_id": stamp.id
+                    if (stamp := envelope.stamp(TransportMessageIdStamp)) is not None
+                    else None,
+                },
+            )
 
             await transport.keep_alive(envelope, duration)
 
@@ -285,6 +354,14 @@ class Worker:
 
         failure_transport = await self._transport_manager.transport(
             failure_transport_name
+        )
+        logger.info(
+            "Sending rejected message to failure transport: %s",
+            failure_transport_name,
+            extra={
+                "message_type": envelope.open().__class__.__name__,
+                "failure_transport": failure_transport_name,
+            },
         )
         await failure_transport.send(
             envelope.with_stamps(
