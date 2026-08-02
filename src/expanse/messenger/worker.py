@@ -1,5 +1,6 @@
 import asyncio
 import contextvars
+import itertools
 import logging
 
 from typing import Any
@@ -10,6 +11,7 @@ from expanse.contracts.cache.asynchronous.cache import Cache
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
+from expanse.contracts.messenger.asynchronous.transport import Transport
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
 from expanse.jobs.synchronous.job import Job as SyncJob
@@ -59,15 +61,20 @@ class Worker:
         self._registry: Registry = registry
         self._stop_event: asyncio.Event = asyncio.Event()
         self._keep_alives: dict[int, tuple[str, Envelope]] = {}
+        self._keep_alive_ids: itertools.count[int] = itertools.count()
 
     async def run(
         self,
         transport_name: str | None = None,
         limit: int | None = None,
         sleep: int = 1000,
+        concurrency: int = 1,
     ) -> None:
         """
         Run the worker, processing messages from the bus until stopped.
+
+        When `concurrency` is greater than 1, `concurrency` independent
+        consumer loops run concurrently, all pulling from the same transport.
         """
         self._stop_event.clear()
 
@@ -77,143 +84,165 @@ class Worker:
         transport = await self._transport_manager.transport(transport_name)
 
         handled_messages = 0
-        while not self._stop_event.is_set():
-            if handled_messages >= limit if limit is not None else False:
-                self.stop()
-                continue
+        handled_lock = asyncio.Lock()
 
-            envelope_handled: bool = False
+        async def reserve_slot() -> bool:
+            nonlocal handled_messages
 
-            async for envelope in transport.receive():
-                envelope_handled = True
-
-                if handled_messages >= limit if limit is not None else False:
-                    self.stop()
-                    break
+            async with handled_lock:
+                if limit is not None and handled_messages >= limit:
+                    return False
 
                 handled_messages += 1
 
-                keep_alive_id = id(envelope)
-                if isinstance(transport, KeepAliveTransport):
-                    self._keep_alives[keep_alive_id] = (transport_name, envelope)
+                return True
 
-                try:
-                    envelope = await self._handle_envelope(envelope)
-                except Exception as e:
-                    if isinstance(e, MessageHandlingFailedError):
-                        envelope = e.envelope
+        async def consume() -> None:
+            while not self._stop_event.is_set():
+                if limit is not None and handled_messages >= limit:
+                    self.stop()
+                    continue
 
-                        if any(
-                            isinstance(error, UnrecoverableMessageHandlingError)
-                            for error in e.errors.values()
-                        ):
-                            logger.error(
-                                "Message handling failed with an unrecoverable error, removing from transport. Error: %s",
-                                e,
-                                extra={
-                                    "message_type": envelope.open().__class__.__name__,
-                                    "error": str(e),
-                                },
-                            )
-                            # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
-                            await self._send_to_failure_transport(
-                                e.envelope, transport_name=transport_name
-                            )
-                            await transport.reject(e.envelope)
+                envelope_handled: bool = False
 
-                            self._keep_alives.pop(keep_alive_id, None)
+                async for envelope in transport.receive():
+                    envelope_handled = True
 
-                            await self._release_unique_lock(envelope)
+                    if not await reserve_slot():
+                        self.stop()
+                        break
 
-                            continue
+                    await self._process_envelope(envelope, transport, transport_name)
 
-                    # If there were errors during message handling, we consider the message as not handled.
-                    # If the message can and should be retried we send it back to the same transport with the appropriate delay.
-                    # Otherwise, if a failure transport is configured, we send it to the failure transport for further analysis.
-                    retry_strategy = self._get_retry_strategy(transport_name)
-                    if retry_strategy is None or not retry_strategy.should_retry(
-                        envelope, exception=e
-                    ):
-                        error_message: str
-                        error_message_args: list[Any] = []
-                        redelivery_stamp = envelope.stamp(RedeliveryStamp)
+                if not envelope_handled:
+                    await asyncio.sleep(sleep / 1000)
 
-                        if redelivery_stamp is not None:
-                            error_message = "Message handling failed after %s retries, removing from transport. Error: %s"
-                            error_message_args.append(redelivery_stamp.retry_count)
-                        else:
-                            error_message = "Message handling failed, removing from transport. Error: %s"
+        if concurrency <= 1:
+            await consume()
+        else:
+            await asyncio.gather(*(consume() for _ in range(concurrency)))
 
-                        error_message_args.append(e)
+    async def _process_envelope(
+        self, envelope: Envelope, transport: Transport, transport_name: str
+    ) -> None:
+        keep_alive_id = next(self._keep_alive_ids)
+        if isinstance(transport, KeepAliveTransport):
+            self._keep_alives[keep_alive_id] = (transport_name, envelope)
 
-                        logger.error(
-                            error_message,
-                            *error_message_args,
-                            extra={
-                                "transport": transport_name,
-                                "message_type": envelope.open().__class__.__name__,
-                                "error": str(e),
-                            },
-                        )
-                        await self._send_to_failure_transport(
-                            envelope, transport_name=transport_name
-                        )
-                        await transport.reject(envelope)
+        try:
+            envelope = await self._handle_envelope(envelope)
+        except Exception as e:
+            if isinstance(e, MessageHandlingFailedError):
+                envelope = e.envelope
 
-                        self._keep_alives.pop(keep_alive_id, None)
-
-                        await self._release_unique_lock(envelope)
-
-                        continue
-
-                    delay = retry_strategy.retry_delay(envelope, e)
-                    redelivery_stamp = envelope.stamp(RedeliveryStamp)
-                    retry_count = (
-                        redelivery_stamp.retry_count
-                        if redelivery_stamp is not None
-                        else 0
-                    ) + 1
-                    logger.warning(
-                        "Message handling failed, sending for retry %s with a delay of %ss. Error: %s",
-                        retry_count,
-                        delay,
+                if any(
+                    isinstance(error, UnrecoverableMessageHandlingError)
+                    for error in e.errors.values()
+                ):
+                    logger.error(
+                        "Message handling failed with an unrecoverable error, removing from transport. Error: %s",
                         e,
                         extra={
                             "message_type": envelope.open().__class__.__name__,
                             "error": str(e),
                         },
                     )
-                    await transport.send(
-                        envelope.with_stamps(
-                            DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
-                        )
+                    # If any of the errors are unrecoverable, we consider the message as not handled and send it to the failure transport if configured.
+                    await self._send_to_failure_transport(
+                        e.envelope, transport_name=transport_name
                     )
-
-                    await transport.reject(envelope)
+                    await transport.reject(e.envelope)
 
                     self._keep_alives.pop(keep_alive_id, None)
 
-                    continue
+                    await self._release_unique_lock(envelope)
 
-                message_id_stamp = envelope.stamp(TransportMessageIdStamp)
-                message_id = message_id_stamp.id if message_id_stamp else None
-                message_class = envelope.open().__class__.__name__
-                logger.info(
-                    "Message %s handled successfully. Acknowledging message to transport.",
-                    message_class,
+                    return
+
+            # If there were errors during message handling, we consider the message as not handled.
+            # If the message can and should be retried we send it back to the same transport with the appropriate delay.
+            # Otherwise, if a failure transport is configured, we send it to the failure transport for further analysis.
+            retry_strategy = self._get_retry_strategy(transport_name)
+            if retry_strategy is None or not retry_strategy.should_retry(
+                envelope, exception=e
+            ):
+                error_message: str
+                error_message_args: list[Any] = []
+                redelivery_stamp = envelope.stamp(RedeliveryStamp)
+
+                if redelivery_stamp is not None:
+                    error_message = "Message handling failed after %s retries, removing from transport. Error: %s"
+                    error_message_args.append(redelivery_stamp.retry_count)
+                else:
+                    error_message = (
+                        "Message handling failed, removing from transport. Error: %s"
+                    )
+
+                error_message_args.append(e)
+
+                logger.error(
+                    error_message,
+                    *error_message_args,
                     extra={
-                        "class": message_class,
-                        "message_id": message_id,
                         "transport": transport_name,
+                        "message_type": envelope.open().__class__.__name__,
+                        "error": str(e),
                     },
                 )
-
-                await transport.acknowledge(envelope)
+                await self._send_to_failure_transport(
+                    envelope, transport_name=transport_name
+                )
+                await transport.reject(envelope)
 
                 self._keep_alives.pop(keep_alive_id, None)
 
-            if not envelope_handled:
-                await asyncio.sleep(sleep / 1000)
+                await self._release_unique_lock(envelope)
+
+                return
+
+            delay = retry_strategy.retry_delay(envelope, e)
+            redelivery_stamp = envelope.stamp(RedeliveryStamp)
+            retry_count = (
+                redelivery_stamp.retry_count if redelivery_stamp is not None else 0
+            ) + 1
+            logger.warning(
+                "Message handling failed, sending for retry %s with a delay of %ss. Error: %s",
+                retry_count,
+                delay,
+                e,
+                extra={
+                    "message_type": envelope.open().__class__.__name__,
+                    "error": str(e),
+                },
+            )
+            await transport.send(
+                envelope.with_stamps(
+                    DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
+                )
+            )
+
+            await transport.reject(envelope)
+
+            self._keep_alives.pop(keep_alive_id, None)
+
+            return
+
+        message_id_stamp = envelope.stamp(TransportMessageIdStamp)
+        message_id = message_id_stamp.id if message_id_stamp else None
+        message_class = envelope.open().__class__.__name__
+        logger.info(
+            "Message %s handled successfully. Acknowledging message to transport.",
+            message_class,
+            extra={
+                "class": message_class,
+                "message_id": message_id,
+                "transport": transport_name,
+            },
+        )
+
+        await transport.acknowledge(envelope)
+
+        self._keep_alives.pop(keep_alive_id, None)
 
     def stop(self) -> None:
         """
@@ -227,7 +256,9 @@ class Worker:
         """
         Keep the worker alive until stopped.
         """
-        for transport_name, envelope in self._keep_alives.values():
+        # Snapshot before iterating: concurrent slots may insert/pop envelopes
+        # into `self._keep_alives` while we `await` below.
+        for transport_name, envelope in list(self._keep_alives.values()):
             transport = await self._transport_manager.transport(transport_name)
 
             if not isinstance(transport, KeepAliveTransport):
@@ -248,91 +279,105 @@ class Worker:
             await transport.keep_alive(envelope, duration)
 
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
-        async def _handle(envelope: Envelope) -> Envelope:
+        # Each envelope is handled with its own scoped container so that
+        # concurrently-processed messages never share resolved instances.
+        async with self._container.create_scoped_container() as container:
             message = envelope.open()
-            errors: dict[str, Exception] = {}
-            if stamp := envelope.stamp(JobStamp):
-                # If the envelope is marked with the JobStamp,
-                # we skip the registry and handle it directly.
-                job_class = string_to_class(stamp.job)
-                if not (
-                    isinstance(job_class, type)
-                    and issubclass(job_class, SyncJob | AsyncJob)
-                ):
-                    # Checked before instantiation: `stamp.job` names a class
-                    # resolved from message data, so construct it only once
-                    # we know it's actually a Job.
-                    raise TypeError(f"Expected job of type 'Job', got '{job_class!r}'")
-                job = job_class(message)
+            container.instance(message.__class__, message)
 
-                try:
-                    token = self._isolate_log_context()
-                    try:
-                        await self._container.call(job.execute)
-                    finally:
-                        self._restore_log_context(token)
-
-                    envelope = envelope.with_stamps(
-                        HandledStamp(
-                            handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
+            async def _handle(envelope: Envelope) -> Envelope:
+                message = envelope.open()
+                errors: dict[str, Exception] = {}
+                if stamp := envelope.stamp(JobStamp):
+                    # If the envelope is marked with the JobStamp,
+                    # we skip the registry and handle it directly.
+                    job_class = string_to_class(stamp.job)
+                    if not (
+                        isinstance(job_class, type)
+                        and issubclass(job_class, SyncJob | AsyncJob)
+                    ):
+                        # Checked before instantiation: `stamp.job` names a class
+                        # resolved from message data, so construct it only once
+                        # we know it's actually a Job.
+                        raise TypeError(
+                            f"Expected job of type 'Job', got '{job_class!r}'"
                         )
-                    )
-                except Exception as e:
-                    errors[
-                        f"{job_class.__module__}.{job_class.__qualname__}.execute"
-                    ] = e
+                    job = job_class(message)
+
+                    try:
+                        token = self._isolate_log_context()
+                        try:
+                            await container.call(job.execute)
+                        finally:
+                            self._restore_log_context(token)
+
+                        envelope = envelope.with_stamps(
+                            HandledStamp(
+                                handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
+                            )
+                        )
+                    except Exception as e:
+                        errors[
+                            f"{job_class.__module__}.{job_class.__qualname__}.execute"
+                        ] = e
+
+                    if errors:
+                        raise MessageHandlingFailedError(
+                            envelope=envelope, errors=errors
+                        )
+
+                    return envelope
+
+                handlers = self._registry.get_handlers(message.__class__)
+
+                for handler in handlers:
+                    if self._has_already_been_handled(envelope, handler):
+                        continue
+
+                    try:
+                        token = self._isolate_log_context()
+                        try:
+                            await container.call(handler, message)
+                        finally:
+                            self._restore_log_context(token)
+
+                        envelope = envelope.with_stamps(
+                            HandledStamp(
+                                handler=f"{handler.__module__}.{handler.__qualname__}"
+                            )
+                        )
+                    except Exception as e:
+                        errors[f"{handler.__module__}.{handler.__qualname__}"] = e
 
                 if errors:
                     raise MessageHandlingFailedError(envelope=envelope, errors=errors)
 
                 return envelope
 
-            handlers = self._registry.get_handlers(message.__class__)
-
-            for handler in handlers:
-                if self._has_already_been_handled(envelope, handler):
-                    continue
-
-                try:
-                    token = self._isolate_log_context()
-                    try:
-                        await self._container.call(handler, message)
-                    finally:
-                        self._restore_log_context(token)
-
-                    envelope = envelope.with_stamps(
-                        HandledStamp(
-                            handler=f"{handler.__module__}.{handler.__qualname__}"
-                        )
-                    )
-                except Exception as e:
-                    errors[f"{handler.__module__}.{handler.__qualname__}"] = e
-
-            if errors:
-                raise MessageHandlingFailedError(envelope=envelope, errors=errors)
-
-            return envelope
-
-        # Build the middleware pipeline and process the envelope through it.
-        return await (
-            Pipeline[Envelope, Envelope]()
-            .use(
-                [
-                    (await self._container.get(m)).handle
-                    for m in self._middleware_stack.middleware
-                ]
+            # Build the middleware pipeline and process the envelope through it.
+            return await (
+                Pipeline[Envelope, Envelope]()
+                .use(
+                    [
+                        (await container.get(m)).handle
+                        for m in self._middleware_stack.middleware
+                    ]
+                )
+                .send(envelope.with_stamps(ReceivedStamp()))
+                .to(_handle)
+                .then(self._after_handling_envelope)
+                .run()
             )
-            .send(envelope.with_stamps(ReceivedStamp()))
-            .to(_handle)
-            .then(self._after_handling_envelope)
-            .run()
-        )
 
     async def _after_handling_envelope(self, envelope: Envelope) -> None:
         await self._release_unique_lock(envelope)
 
     async def _release_unique_lock(self, envelope: Envelope) -> None:
         if envelope.has_stamp(UniqueStamp):
+            # The unique lock is backed by the shared `Cache` service, not
+            # per-envelope scoped state, so the base container is used here
+            # (the scoped container from `_handle_envelope` may already be
+            # torn down by the time this runs from an error path).
             await UniqueLock(await self._container.get(Cache)).release(envelope)
 
     def _has_already_been_handled(

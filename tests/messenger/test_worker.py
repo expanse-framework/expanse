@@ -795,9 +795,9 @@ async def test_worker_tracks_keep_alives_for_keep_alive_transport(
     await worker.run(limit=1)
 
     assert len(captured) == 1
-    key = id(envelope)
-    assert key in captured
-    assert captured[key][0] == "keep_alive"
+    transport_name, tracked_envelope = next(iter(captured.values()))
+    assert transport_name == "keep_alive"
+    assert tracked_envelope is envelope
 
 
 async def test_worker_clears_keep_alives_after_successful_handling(
@@ -1164,6 +1164,136 @@ async def test_worker_releases_unique_lock_when_retries_are_exhausted(
 
     other = UniqueLock(cache)
     assert await other.acquire(envelope) is True
+
+
+async def test_worker_processes_messages_concurrently(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    concurrency = 3
+    active = 0
+    all_active = asyncio.Event()
+
+    async def handler(_message: WorkerMessage) -> None:
+        nonlocal active
+        active += 1
+        if active == concurrency:
+            all_active.set()
+
+        # Only returns once every slot has a message in flight at the same
+        # time, which is only possible if the worker actually runs
+        # `concurrency` handlers concurrently rather than one at a time.
+        await asyncio.wait_for(all_active.wait(), timeout=5)
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    for i in range(concurrency):
+        await transport.send(Envelope.wrap(WorkerMessage(value=str(i))))
+
+    registry.register_handler(handler)
+
+    await worker.run(limit=concurrency, concurrency=concurrency)
+
+    assert active == concurrency
+
+
+async def test_worker_concurrency_respects_limit(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[str] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message.value)
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    for i in range(5):
+        await transport.send(Envelope.wrap(WorkerMessage(value=str(i))))
+
+    registry.register_handler(handler)
+
+    await worker.run(limit=3, concurrency=3)
+
+    assert len(handled) == 3
+
+
+async def test_worker_keep_alive_dict_safe_under_concurrency(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, _ = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+
+    concurrency = 3
+    active = 0
+    all_active = asyncio.Event()
+    release = asyncio.Event()
+
+    async def handler(_message: WorkerMessage) -> None:
+        nonlocal active
+        active += 1
+        if active == concurrency:
+            all_active.set()
+
+        await asyncio.wait_for(release.wait(), timeout=5)
+
+    for i in range(concurrency):
+        fake_transport.enqueue(Envelope.wrap(WorkerMessage(value=str(i))))
+
+    registry.register_handler(handler)
+
+    async def trigger_keep_alive() -> None:
+        await asyncio.wait_for(all_active.wait(), timeout=5)
+        # Every slot has an envelope in flight at this point, so this
+        # exercises `keep_alive()` iterating `_keep_alives` while other
+        # tasks may still be inserting/popping from it.
+        await worker.keep_alive()
+        release.set()
+
+    await asyncio.gather(
+        worker.run(limit=concurrency, concurrency=concurrency),
+        trigger_keep_alive(),
+    )
+
+    assert len(fake_transport.keep_alive_calls) == concurrency
+
+
+async def test_worker_scoped_container_does_not_leak_between_concurrent_messages(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    concurrency = 2
+    active = 0
+    all_active = asyncio.Event()
+    resolved_values: list[str] = []
+
+    async def handler(message: WorkerMessage, resolved: WorkerMessage) -> None:
+        nonlocal active
+        active += 1
+        if active == concurrency:
+            all_active.set()
+
+        await asyncio.wait_for(all_active.wait(), timeout=5)
+
+        # `resolved` is injected from the container rather than passed
+        # directly; if messages being handled concurrently shared a
+        # container, one handler could resolve the other's message here.
+        resolved_values.append(resolved.value)
+        assert resolved.value == message.value
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(Envelope.wrap(WorkerMessage(value="a")))
+    await transport.send(Envelope.wrap(WorkerMessage(value="b")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=concurrency, concurrency=concurrency)
+
+    assert sorted(resolved_values) == ["a", "b"]
 
 
 async def test_worker_does_not_release_when_envelope_has_no_unique_stamp(

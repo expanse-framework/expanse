@@ -52,7 +52,7 @@ async def test_command_runs_worker_with_default_transport(
     command.run()
 
     mock_worker.run.assert_awaited_once_with(
-        transport_name=None, limit=None, sleep=1000
+        transport_name=None, limit=None, sleep=1000, concurrency=1
     )
 
 
@@ -65,7 +65,7 @@ async def test_command_runs_worker_with_specified_transport(
     command.run("database")
 
     mock_worker.run.assert_awaited_once_with(
-        transport_name="database", limit=None, sleep=1000
+        transport_name="database", limit=None, sleep=1000, concurrency=1
     )
 
 
@@ -77,7 +77,9 @@ async def test_command_passes_limit_to_worker(
     command = command_tester.command("messenger consume")
     command.run("--limit 10")
 
-    mock_worker.run.assert_awaited_once_with(transport_name=None, limit=10, sleep=1000)
+    mock_worker.run.assert_awaited_once_with(
+        transport_name=None, limit=10, sleep=1000, concurrency=1
+    )
 
 
 @pytest.mark.usefixtures("_mock_signal_handlers")
@@ -89,7 +91,7 @@ async def test_command_passes_sleep_to_worker(
     command.run("--sleep 5")
 
     mock_worker.run.assert_awaited_once_with(
-        transport_name=None, limit=None, sleep=5000
+        transport_name=None, limit=None, sleep=5000, concurrency=1
     )
 
 

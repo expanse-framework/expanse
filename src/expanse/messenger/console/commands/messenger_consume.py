@@ -44,6 +44,13 @@ class MessengerConsumeCommand(Command):
             default=1,
         ),
         option(
+            "concurrency",
+            "c",
+            description="The number of messages to process concurrently.",
+            flag=False,
+            default=1,
+        ),
+        option(
             "keep-alive",
             None,
             description="Whether to keep the worker alive by sending periodic keep-alive signals to the transport. This is useful to ensure transports do not redeliver messages while they are being processed.",
@@ -115,6 +122,7 @@ class MessengerConsumeCommand(Command):
                     else None
                 ),
                 sleep=int(self.option("sleep")) * 1000,
+                concurrency=int(self.option("concurrency")),
             )
         finally:
             if keep_alive_task is not None:

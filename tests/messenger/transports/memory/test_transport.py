@@ -147,3 +147,40 @@ async def test_reject_raises_when_no_transport_message_id_stamp() -> None:
 
     with pytest.raises(ValueError, match="TransportMessageIdStamp"):
         await transport.reject(envelope)
+
+
+async def test_receive_does_not_return_in_flight_envelope_again() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+
+    second = [e async for e in transport.receive()]
+    assert second == []
+
+
+async def test_acknowledge_clears_in_flight_tracking() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+    assert transport._in_flight
+
+    await transport.acknowledge(first[0])
+
+    assert transport._in_flight == set()
+
+
+async def test_reject_clears_in_flight_tracking() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+    assert transport._in_flight
+
+    await transport.reject(first[0])
+
+    assert transport._in_flight == set()
