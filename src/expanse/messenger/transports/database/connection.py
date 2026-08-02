@@ -133,7 +133,7 @@ class Connection:
 
     async def _get_with_update_returning(self) -> MessageRow | None:
         now = datetime.now(UTC)
-        redelivery_limit = now - timedelta(milliseconds=self._config.redelivery_timeout)
+        redelivery_limit = now - timedelta(seconds=self._config.redelivery_timeout)
 
         # Use a subquery with FOR UPDATE SKIP LOCKED to atomically find and claim
         # a message in a single UPDATE ... RETURNING statement, preventing multiple
@@ -180,7 +180,7 @@ class Connection:
 
     async def _get_with_select_for_update(self) -> MessageRow | None:
         now = datetime.now(UTC)
-        redelivery_limit = now - timedelta(milliseconds=self._config.redelivery_timeout)
+        redelivery_limit = now - timedelta(seconds=self._config.redelivery_timeout)
 
         # If the database does not support UPDATE ... RETURNING,
         # we will need to execute the update and select in two steps.
