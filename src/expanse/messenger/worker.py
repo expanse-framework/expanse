@@ -62,6 +62,15 @@ class Worker:
         self._stop_event: asyncio.Event = asyncio.Event()
         self._keep_alives: dict[int, tuple[str, Envelope]] = {}
         self._keep_alive_ids: itertools.count[int] = itertools.count()
+        # Transport message IDs currently being processed by one of this
+        # worker's own consumer slots. A lease-based transport (database,
+        # redis, ...) may consider a message eligible for redelivery again
+        # once its lease expires, even though a sibling slot in this same
+        # process is still actively handling it (e.g. its keep-alive
+        # refresh hasn't run yet); this guards against reprocessing it in
+        # that case, without affecting redelivery to *other* worker
+        # processes, which is the mechanism's intended purpose.
+        self._in_flight_message_ids: set[tuple[str, Any]] = set()
 
     async def run(
         self,
@@ -126,7 +135,32 @@ class Worker:
         self, envelope: Envelope, transport: Transport, transport_name: str
     ) -> None:
         keep_alive_id = next(self._keep_alive_ids)
+        dedup_key: tuple[str, Any] | None = None
+
         if isinstance(transport, KeepAliveTransport):
+            message_id_stamp = envelope.stamp(TransportMessageIdStamp)
+            if message_id_stamp is not None:
+                dedup_key = (transport_name, message_id_stamp.id)
+
+            if dedup_key is not None and dedup_key in self._in_flight_message_ids:
+                # Another one of this worker's own slots is already
+                # processing this exact message: skip it rather than
+                # handling it a second time.
+                logger.debug(
+                    "Skipping message that is already being processed by this worker.",
+                    extra={
+                        "transport": transport_name,
+                        "message_id": message_id_stamp.id
+                        if message_id_stamp is not None
+                        else None,
+                    },
+                )
+
+                return
+
+            if dedup_key is not None:
+                self._in_flight_message_ids.add(dedup_key)
+
             self._keep_alives[keep_alive_id] = (transport_name, envelope)
 
         try:
@@ -154,6 +188,7 @@ class Worker:
                     await transport.reject(e.envelope)
 
                     self._keep_alives.pop(keep_alive_id, None)
+                    self._in_flight_message_ids.discard(dedup_key)
 
                     await self._release_unique_lock(envelope)
 
@@ -195,6 +230,7 @@ class Worker:
                 await transport.reject(envelope)
 
                 self._keep_alives.pop(keep_alive_id, None)
+                self._in_flight_message_ids.discard(dedup_key)
 
                 await self._release_unique_lock(envelope)
 
@@ -224,6 +260,7 @@ class Worker:
             await transport.reject(envelope)
 
             self._keep_alives.pop(keep_alive_id, None)
+            self._in_flight_message_ids.discard(dedup_key)
 
             return
 
@@ -243,6 +280,7 @@ class Worker:
         await transport.acknowledge(envelope)
 
         self._keep_alives.pop(keep_alive_id, None)
+        self._in_flight_message_ids.discard(dedup_key)
 
     def stop(self) -> None:
         """
@@ -281,7 +319,9 @@ class Worker:
     async def _handle_envelope(self, envelope: Envelope) -> Envelope:
         # Each envelope is handled with its own scoped container so that
         # concurrently-processed messages never share resolved instances.
-        async with self._container.create_scoped_container() as container:
+        container = self._container.create_scoped_container()
+
+        try:
             message = envelope.open()
             container.instance(message.__class__, message)
 
@@ -368,6 +408,20 @@ class Worker:
                 .then(self._after_handling_envelope)
                 .run()
             )
+        finally:
+            # A failure while tearing down scoped dependencies (e.g. closing
+            # a database session) must not be mistaken for the message
+            # handling itself having failed: the job/handler above may have
+            # already completed successfully, and letting a termination
+            # error propagate here would cause the worker to retry
+            # a message that already ran successfully.
+            try:
+                await container.terminate()
+            except Exception:
+                logger.exception(
+                    "Error while terminating the scoped container for message %s",
+                    envelope.open().__class__.__name__,
+                )
 
     async def _after_handling_envelope(self, envelope: Envelope) -> None:
         await self._release_unique_lock(envelope)

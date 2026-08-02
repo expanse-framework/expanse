@@ -100,6 +100,46 @@ class FakeKeepAliveTransport(KeepAliveTransport):
         self.closed = True
 
 
+class FlappingLeaseTransport(KeepAliveTransport):
+    """A transport whose single message can become available again while
+    still in flight, simulating a lease/redelivery-timeout expiring before
+    a sibling consumer slot has finished handling it."""
+
+    def __init__(self) -> None:
+        self._envelope: Envelope | None = None
+        self.available: bool = True
+        self.acknowledged: list[Envelope] = []
+        self.rejected: list[Envelope] = []
+        self.keep_alive_calls: list[Envelope] = []
+
+    def enqueue(self, envelope: Envelope) -> Envelope:
+        stamped = envelope.with_stamps(TransportMessageIdStamp(id=1))
+        self._envelope = stamped
+        return stamped
+
+    async def send(self, envelope: Envelope) -> Envelope:
+        return envelope
+
+    async def receive(self) -> AsyncIterator[Envelope]:
+        if self._envelope is not None and self.available:
+            self.available = False
+            yield self._envelope
+
+    async def acknowledge(self, envelope: Envelope) -> None:
+        self.acknowledged.append(envelope)
+        self._envelope = None
+
+    async def reject(self, envelope: Envelope) -> None:
+        self.rejected.append(envelope)
+        self._envelope = None
+
+    async def keep_alive(self, envelope: Envelope, duration: int | None = None) -> None:
+        self.keep_alive_calls.append(envelope)
+
+    async def close(self) -> None:
+        pass
+
+
 @dataclass
 class WorkerMessage:
     value: str
@@ -124,6 +164,25 @@ class ProcessJobWithDep(AsyncJob[WorkerMessage]):
     @override
     async def execute(self, service: MyService) -> None:
         ProcessJobWithDep.injected.append(service)
+
+
+class FakeScopedSession:
+    pass
+
+
+async def _create_fake_scoped_session() -> AsyncIterator[FakeScopedSession]:
+    yield FakeScopedSession()
+    # Simulates a failure while tearing down a scoped dependency, e.g. a
+    # database session raising while being closed.
+    raise RuntimeError("boom during scoped session teardown")
+
+
+class ProcessJobWithScopedSession(AsyncJob[WorkerMessage]):
+    call_log: ClassVar[list[str]] = []
+
+    @override
+    async def execute(self, session: FakeScopedSession) -> None:
+        ProcessJobWithScopedSession.call_log.append(self.payload.value)
 
 
 @dataclass
@@ -412,6 +471,38 @@ async def test_worker_job_receives_injected_dependencies(
 
     assert len(ProcessJobWithDep.injected) == 1
     assert ProcessJobWithDep.injected[0] is service
+
+
+async def test_worker_does_not_retry_job_when_only_scope_teardown_fails(
+    worker: Worker,
+    transport_manager: TransportManager,
+    container: Container,
+    caplog: LogCaptureFixture,
+) -> None:
+    """A failure while tearing down a scoped dependency (e.g. closing a
+    database session) must not be mistaken for the job itself having
+    failed -- otherwise an already-successful job gets retried and its
+    side effects run again."""
+    caplog.set_level(logging.ERROR)
+    ProcessJobWithScopedSession.call_log.clear()
+    container.scoped(FakeScopedSession, _create_fake_scoped_session)
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+
+    await transport.send(
+        Envelope.wrap(
+            WorkerMessage(value="once"),
+            stamps=[JobStamp(class_to_name(ProcessJobWithScopedSession))],
+        )
+    )
+
+    await worker.run(limit=1)
+
+    assert ProcessJobWithScopedSession.call_log == ["once"]
+    assert len(transport._acknowledged) == 1
+    assert transport._rejected == []
+    assert "Error while terminating the scoped container" in caplog.text
 
 
 async def test_worker_routes_invalid_job_class_to_failure_transport(
@@ -1294,6 +1385,68 @@ async def test_worker_scoped_container_does_not_leak_between_concurrent_messages
     await worker.run(limit=concurrency, concurrency=concurrency)
 
     assert sorted(resolved_values) == ["a", "b"]
+
+
+async def test_worker_does_not_reprocess_message_reclaimed_by_own_slot(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    """If a lease-based transport (database, redis, ...) considers a
+    message eligible for redelivery again while one of this worker's own
+    concurrent slots is still actively handling it -- e.g. because its
+    keep-alive refresh hasn't run yet -- a sibling slot must not process
+    it a second time."""
+    fake_transport = FlappingLeaseTransport()
+    cfg = Config(
+        {
+            "messenger": {
+                "transport": "flapping",
+                "failure_transport": "failed",
+                "transports": {
+                    "flapping": {"driver": "memory"},
+                    "failed": {"driver": "memory"},
+                },
+            }
+        }
+    )
+    tm = TransportManager(container, cfg, registry)
+    tm._transports["flapping"] = fake_transport
+    worker = Worker(
+        tm, RetryStrategyManager(cfg), cfg, middleware_stack, container, registry
+    )
+
+    call_count = 0
+
+    async def handler(_message: WorkerMessage) -> None:
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0.05)
+
+    fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="once")))
+    registry.register_handler(handler)
+
+    async def flapper() -> None:
+        # Simulates the transport's lease/redelivery-timeout repeatedly
+        # elapsing while the message is still being handled.
+        for _ in range(20):
+            await asyncio.sleep(0.005)
+            fake_transport.available = True
+
+    async def stopper() -> None:
+        await asyncio.sleep(0.2)
+        worker.stop()
+
+    flap_task = asyncio.ensure_future(flapper())
+    stop_task = asyncio.ensure_future(stopper())
+    try:
+        await worker.run(concurrency=3, sleep=1)
+    finally:
+        flap_task.cancel()
+        stop_task.cancel()
+
+    assert call_count == 1
+    assert len(fake_transport.acknowledged) == 1
 
 
 async def test_worker_does_not_release_when_envelope_has_no_unique_stamp(
