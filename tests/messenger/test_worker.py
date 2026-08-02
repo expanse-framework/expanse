@@ -795,7 +795,7 @@ async def test_worker_tracks_keep_alives_for_keep_alive_transport(
     await worker.run(limit=1)
 
     assert len(captured) == 1
-    key = id(envelope.open())
+    key = id(envelope)
     assert key in captured
     assert captured[key][0] == "keep_alive"
 

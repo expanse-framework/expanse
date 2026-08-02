@@ -93,9 +93,9 @@ class Worker:
 
                 handled_messages += 1
 
-                keep_alive_id = (transport_name, envelope)
+                keep_alive_id = id(envelope)
                 if isinstance(transport, KeepAliveTransport):
-                    self._keep_alives[id(envelope.open())] = keep_alive_id
+                    self._keep_alives[keep_alive_id] = (transport_name, envelope)
 
                 try:
                     envelope = await self._handle_envelope(envelope)
@@ -121,7 +121,7 @@ class Worker:
                             )
                             await transport.reject(e.envelope)
 
-                            self._keep_alives.pop(id(envelope.open()), None)
+                            self._keep_alives.pop(keep_alive_id, None)
 
                             await self._release_unique_lock(envelope)
 
@@ -160,7 +160,7 @@ class Worker:
                         )
                         await transport.reject(envelope)
 
-                        self._keep_alives.pop(id(envelope.open()), None)
+                        self._keep_alives.pop(keep_alive_id, None)
 
                         await self._release_unique_lock(envelope)
 
@@ -191,7 +191,7 @@ class Worker:
 
                     await transport.reject(envelope)
 
-                    self._keep_alives.pop(id(envelope.open()), None)
+                    self._keep_alives.pop(keep_alive_id, None)
 
                     continue
 
@@ -210,7 +210,7 @@ class Worker:
 
                 await transport.acknowledge(envelope)
 
-                self._keep_alives.pop(id(envelope.open()), None)
+                self._keep_alives.pop(keep_alive_id, None)
 
             if not envelope_handled:
                 await asyncio.sleep(sleep / 1000)
