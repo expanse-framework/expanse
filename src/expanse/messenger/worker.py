@@ -12,6 +12,10 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
 from expanse.contracts.messenger.asynchronous.transport import Transport
+from expanse.contracts.messenger.asynchronous.worker_aware_transport import (
+    WorkerAwareTransport,
+)
+from expanse.encryption.utils import generate_random_string
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
 from expanse.jobs.synchronous.job import Job as SyncJob
@@ -106,7 +110,13 @@ class Worker:
 
                 return True
 
-        async def consume() -> None:
+        async def consume(concurrent: bool = True) -> None:
+            worker_id = generate_random_string(8, restricted=True)
+            worker_transport = transport
+
+            if isinstance(worker_transport, WorkerAwareTransport) and concurrent:
+                worker_transport = worker_transport.clone_for_worker(worker_id)
+
             while not self._stop_event.is_set():
                 if limit is not None and handled_messages >= limit:
                     self.stop()
@@ -114,20 +124,22 @@ class Worker:
 
                 envelope_handled: bool = False
 
-                async for envelope in transport.receive():
+                async for envelope in worker_transport.receive():
                     envelope_handled = True
 
                     if not await reserve_slot():
                         self.stop()
                         break
 
-                    await self._process_envelope(envelope, transport, transport_name)
+                    await self._process_envelope(
+                        envelope, worker_transport, transport_name
+                    )
 
                 if not envelope_handled:
                     await asyncio.sleep(sleep / 1000)
 
         if concurrency <= 1:
-            await consume()
+            await consume(False)
         else:
             await asyncio.gather(*(consume() for _ in range(concurrency)))
 

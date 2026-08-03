@@ -1,9 +1,14 @@
 import json
+import logging
 
 from collections.abc import AsyncIterator
+from typing import Self
 
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
+)
+from expanse.contracts.messenger.asynchronous.worker_aware_transport import (
+    WorkerAwareTransport,
 )
 from expanse.contracts.messenger.serializer import Serializer
 from expanse.messenger.envelope import Envelope
@@ -18,15 +23,36 @@ from expanse.redis.asynchronous.connections.connection import (
 )
 
 
-class RedisTransport(KeepAliveTransport):
+logger = logging.getLogger(__name__)
+
+
+class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
     def __init__(
         self,
         redis_connection: RedisConnection,
         config: RedisTransportConfig,
         serializer: Serializer,
     ) -> None:
+        self._config: RedisTransportConfig = config
+        self._redis_connection: RedisConnection = redis_connection
         self._connection: Connection = Connection(redis_connection, config)
         self._serializer: Serializer = serializer
+
+        logger.debug(
+            "Initializing Redis transport",
+            extra={"group": config.group, "consumer": config.consumer},
+        )
+
+    def clone_for_worker(self, worker_id: str) -> Self:
+        config = self._config.model_copy(
+            update={"consumer": f"{self._config.consumer}-{worker_id}"}
+        )
+
+        return self.__class__(
+            redis_connection=self._redis_connection,
+            config=config,
+            serializer=self._serializer,
+        )
 
     async def send(self, envelope: Envelope) -> Envelope:
         encoded_envelope = self._serializer.encode(envelope)
