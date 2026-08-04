@@ -3,6 +3,7 @@ import contextvars
 import itertools
 import logging
 
+from enum import StrEnum
 from typing import Any
 
 from expanse.configuration.config import Config
@@ -46,6 +47,28 @@ from expanse.types.messenger import MessageHandler
 
 
 logger = logging.getLogger(__name__)
+
+
+class MessageLogMessage(StrEnum):
+    HANDLED = "Message %s handled successfully."
+    UNRECOVERABLE_ERROR = "Message handling failed with an unrecoverable error, removing from transport. Error: %s"
+    FAILED_AFTER_RETRIES = "Message handling failed after %s retries. Error: %s"
+    FAILED = "Message handling failed. Error: %s"
+    FAILED_RETRYING = (
+        "Message handling failed, sending for retry %s with a delay of %ss. Error: %s"
+    )
+    SKIPPED_DUPLICATE = (
+        "Skipping message that is already being processed by this worker."
+    )
+
+
+class JobLogMessage(StrEnum):
+    HANDLED = "Job %s executed successfully."
+    UNRECOVERABLE_ERROR = "Job failed with an unrecoverable error. Error: %s"
+    FAILED_AFTER_RETRIES = "Job failed after %s retries. Error: %s"
+    FAILED = "Job failed. Error: %s"
+    FAILED_RETRYING = "Job failed, sending for retry %s with a delay of %ss. Error: %s"
+    SKIPPED_DUPLICATE = "Skipping job that is already being processed by this worker."
 
 
 class Worker:
@@ -152,6 +175,20 @@ class Worker:
     ) -> None:
         keep_alive_id = next(self._keep_alive_ids)
         dedup_key: tuple[str, Any] | None = None
+        log_messages: type[MessageLogMessage] | type[JobLogMessage]
+        message_id_stamp = envelope.stamp(TransportMessageIdStamp)
+        log_extras: dict[str, Any] = {
+            "transport": transport_name,
+        }
+        if message_id_stamp is not None:
+            log_extras["message_id"] = message_id_stamp.id
+
+        if job_stamp := envelope.stamp(JobStamp):
+            log_extras["job"] = job_stamp.job
+            log_messages = JobLogMessage
+        else:
+            log_extras["message_type"] = envelope.open().__class__.__name__
+            log_messages = MessageLogMessage
 
         if isinstance(transport, KeepAliveTransport):
             message_id_stamp = envelope.stamp(TransportMessageIdStamp)
@@ -162,15 +199,7 @@ class Worker:
                 # Another one of this worker's own slots is already
                 # processing this exact message: skip it rather than
                 # handling it a second time.
-                logger.debug(
-                    "Skipping message that is already being processed by this worker.",
-                    extra={
-                        "transport": transport_name,
-                        "message_id": message_id_stamp.id
-                        if message_id_stamp is not None
-                        else None,
-                    },
-                )
+                logger.debug(log_messages.SKIPPED_DUPLICATE.value, extra=log_extras)
 
                 return
 
@@ -190,10 +219,10 @@ class Worker:
                     for error in e.errors.values()
                 ):
                     logger.error(
-                        "Message handling failed with an unrecoverable error, removing from transport. Error: %s",
+                        log_messages.UNRECOVERABLE_ERROR.value,
                         e,
                         extra={
-                            "message_type": envelope.open().__class__.__name__,
+                            **log_extras,
                             "error": str(e),
                         },
                     )
@@ -222,12 +251,10 @@ class Worker:
                 redelivery_stamp = envelope.stamp(RedeliveryStamp)
 
                 if redelivery_stamp is not None:
-                    error_message = "Message handling failed after %s retries, removing from transport. Error: %s"
+                    error_message = log_messages.FAILED_AFTER_RETRIES.value
                     error_message_args.append(redelivery_stamp.retry_count)
                 else:
-                    error_message = (
-                        "Message handling failed, removing from transport. Error: %s"
-                    )
+                    error_message = log_messages.FAILED.value
 
                 error_message_args.append(e)
 
@@ -235,8 +262,7 @@ class Worker:
                     error_message,
                     *error_message_args,
                     extra={
-                        "transport": transport_name,
-                        "message_type": envelope.open().__class__.__name__,
+                        **log_extras,
                         "error": str(e),
                     },
                 )
@@ -258,12 +284,12 @@ class Worker:
                 redelivery_stamp.retry_count if redelivery_stamp is not None else 0
             ) + 1
             logger.warning(
-                "Message handling failed, sending for retry %s with a delay of %ss. Error: %s",
+                log_messages.FAILED_RETRYING.value,
                 retry_count,
                 delay,
                 e,
                 extra={
-                    "message_type": envelope.open().__class__.__name__,
+                    **log_extras,
                     "error": str(e),
                 },
             )
@@ -280,17 +306,10 @@ class Worker:
 
             return
 
-        message_id_stamp = envelope.stamp(TransportMessageIdStamp)
-        message_id = message_id_stamp.id if message_id_stamp else None
-        message_class = envelope.open().__class__.__name__
         logger.info(
-            "Message %s handled successfully. Acknowledging message to transport.",
-            message_class,
-            extra={
-                "class": message_class,
-                "message_id": message_id,
-                "transport": transport_name,
-            },
+            log_messages.HANDLED.value,
+            log_extras.get("job", log_extras.get("message_type")),
+            extra=log_extras,
         )
 
         await transport.acknowledge(envelope)

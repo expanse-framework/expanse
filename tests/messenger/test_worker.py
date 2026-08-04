@@ -324,10 +324,7 @@ async def test_worker_handles_messages(
 
     assert called_values == [message.value]
     assert [e async for e in transport.receive()] == []
-    assert (
-        caplog.messages[0]
-        == "Message WorkerMessage handled successfully. Acknowledging message to transport."
-    )
+    assert caplog.messages[0] == "Message WorkerMessage handled successfully."
 
 
 async def test_worker_sends_unrecoverable_failures_to_failure_transport(
@@ -429,7 +426,7 @@ async def test_worker_routes_to_failure_transport_when_retries_are_exhausted(
 
     assert (
         caplog.messages[0]
-        == "Message handling failed after 3 retries, removing from transport. Error: Message handling failed for message <class 'method'>: permanent failure"
+        == "Message handling failed after 3 retries. Error: Message handling failed for message <class 'method'>: permanent failure"
     )
 
 
