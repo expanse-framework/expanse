@@ -19,6 +19,7 @@ include_name: Callable[
             "index",
             "unique_constraint",
             "foreign_key_constraint",
+            "check_constraint",
         ],
         MutableMapping[
             Literal[
