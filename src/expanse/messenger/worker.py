@@ -19,6 +19,7 @@ from expanse.encryption.utils import generate_random_string
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
 from expanse.jobs.synchronous.job import Job as SyncJob
+from expanse.logging.context import Context
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
@@ -111,10 +112,13 @@ class Worker:
                 return True
 
         async def consume(concurrent: bool = True) -> None:
-            worker_id = generate_random_string(8, restricted=True)
             worker_transport = transport
 
             if isinstance(worker_transport, WorkerAwareTransport) and concurrent:
+                worker_id = generate_random_string(8, restricted=True)
+                context = await self._container.get(Context)
+                context["worker.id"] = worker_id
+
                 worker_transport = worker_transport.clone_for_worker(worker_id)
 
             while not self._stop_event.is_set():
