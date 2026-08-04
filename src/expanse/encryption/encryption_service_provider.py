@@ -2,6 +2,7 @@ import base64
 
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import cast
 
 from expanse.contracts.encryption.signer import Signer as SignerContract
 from expanse.core.application import Application
@@ -38,7 +39,9 @@ class EncryptionServiceProvider(ServiceProvider):
         from expanse.encryption.key import Key
         from expanse.encryption.key_chain import KeyChain
 
-        secret_key: Secret[str] = Secret[str].wrap(app.config.get("app.secret_key"))
+        secret_key: Secret[str] = Secret[str].wrap(
+            cast("str", app.config.get("app.secret_key"))
+        )
         previous_keys: str | Secret[str] | list[str | Secret[str]] | None = (
             app.config.get("app.previous_keys")
         )
