@@ -9,7 +9,9 @@ import pytest
 
 from sqlalchemy import text
 
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.database_manager import DatabaseManager
+from expanse.messenger.serializers.serializer import Serializer
 
 
 if TYPE_CHECKING:
@@ -18,6 +20,11 @@ if TYPE_CHECKING:
     from expanse.configuration.config import Config
     from expanse.core.application import Application
     from expanse.testing.command_tester import CommandTester
+
+
+@pytest.fixture(autouse=True)
+def configure_messenger(app: Application) -> None:
+    app.container.instance(SerializerContract, Serializer())
 
 
 @pytest.fixture()

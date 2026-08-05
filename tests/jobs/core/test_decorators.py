@@ -106,3 +106,25 @@ def test_delay_rejects_negative_values() -> None:
 def test_transport_rejects_empty_name() -> None:
     with pytest.raises(ValueError, match="empty"):
         transport("")
+
+
+def test_unique_decorator_sets_unique_option() -> None:
+    @unique()
+    class MyJob(Job[str]):
+        pass
+
+    job = MyJob("hello")
+
+    assert job.options["unique"]
+
+
+def test_sensitive_decorator_sets_sensitive_option() -> None:
+    from expanse.jobs.decorators import sensitive
+
+    @sensitive()
+    class MyJob(Job[str]):
+        pass
+
+    job = MyJob("hello")
+
+    assert job.options["sensitive"]

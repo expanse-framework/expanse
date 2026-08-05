@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 
 import msgspec
+import pytest
 
 from pydantic import BaseModel
 
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.exceptions import UntrustedMessageTypeError
+from expanse.messenger.serializers.strict_serializer import (
+    StrictSerializer as Serializer,
+)
+from expanse.messenger.trusted_collection import TrustedCollection
 
 
 @dataclass
@@ -26,14 +31,16 @@ class MyStamp(msgspec.Struct):
 
 
 def test_serializer_supports_envelope_with_dataclass_message() -> None:
-    serializer = Serializer()
+    trusted_collection = TrustedCollection()
+    trusted_collection.trust(Foo)
+    serializer = Serializer(trusted_collection=trusted_collection)
 
     envelope = Envelope.wrap(Foo(foo="bar"))
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
         "d": '{"foo":"bar"}',
-        "t": "tests.messenger.test_serializer.Foo",
+        "t": "tests.messenger.serializers.test_strict_serializer.Foo",
         "s": "dataclass",
     }
 
@@ -44,14 +51,16 @@ def test_serializer_supports_envelope_with_dataclass_message() -> None:
 
 
 def test_serializer_supports_envelope_with_msgspec_message() -> None:
-    serializer = Serializer()
+    trusted_collection = TrustedCollection()
+    trusted_collection.trust(Bar)
+    serializer = Serializer(trusted_collection=trusted_collection)
 
     envelope = Envelope.wrap(Bar(bar="baz"))
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
         "d": '{"bar":"baz"}',
-        "t": "tests.messenger.test_serializer.Bar",
+        "t": "tests.messenger.serializers.test_strict_serializer.Bar",
         "s": "msgspec",
     }
 
@@ -62,14 +71,16 @@ def test_serializer_supports_envelope_with_msgspec_message() -> None:
 
 
 def test_serializer_supports_envelope_with_pydantic_message() -> None:
-    serializer = Serializer()
+    trusted_collection = TrustedCollection()
+    trusted_collection.trust(Baz)
+    serializer = Serializer(trusted_collection=trusted_collection)
 
     envelope = Envelope.wrap(Baz(baz="qux"))
     encoded_envelope = serializer.encode(envelope)
 
     assert encoded_envelope["body"] == {
         "d": '{"baz":"qux"}',
-        "t": "tests.messenger.test_serializer.Baz",
+        "t": "tests.messenger.serializers.test_strict_serializer.Baz",
         "s": "pydantic",
     }
 
@@ -80,7 +91,10 @@ def test_serializer_supports_envelope_with_pydantic_message() -> None:
 
 
 def test_serializer_serializes_envelope_with_stamps() -> None:
-    serializer = Serializer()
+    trusted_collection = TrustedCollection()
+    trusted_collection.trust(Foo)
+    trusted_collection.trust(MyStamp)
+    serializer = Serializer(trusted_collection=trusted_collection)
 
     envelope = Envelope.wrap(Foo(foo="bar")).with_stamps(MyStamp(value="test"))
     encoded_envelope = serializer.encode(envelope)
@@ -88,7 +102,7 @@ def test_serializer_serializes_envelope_with_stamps() -> None:
     assert encoded_envelope["headers"]["stamps"] == [
         {
             "d": '{"value":"test"}',
-            "t": "tests.messenger.test_serializer.MyStamp",
+            "t": "tests.messenger.serializers.test_strict_serializer.MyStamp",
             "s": "msgspec",
         }
     ]
@@ -101,3 +115,13 @@ def test_serializer_serializes_envelope_with_stamps() -> None:
     stamp = decoded_envelope.stamp(MyStamp)
     assert isinstance(stamp, MyStamp)
     assert stamp.value == "test"
+
+
+def test_serializer_refuses_to_decode_an_untrusted_type() -> None:
+    serializer = Serializer(trusted_collection=TrustedCollection())
+
+    envelope = Envelope.wrap(Foo(foo="bar"))
+    encoded_envelope = serializer.encode(envelope)
+
+    with pytest.raises(UntrustedMessageTypeError):
+        serializer.decode(encoded_envelope)

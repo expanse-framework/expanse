@@ -12,7 +12,7 @@ from expanse.configuration.config import Config
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransportError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig
@@ -65,7 +65,11 @@ async def redis_transport(redis_connection: RedisConnection) -> RedisTransport:
         group="test_group",
         consumer="test_consumer",
     )
-    return RedisTransport(redis_connection, transport_config, Serializer())
+    return RedisTransport(
+        redis_connection,
+        transport_config,
+        Serializer(),
+    )
 
 
 async def test_transport_can_send_a_message(

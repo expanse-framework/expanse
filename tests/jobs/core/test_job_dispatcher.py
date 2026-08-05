@@ -6,6 +6,7 @@ from expanse.jobs.core.job import Job
 from expanse.jobs.core.job_dispatcher import JobDispatcher
 from expanse.jobs.stamps.job import JobStamp
 from expanse.messenger.stamps.delay import DelayStamp
+from expanse.messenger.stamps.sensitive import SensitiveStamp
 from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.support._utils import class_to_name
@@ -158,3 +159,21 @@ def test_prepare_with_unique_true_adds_unique_stamp() -> None:
     envelope = dispatcher.prepare(job)
 
     assert envelope.has_stamp(UniqueStamp)
+
+
+def test_prepare_with_sensitive_false_does_not_add_sensitive_stamp() -> None:
+    dispatcher = JobDispatcher()
+    job = MyJob(Payload("hello"))
+    job.options["sensitive"] = False
+    envelope = dispatcher.prepare(job)
+
+    assert not envelope.has_stamp(SensitiveStamp)
+
+
+def test_prepare_with_sensitive_true_adds_sensitive_stamp() -> None:
+    dispatcher = JobDispatcher()
+    job = MyJob(Payload("hello"))
+    job.options["sensitive"] = True
+    envelope = dispatcher.prepare(job)
+
+    assert envelope.has_stamp(SensitiveStamp)

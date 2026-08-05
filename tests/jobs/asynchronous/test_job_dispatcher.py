@@ -40,7 +40,8 @@ def config() -> Config:
 
 @pytest.fixture()
 def transport_manager(container: Container, config: Config) -> TransportManager:
-    return TransportManager(container, config, Registry())
+    registry = Registry()
+    return TransportManager(container, config, registry)
 
 
 @pytest.fixture()

@@ -8,7 +8,7 @@ SALT = b"73NBdlFeA2L1rP-GDasaIFOKYZMIWo07"
 
 
 def test_deriving_key_should_generate_a_new_key_of_default_size() -> None:
-    key = KeyGenerator(Secret(SALT)).generate_key(Key(SECRET))
+    key = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT))
 
     assert isinstance(key.value.reveal(), bytes)
     assert len(key.value.reveal()) == 32
@@ -16,7 +16,7 @@ def test_deriving_key_should_generate_a_new_key_of_default_size() -> None:
 
 
 def test_deriving_key_should_generate_a_new_key_of_given_size() -> None:
-    key = KeyGenerator(Secret(SALT)).generate_key(Key(SECRET), 64)
+    key = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT), key_size=64)
 
     assert isinstance(key.value.reveal(), bytes)
     assert len(key.value.reveal()) == 64
@@ -24,18 +24,18 @@ def test_deriving_key_should_generate_a_new_key_of_given_size() -> None:
 
 
 def test_derived_key_is_different_if_salt_is_different() -> None:
-    key = KeyGenerator(Secret(SALT)).generate_key(Key(SECRET))
-    key2 = KeyGenerator(Secret(SALT)).generate_key(Key(SECRET))
-    other_key = KeyGenerator(Secret(b"other_salt")).generate_key(Key(SECRET))
+    key = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT))
+    key2 = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT))
+    other_key = KeyGenerator.generate_key(Key(SECRET), salt=Secret(b"other_salt"))
 
     assert key.value.reveal() == key2.value.reveal()
     assert key.value.reveal() != other_key.value.reveal()
 
 
 def test_derived_key_is_different_if_label_is_different() -> None:
-    key = KeyGenerator(Secret(SALT), purpose=b"foo").generate_key(Key(SECRET))
-    key2 = KeyGenerator(Secret(SALT), purpose=b"bar").generate_key(Key(SECRET))
-    key3 = KeyGenerator(Secret(SALT), purpose=b"foo").generate_key(Key(SECRET))
+    key = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT), purpose=b"foo")
+    key2 = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT), purpose=b"bar")
+    key3 = KeyGenerator.generate_key(Key(SECRET), salt=Secret(SALT), purpose=b"foo")
 
     assert key.value.reveal() != key2.value.reveal()
     assert key.value.reveal() == key3.value.reveal()

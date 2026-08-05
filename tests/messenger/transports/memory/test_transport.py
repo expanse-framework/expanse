@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
@@ -16,7 +17,8 @@ class FooMessage:
 
 
 def make_transport() -> MemoryTransport:
-    return MemoryTransport()
+    serializer = Serializer()
+    return MemoryTransport(serializer)
 
 
 async def test_send_stamps_envelope_with_transport_message_id() -> None:
@@ -145,3 +147,40 @@ async def test_reject_raises_when_no_transport_message_id_stamp() -> None:
 
     with pytest.raises(ValueError, match="TransportMessageIdStamp"):
         await transport.reject(envelope)
+
+
+async def test_receive_does_not_return_in_flight_envelope_again() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+
+    second = [e async for e in transport.receive()]
+    assert second == []
+
+
+async def test_acknowledge_clears_in_flight_tracking() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+    assert transport._in_flight
+
+    await transport.acknowledge(first[0])
+
+    assert transport._in_flight == set()
+
+
+async def test_reject_clears_in_flight_tracking() -> None:
+    transport = make_transport()
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    first = [e async for e in transport.receive()]
+    assert len(first) == 1
+    assert transport._in_flight
+
+    await transport.reject(first[0])
+
+    assert transport._in_flight == set()

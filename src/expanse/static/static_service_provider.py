@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from typing import cast
 
 from expanse.configuration.config import Config
 from expanse.static.static import Static
@@ -28,7 +29,7 @@ class StaticServiceProvider(ServiceProvider):
         if (url := config.get("static.url")) is not None:
             url = str(url)
 
-        return Static(paths, prefix=config.get("static.prefix"), url=url)
+        return Static(paths, prefix=cast("str", config.get("static.prefix")), url=url)
 
     async def _add_static_route(self, router: "Router") -> None:
         config = await self._container.get(Config)

@@ -2,21 +2,26 @@ from collections import defaultdict
 from typing import get_type_hints
 
 from expanse.messenger.exceptions import InvalidHandlerError
+from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.types.messenger import Message
 from expanse.types.messenger import MessageHandler
 from expanse.types.messenger import MessageT
 
 
 class Registry:
-    def __init__(self) -> None:
+    def __init__(self, trusted_collection: TrustedCollection | None = None) -> None:
         self._handlers: dict[type[Message], list[MessageHandler[Message]]] = (
             defaultdict(list)
         )
+        self._trusted_collection: TrustedCollection | None = trusted_collection
 
     def register(
         self, message_type: type[MessageT], handler: MessageHandler[MessageT]
     ) -> None:
         self._handlers[message_type].append(handler)
+
+        if self._trusted_collection is not None:
+            self._trusted_collection.trust(message_type)
 
     def register_handler(self, handler: MessageHandler[Message]) -> None:
         hints = get_type_hints(handler)

@@ -9,7 +9,8 @@ from expanse.contracts.messenger.asynchronous.transport import (
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.exceptions import MessageDecodingFailedError
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 
@@ -27,6 +28,7 @@ class MemoryTransport(TransportContract):
         self._rejected: list[EncodedEnvelope] = []
         self._available_at: dict[int, datetime] = {}
         self._queue: dict[int, EncodedEnvelope] = {}
+        self._in_flight: set[int] = set()
 
     @property
     def sent(self) -> list[Envelope]:
@@ -49,11 +51,27 @@ class MemoryTransport(TransportContract):
 
     async def receive(self) -> AsyncIterator[Envelope]:
         for message_id, encoded_envelope in list(self._queue.items()):
+            if message_id in self._in_flight:
+                # Already handed out to a consumer and not yet acknowledged
+                # or rejected: skip it so concurrent consumers don't claim
+                # the same message.
+                continue
+
             if (
                 message_id not in self._available_at
                 or datetime.now(UTC) >= self._available_at[message_id]
             ):
-                yield self._serializer.decode(encoded_envelope)
+                self._in_flight.add(message_id)
+
+                try:
+                    yield self._serializer.decode(encoded_envelope)
+                except MessageDecodingFailedError as e:
+                    # If decoding fails, make an envelope
+                    yield e.as_envelope().with_stamps(
+                        TransportMessageIdStamp(message_id)
+                    )
+
+                    continue
 
     async def acknowledge(self, envelope: Envelope) -> None:
         encoded_envelope = self._serializer.encode(envelope)
@@ -67,6 +85,7 @@ class MemoryTransport(TransportContract):
 
         self._queue.pop(message_id_stamp.id, None)
         self._available_at.pop(message_id_stamp.id, None)
+        self._in_flight.discard(message_id_stamp.id)
 
     async def reject(self, envelope: Envelope) -> None:
         encoded_envelope = self._serializer.encode(envelope)
@@ -80,6 +99,7 @@ class MemoryTransport(TransportContract):
 
         self._queue.pop(message_id_stamp.id, None)
         self._available_at.pop(message_id_stamp.id, None)
+        self._in_flight.discard(message_id_stamp.id)
 
     async def close(self) -> None:
         self._sent.clear()
@@ -87,3 +107,4 @@ class MemoryTransport(TransportContract):
         self._rejected.clear()
         self._available_at.clear()
         self._queue.clear()
+        self._in_flight.clear()

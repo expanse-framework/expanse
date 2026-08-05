@@ -51,6 +51,17 @@ class Config(BaseSettings):
         }
     )
 
+    # Whether to sign messages or not
+    #
+    # Signing messages ensures their integrity and authenticity.
+    # If enabled, messages will be signed before being sent and verified upon receipt.
+    sign: bool = True
+
+    # Whether the serializer should be strict about types being decoded
+    #
+    # When decoding messages, the serializer will only allow types that are explicitly trusted.
+    strict: bool = False
+
     model_config = SettingsConfigDict(
         env_prefix="messenger_", env_nested_delimiter="__"
     )

@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 
+import pytest
+
 from expanse.core.application import Application
 from expanse.encryption.encryptor_factory import EncryptorFactory
+from expanse.encryption.key import Key
+from expanse.encryption.key_chain import KeyChain
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.handle_encryption import EncryptedMessage
 from expanse.messenger.middleware.handle_encryption import HandleEncryption
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.encrypted import EncryptedStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
@@ -20,15 +24,14 @@ async def next_call(envelope: Envelope) -> Envelope:
     return envelope
 
 
+@pytest.fixture()
+def encryption() -> EncryptorFactory:
+    return EncryptorFactory(KeyChain([Key(b"k" * 32)]), salt=b"s" * 32)
+
+
 async def test_middleware_handles_encryption_and_decryption_properly(
-    app: Application,
+    encryption: EncryptorFactory,
 ) -> None:
-    app.config["app.secret_key"] = "k" * 32
-    app.config["encryption"] = {
-        "cipher": "aes-256-gcm",
-        "salt": "s" * 32,
-    }
-    encryption = EncryptorFactory(app)
     serializer = Serializer()
     middleware = HandleEncryption(encryption, serializer)
 
@@ -57,14 +60,13 @@ async def test_middleware_handles_encryption_and_decryption_properly(
 
 
 async def test_middleware_does_not_encrypt_envelope_without_sensitive_stamp(
-    app: Application,
+    app: Application, encryption: EncryptorFactory
 ) -> None:
     app.config["app.secret_key"] = "k" * 32
     app.config["encryption"] = {
         "cipher": "aes-256-gcm",
         "salt": "s" * 32,
     }
-    encryption = EncryptorFactory(app)
     serializer = Serializer()
     middleware = HandleEncryption(encryption, serializer)
 

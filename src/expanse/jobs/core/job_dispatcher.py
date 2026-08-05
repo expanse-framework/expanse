@@ -54,4 +54,9 @@ class JobDispatcher:
 
             stamps.append(UniqueStamp())
 
+        if job.options.get("sensitive", False):
+            from expanse.messenger.stamps.sensitive import SensitiveStamp
+
+            stamps.append(SensitiveStamp())
+
         return stamps

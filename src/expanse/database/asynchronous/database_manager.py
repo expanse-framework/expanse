@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import cast
 
 from sqlalchemy import URL
 from sqlalchemy import create_engine
@@ -257,7 +258,7 @@ class AsyncDatabaseManager:
         return engine
 
     def get_default_connection(self) -> str:
-        return self._app.config.get("database.default")
+        return cast("str", self._app.config.get("database.default"))
 
     def _configuration(self, name: str) -> Any:
         connections = self._app.config.get("database.connections", {})

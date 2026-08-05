@@ -5,10 +5,12 @@ from collections.abc import AsyncIterator
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport as KeepAliveTransportContract,
 )
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializer import Serializer
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
@@ -20,12 +22,12 @@ class DatabaseTransport(KeepAliveTransportContract):
         self,
         config: DatabaseTransportConfig,
         db: AsyncDatabaseManager,
-        serializer: Serializer | None = None,
+        serializer: SerializerContract | None = None,
     ) -> None:
         self._config: DatabaseTransportConfig = config
         self._db: AsyncDatabaseManager = db
         self._connection: Connection = Connection(self._db, self._config)
-        self._serializer: Serializer = serializer or Serializer()
+        self._serializer: SerializerContract = serializer or Serializer()
 
     async def send(self, envelope: Envelope) -> Envelope:
         encoded_envelope = self._serializer.encode(envelope)
@@ -46,12 +48,16 @@ class DatabaseTransport(KeepAliveTransportContract):
         if message_row is None:
             return
 
-        envelope = self._serializer.decode(
-            {
-                "body": json.loads(message_row.body),
-                "headers": json.loads(message_row.headers),
-            }
-        )
+        try:
+            envelope = self._serializer.decode(
+                {
+                    "body": json.loads(message_row.body),
+                    "headers": json.loads(message_row.headers),
+                }
+            )
+        except MessageDecodingFailedError as e:
+            yield e.as_envelope().with_stamps(TransportMessageIdStamp(message_row.id))
+            return
 
         yield envelope.with_stamps(TransportMessageIdStamp(message_row.id))
 

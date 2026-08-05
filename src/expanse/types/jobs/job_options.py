@@ -13,3 +13,4 @@ class JobOptions(TypedDict):
     transport: NotRequired[str]
     delay: NotRequired[int]
     unique: NotRequired[bool]
+    sensitive: NotRequired[bool]

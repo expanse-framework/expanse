@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypeVar
+from typing import override
 
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import MessageEncodingFailedError
@@ -20,7 +24,11 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class Serializer:
+class Serializer(SerializerContract):
+    """
+    Encodes and decodes envelopes for transport.
+    """
+
     def __init__(
         self, serialization_manager: SerializationManager | None = None
     ) -> None:
@@ -28,6 +36,7 @@ class Serializer:
             serialization_manager or SerializationManager()
         )
 
+    @override
     def encode(self, envelope: Envelope) -> EncodedEnvelope:
         message = envelope.open()
         body = self._encode(message)
@@ -39,13 +48,20 @@ class Serializer:
 
         return EncodedEnvelope(body=body, headers=headers)
 
-    def decode(self, encoded: EncodedEnvelope) -> Envelope:
-        message = self._decode(encoded["body"])
-        raw_stamps: list[Encoded] = encoded["headers"].get("stamps", [])
+    @override
+    def decode(self, encoded_envelope: EncodedEnvelope) -> Envelope:
+        message = self._decode(encoded_envelope["body"])
+        raw_stamps: list[Encoded] = encoded_envelope["headers"].get("stamps", [])
         stamps: list[Stamp] = []
         for raw_stamp in raw_stamps:
-            stamp: Stamp = self._decode(raw_stamp)
-            stamps.append(stamp)
+            try:
+                stamp: Stamp = self._decode(raw_stamp)
+                stamps.append(stamp)
+            except Exception:
+                raise MessageDecodingFailedError(
+                    f"Failed to decode stamp of type {raw_stamp['t']}",
+                    encoded_envelope=encoded_envelope,
+                )
 
         return Envelope.wrap(message, stamps)
 
@@ -64,9 +80,4 @@ class Serializer:
     def _decode(self, data: Encoded) -> Any:
         serializer = self._serialization_manager.serializer(data["s"])
 
-        try:
-            return serializer.decode(data)
-        except Exception as e:
-            raise MessageDecodingFailedError(
-                f"Failed to decode message of type {data['t']}"
-            ) from e
+        return serializer.decode(data)

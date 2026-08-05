@@ -1,6 +1,7 @@
 import asyncio
 import signal
 
+from math import ceil
 from typing import ClassVar
 
 from cleo.helpers import argument
@@ -10,6 +11,7 @@ from cleo.io.inputs.option import Option
 
 from expanse.console.commands.command import Command
 from expanse.messenger.worker import Worker
+from expanse.support._utils import wait_for_event
 
 
 class MessengerConsumeCommand(Command):
@@ -42,6 +44,13 @@ class MessengerConsumeCommand(Command):
             default=1,
         ),
         option(
+            "concurrency",
+            "c",
+            description="The number of messages to process concurrently.",
+            flag=False,
+            default=1,
+        ),
+        option(
             "keep-alive",
             None,
             description="Whether to keep the worker alive by sending periodic keep-alive signals to the transport. This is useful to ensure transports do not redeliver messages while they are being processed.",
@@ -61,10 +70,14 @@ class MessengerConsumeCommand(Command):
         else:
             keep_alive_interval = 0
 
-        async def _keep_alive() -> None:
-            await worker.keep_alive()
+        keep_alive_task: asyncio.Task[None] | None = None
+        stop_keep_alive: asyncio.Event = asyncio.Event()
 
-            signal.alarm(keep_alive_interval)
+        async def _keep_alive_loop() -> None:
+            while not await wait_for_event(
+                stop_keep_alive, timeout=keep_alive_interval
+            ):
+                await worker.keep_alive(ceil(keep_alive_interval * 3 / 2))
 
         def _shutdown() -> None:
             worker.stop()
@@ -74,17 +87,13 @@ class MessengerConsumeCommand(Command):
             loop.remove_signal_handler(signal.SIGINT)
             loop.remove_signal_handler(signal.SIGTERM)
 
-            if keep_alive_interval > 0:
-                loop.remove_signal_handler(signal.SIGALRM)
+            stop_keep_alive.set()
 
         loop.add_signal_handler(signal.SIGINT, _shutdown)
         loop.add_signal_handler(signal.SIGTERM, _shutdown)
 
         if keep_alive_interval > 0:
-            loop.add_signal_handler(
-                signal.SIGALRM, lambda: asyncio.create_task(_keep_alive())
-            )
-            signal.alarm(keep_alive_interval)
+            keep_alive_task = asyncio.ensure_future(_keep_alive_loop())
 
         stop_conditions: list[str] = []
         if self.option("limit") is not None:
@@ -104,10 +113,18 @@ class MessengerConsumeCommand(Command):
 
         self.line_error("<comment>Press Ctrl+C to stop consuming messages.</comment>")
 
-        await worker.run(
-            transport_name=transport_name,
-            limit=(
-                int(self.option("limit")) if self.option("limit") is not None else None
-            ),
-            sleep=int(self.option("sleep")) * 1000,
-        )
+        try:
+            await worker.run(
+                transport_name=transport_name,
+                limit=(
+                    int(self.option("limit"))
+                    if self.option("limit") is not None
+                    else None
+                ),
+                sleep=int(self.option("sleep")) * 1000,
+                concurrency=int(self.option("concurrency")),
+            )
+        finally:
+            if keep_alive_task is not None:
+                stop_keep_alive.set()
+                await keep_alive_task

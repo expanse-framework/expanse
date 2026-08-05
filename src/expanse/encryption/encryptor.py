@@ -38,9 +38,10 @@ class Encryptor(EncryptorContract):
         self._cipher = cipher
         self._compress = compress
         self._compressor = ZlibCompressor()
-        self._key_generator = KeyGenerator(
-            Secret[bytes].wrap(salt) if salt is not None else None, purpose=purpose
+        self._salt: Secret[bytes] | None = (
+            Secret[bytes].wrap(salt) if salt is not None else None
         )
+        self._purpose: bytes | None = purpose
         self._purpose = purpose
         self._store_key_references: bool = store_key_references
 
@@ -75,8 +76,11 @@ class Encryptor(EncryptorContract):
         """
         cipher_class = self.CIPHERS[self._cipher]
 
-        key = self._key_generator.generate_key(
-            self._secret_key, key_size=cipher_class.key_length
+        key = KeyGenerator.generate_key(
+            self._secret_key,
+            key_size=cipher_class.key_length,
+            salt=self._salt,
+            purpose=self._purpose,
         )
 
         cipher = cipher_class(key.value)
@@ -147,7 +151,12 @@ class Encryptor(EncryptorContract):
     ) -> str:
         cipher_class = self.CIPHERS[self._cipher]
 
-        key = self._key_generator.generate_key(key, key_size=cipher_class.key_length)
+        key = KeyGenerator.generate_key(
+            key,
+            key_size=cipher_class.key_length,
+            salt=self._salt,
+            purpose=self._purpose,
+        )
 
         cipher = cipher_class(key.value)
 
