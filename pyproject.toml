@@ -31,6 +31,7 @@ dependencies = [
     "obstore>=0.9.3",
     "python-json-logger>=4.1.0",
     "atomic-lru>=0.0.7",
+    "whenever>=0.10.4",
 ]
 
 [project.optional-dependencies]

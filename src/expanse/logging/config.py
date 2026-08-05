@@ -8,6 +8,8 @@ from pydantic import Field
 from pydantic import ImportString
 from pydantic import field_validator
 
+from expanse.support.duration import SingleUnitDuration
+
 
 class BaseConfig(BaseModel):
     enabled: bool = True
@@ -35,6 +37,28 @@ class FileConfig(BaseConfig):
     driver: Literal["file"] = "file"
 
     path: Path
+
+
+class TimeBasedConfig(BaseConfig):
+    driver: Literal["time_based"] = "time_based"
+
+    path: Path
+    every: SingleUnitDuration | None = None
+    on: (
+        Literal[
+            "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+        ]
+        | None
+    ) = None
+    at: str | None = None
+    max_files: int
+
+
+class DailyConfig(BaseConfig):
+    driver: Literal["daily"] = "daily"
+
+    path: Path
+    max_files: int = 30
 
 
 class GroupConfig(BaseConfig):

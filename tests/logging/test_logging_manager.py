@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import time
 
+from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from typing import Any
 from unittest.mock import MagicMock
@@ -20,11 +22,13 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
+    from pytest_mock import MockerFixture
+
     from expanse.core.application import Application
 
 
 @pytest.fixture()
-def manager(app: Application) -> Generator[LoggingManager]:
+def manager(app: Application, tmp_path: Path) -> Generator[LoggingManager]:
     app.config["logging"] = {
         "default": "stream",
         "channels": {
@@ -41,6 +45,24 @@ def manager(app: Application) -> Generator[LoggingManager]:
             "console": {
                 "driver": "console",
                 "level": "DEBUG",
+            },
+            "weekly": {
+                "driver": "time_based",
+                "path": str(tmp_path / "weekly.log"),
+                "every": "1 week",
+                "max_files": 5,
+            },
+            "daily": {
+                "driver": "daily",
+                "path": str(tmp_path / "daily.log"),
+                "max_files": 11,
+            },
+            "on_day": {
+                "driver": "time_based",
+                "path": str(tmp_path / "wednesday.log"),
+                "on": "wednesday",
+                "at": "12:34:56",
+                "max_files": 5,
             },
         },
     }
@@ -418,6 +440,57 @@ def test_file_channel_with_relative_path(app: Application, tmp_path: Path) -> No
 
     content = (tmp_path / "log" / "app.log").read_text()
     assert "relative path test" in content
+
+
+def test_time_based_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("weekly")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "weekly.log",
+        when="D",
+        interval=7,
+        backupCount=5,
+    )
+
+
+def test_daily_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("daily")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "daily.log",
+        when="D",
+        interval=1,
+        backupCount=11,
+    )
+
+
+def test_on_day_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("on_day")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "wednesday.log",
+        when="W2",
+        backupCount=5,
+        atTime=datetime.time(12, 34, 56),
+    )
 
 
 def test_new_drivers_can_be_added(app: Application) -> None:
