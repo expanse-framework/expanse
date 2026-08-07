@@ -1,10 +1,11 @@
 from pathlib import Path
 
-import pendulum
 import pytest
+import time_machine
 
 from alembic import util
 from treat.mock import Mockery
+from whenever import Instant
 
 from expanse.core.application import Application
 from expanse.testing.command_tester import CommandTester
@@ -23,7 +24,7 @@ def test_command_creates_a_new_migration_file_with_necessary_operations(
 
     command = command_tester.command("make messages table")
 
-    with pendulum.travel_to(pendulum.datetime(2024, 9, 5, 12, 34, 56), freeze=True):
+    with time_machine.travel(Instant("2024-09-05 12:34:56Z").to_stdlib(), tick=False):
         assert command.run() == 0
 
     output: str = command.output.fetch()
@@ -76,7 +77,7 @@ def test_command_creates_a_new_migration_for_custom_table_name(
 
     command = command_tester.command("make messages table")
 
-    with pendulum.travel_to(pendulum.datetime(2024, 9, 5, 12, 34, 56), freeze=True):
+    with time_machine.travel(Instant("2024-09-05 12:34:56Z").to_stdlib(), tick=False):
         assert command.run("--table-name outbox") == 0
 
     migration_file = tmp_path.joinpath(

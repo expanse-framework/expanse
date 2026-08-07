@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 from typing import Literal
 
-import pendulum
+import whenever
 
 from cleo.formatters.formatter import Formatter
 from cleo.io.outputs.buffered_output import BufferedOutput
@@ -95,7 +95,11 @@ class ConsoleFormatter(logging.Formatter):
 
         log_message = str(record.msg) % args
         level = record.levelname
-        time = pendulum.from_timestamp(record.created, tz="local").format("HH:mm:ss")
+        time = (
+            whenever.Instant.from_timestamp(record.created)
+            .to_system_tz()
+            .format("hh:mm:ss")
+        )
         lines = []
         lines.append(
             "".join(
@@ -115,7 +119,7 @@ class ConsoleFormatter(logging.Formatter):
                     ]
                 )
             else:
-                lines[-1] += " " + " ".join(
+                lines[-1] += " <options=dark>|</> " + " ".join(
                     [
                         f"<options=bold>{k}</>: {highlight(json.dumps(v, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).strip()}"
                         for k, v in extra.items()

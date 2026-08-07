@@ -20,7 +20,6 @@ dependencies = [
     "httpx>=0.26.0",
     "inflection>=0.5.1",
     "jinja2>=3.1.6",
-    "pendulum[test]>=3.1.0",
     "pydantic>=2.11.3",
     "pydantic-settings>=2.8.1",
     "pygments>=2.18.0",
@@ -59,6 +58,7 @@ test = [
     "treat>=0.4.2",
     "pytest-codspeed>=3.2.0",
     "redis>=7.4.0",
+    "time-machine>=2.19.0",
 ]
 dev = ["pytest-mock>=3.14.0"]
 typing = ["types-pygments>=2.18.0.20240506"]

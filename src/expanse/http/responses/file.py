@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterable
 from collections.abc import Callable
 from collections.abc import Mapping
+from datetime import UTC
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -10,7 +11,7 @@ from typing import NotRequired
 from typing import TypedDict
 from urllib.parse import quote
 
-import pendulum
+import whenever
 
 from anyio import AsyncFile
 
@@ -24,7 +25,7 @@ from expanse.types import Send
 
 class Metadata(TypedDict, total=False):
     size: NotRequired[int]
-    last_modified: NotRequired[datetime]
+    last_modified: NotRequired[datetime | int]
 
 
 class FileResponse(StreamedResponse):
@@ -96,27 +97,47 @@ class FileResponse(StreamedResponse):
         size: int | None = self.metadata.get("size") or (
             os.stat(self.path).st_size if isinstance(self.path, Path) else None
         )
-        last_modified: pendulum.DateTime | None = None
+        last_modified: whenever.ZonedDateTime | None = None
 
         if "last_modified" in self.metadata:
-            if isinstance(self.metadata["last_modified"], datetime):
-                last_modified = pendulum.instance(self.metadata["last_modified"])
+            meta_last_modified = self.metadata["last_modified"]
+            if isinstance(meta_last_modified, datetime):
+                # whenever does not support the UTC object directly
+                if meta_last_modified.tzinfo is UTC:
+                    last_modified = whenever.ZonedDateTime(
+                        meta_last_modified.year,
+                        meta_last_modified.month,
+                        meta_last_modified.day,
+                        meta_last_modified.hour,
+                        meta_last_modified.minute,
+                        meta_last_modified.second,
+                        nanosecond=meta_last_modified.microsecond * 1000,
+                        tz="UTC",
+                    )
+                else:
+                    last_modified = whenever.ZonedDateTime(meta_last_modified)
             else:
-                last_modified = pendulum.from_timestamp(self.metadata["last_modified"])
+                last_modified = whenever.ZonedDateTime.from_timestamp(
+                    meta_last_modified, tz="UTC"
+                )
         elif isinstance(self.path, Path):
-            last_modified = pendulum.from_timestamp(os.stat(self.path).st_mtime)
+            last_modified = whenever.ZonedDateTime.from_timestamp(
+                os.stat(self.path).st_mtime, tz="UTC"
+            )
 
         if size is not None:
             self.headers.set("Content-Length", str(size))
         if last_modified is not None:
             self.headers.set(
                 "Last-Modified",
-                last_modified.format("ddd, DD MMM YYYY HH:mm:ss [GMT]"),
+                last_modified.format("EEEE, DD MMM YYYY hh:mm:ss 'GMT'"),
             )
         else:
             self.headers.set(
                 "Last-Modified",
-                pendulum.now().format("ddd, DD MMM YYYY HH:mm:ss [GMT]"),
+                whenever.ZonedDateTime.now("UTC").format(
+                    "EEEE, DD MMM YYYY hh:mm:ss 'GMT'"
+                ),
             )
 
         filename = quote(self.filename)

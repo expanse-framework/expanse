@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
 
-import pendulum
+import time_machine
+
+from whenever import Instant
 
 from expanse.core.application import Application
 from expanse.testing.command_tester import CommandTester
@@ -24,7 +26,9 @@ async def test_command_calls_the_underlying_store_to_clear_expired_sessions(
     assert return_code == 0
     assert command.output.fetch() == "No expired sessions to clear.\n"
 
-    with pendulum.travel_to(pendulum.now("UTC").subtract(minutes=180)):
+    with time_machine.travel(
+        Instant.now().subtract(minutes=180).to_stdlib(), tick=False
+    ):
         await store.write("s" * 40, "payload")
 
     return_code = command.run()
