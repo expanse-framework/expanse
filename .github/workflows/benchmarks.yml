@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --group test
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5
         with:
           mode: simulation
           token: ${{ secrets.CODSPEED_TOKEN }}
