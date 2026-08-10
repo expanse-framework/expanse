@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import datetime
 import logging
+import socket
 import time
 
+from logging.handlers import SysLogHandler
 from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from typing import Any
@@ -491,6 +493,105 @@ def test_on_day_channel(
         backupCount=5,
         atTime=datetime.time(12, 34, 56),
     )
+
+
+def test_creates_syslog_channel(app: Application, mocker: MockerFixture) -> None:
+    mocker.patch.object(SysLogHandler, "_connect_unixsocket")
+    mocker.patch.object(SysLogHandler, "createSocket")
+    m = mocker.spy(SysLogHandler, "__init__")
+
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "syslog.example.com:5140",
+                "facility": "local3",
+                "socket_type": "tcp",
+                "level": "WARNING",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("syslog")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        address=("syslog.example.com", 5140),
+        facility=SysLogHandler.LOG_LOCAL3,
+        socktype=socket.SOCK_STREAM,
+    )
+
+    mgr.terminate()
+
+
+def test_creates_syslog_channel_with_unix_socket(
+    app: Application, mocker: MockerFixture
+) -> None:
+    mocker.patch.object(SysLogHandler, "_connect_unixsocket")
+    m = mocker.spy(SysLogHandler, "__init__")
+
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "/dev/log",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("syslog")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        address="/dev/log",
+        facility=SysLogHandler.LOG_USER,
+        socktype=None,
+    )
+
+    mgr.terminate()
+
+
+def test_syslog_channel_with_invalid_address_raises(app: Application) -> None:
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "not-a-valid-address",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    with pytest.raises(LogChannelConfigurationError, match="Invalid syslog address"):
+        mgr.channel("syslog")
+
+
+def test_syslog_channel_with_invalid_port_raises(app: Application) -> None:
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "localhost:not-a-port",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    with pytest.raises(LogChannelConfigurationError, match="Invalid syslog port"):
+        mgr.channel("syslog")
 
 
 def test_new_drivers_can_be_added(app: Application) -> None:

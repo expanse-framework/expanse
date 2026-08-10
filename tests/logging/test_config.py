@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from pydantic import ValidationError
+
 from expanse.logging.config import ConsoleConfig
 from expanse.logging.config import FileConfig
 from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
+from expanse.logging.config import SyslogConfig
 
 
 def test_stream_config_defaults() -> None:
@@ -55,3 +60,25 @@ def test_group_config_channels_from_comma_separated_string() -> None:
     config = GroupConfig(channels="console, file")  # type: ignore[arg-type]
 
     assert config.channels == ["console", "file"]
+
+
+def test_syslog_config_defaults() -> None:
+    config = SyslogConfig()
+
+    assert config.driver == "syslog"
+    assert config.address == "localhost:514"
+    assert config.facility == "user"
+    assert config.socket_type is None
+
+
+def test_syslog_config_with_unix_socket() -> None:
+    config = SyslogConfig(address="/dev/log", facility="local0", socket_type="udp")
+
+    assert config.address == "/dev/log"
+    assert config.facility == "local0"
+    assert config.socket_type == "udp"
+
+
+def test_syslog_config_rejects_unknown_facility() -> None:
+    with pytest.raises(ValidationError):
+        SyslogConfig(facility="unknown")  # type: ignore[arg-type]

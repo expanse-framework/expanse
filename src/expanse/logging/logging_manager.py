@@ -1,7 +1,7 @@
-import datetime
 import logging
 import sys
 
+from logging.handlers import SysLogHandler
 from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from typing import Any
@@ -19,6 +19,7 @@ from expanse.logging.config import DailyConfig
 from expanse.logging.config import FileConfig
 from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
+from expanse.logging.config import SyslogConfig
 from expanse.logging.exceptions import LogChannelConfigurationError
 from expanse.logging.exceptions import UnconfiguredLogChannelError
 from expanse.logging.exceptions import UnsupportedLogChannelDriverError
@@ -27,6 +28,8 @@ from expanse.support.duration import SingleUnitDuration
 
 
 if TYPE_CHECKING:
+    import datetime
+
     from collections.abc import Callable
 
 
@@ -176,6 +179,8 @@ class LoggingManager:
                 handler = self._create_time_based_handler(channel_name, config)
             case "daily":
                 handler = self._create_daily_handler(channel_name, config)
+            case "syslog":
+                handler = self._create_syslog_handler(channel_name, config)
 
             case _:
                 if driver not in self._handler_creators:
@@ -343,6 +348,58 @@ class LoggingManager:
                 "structured": config.structured,
             },
         )
+
+    def _create_syslog_handler(
+        self, channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        import socket
+
+        from socket import SocketKind
+
+        config = SyslogConfig.model_validate(raw_config)
+
+        address: str | tuple[str, int]
+        if config.address.startswith("/"):
+            address = config.address
+        else:
+            host, _, port = config.address.rpartition(":")
+            if not host or not port:
+                raise LogChannelConfigurationError(
+                    f"Invalid syslog address '{config.address}' for channel "
+                    f"'{channel_name}'. Expected a Unix socket path or 'host:port'."
+                )
+
+            try:
+                address = (host, int(port))
+            except ValueError as e:
+                raise LogChannelConfigurationError(
+                    f"Invalid syslog port '{port}' for channel '{channel_name}'."
+                ) from e
+
+        socktype: SocketKind | None = None
+        match config.socket_type:
+            case "udp":
+                socktype = socket.SOCK_DGRAM
+            case "tcp":
+                socktype = socket.SOCK_STREAM
+
+        handler = SysLogHandler(
+            address=address,
+            facility=SysLogHandler.facility_names[config.facility],
+            socktype=socktype,
+        )
+
+        fmt = config.format or self.DEFAULT_FORMAT
+        if config.structured:
+            from expanse.logging.formatters.structured import StructuredFormatter
+
+            handler.setFormatter(StructuredFormatter(fmt=fmt))
+        else:
+            handler.setFormatter(logging.Formatter(fmt=fmt))
+
+        handler.setLevel(config.level)
+
+        return handler
 
     def _create_group_channel(
         self, config: GroupConfig, base_logger: logging.Logger | None = None

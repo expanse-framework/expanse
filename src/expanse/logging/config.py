@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from logging import LogRecord
+from logging.handlers import SysLogHandler
 from pathlib import Path
 from typing import Literal
 
@@ -9,6 +10,34 @@ from pydantic import ImportString
 from pydantic import field_validator
 
 from expanse.support.duration import SingleUnitDuration
+
+
+SyslogFacility = Literal[
+    "auth",
+    "authpriv",
+    "console",
+    "cron",
+    "daemon",
+    "ftp",
+    "kern",
+    "lpr",
+    "mail",
+    "news",
+    "ntp",
+    "security",
+    "solaris-cron",
+    "syslog",
+    "user",
+    "uucp",
+    "local0",
+    "local1",
+    "local2",
+    "local3",
+    "local4",
+    "local5",
+    "local6",
+    "local7",
+]
 
 
 class BaseConfig(BaseModel):
@@ -60,6 +89,22 @@ class DailyConfig(BaseConfig):
 
     path: Path
     max_files: int = 30
+
+
+class SyslogConfig(BaseConfig):
+    driver: Literal["syslog"] = "syslog"
+
+    address: str = "localhost:514"
+    facility: SyslogFacility = "user"
+    socket_type: Literal["udp", "tcp"] | None = None
+
+    @field_validator("facility")
+    @classmethod
+    def validate_facility(cls, v: str) -> str:
+        if v not in SysLogHandler.facility_names:
+            raise ValueError(f"Invalid syslog facility: {v}")
+
+        return v
 
 
 class GroupConfig(BaseConfig):
