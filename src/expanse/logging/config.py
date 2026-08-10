@@ -31,6 +31,7 @@ class ConsoleConfig(BaseConfig):
     driver: Literal["console"] = "console"
 
     multiline: bool = False
+    milliseconds: bool = False
 
 
 class FileConfig(BaseConfig):
