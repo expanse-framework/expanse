@@ -42,6 +42,151 @@ logger = logging.getLogger(__name__)
 
 _Callback = Callable[..., None] | Callable[..., Awaitable[None]]
 
+# inspect.signature() re-walks the MRO, unwraps partials/descriptors, and
+# rebuilds a Signature object from scratch every time it's called; for
+# functions and classes (registered once, at startup) that work never
+# changes, so we memoize it across the many scoped containers created over
+# the life of the process. Bound methods are obtained fresh per request
+# (e.g. `getattr(instance, name)` on a request-scoped instance), so we
+# never cache by the bound method's own identity - that would pin the
+# instance in memory and never hit anyway. Instead we cache by `__func__`,
+# the underlying plain function shared by every instance of the class, and
+# strip its leading `self`/`cls` parameter (same approach as Route, which
+# does this once at registration time via the class rather than an
+# instance).
+_signature_cache: dict[Callable[..., Any] | type, inspect.Signature] = {}
+
+# Similarly, `partial(callback, instance)` (e.g. after_resolving callbacks,
+# which rebuild that partial on every resolution to bind the freshly
+# resolved instance) produces a fresh, uncacheable-by-identity object each
+# time even though its resulting signature never changes: it only depends
+# on which parameter slots `callback` + the pre-supplied args/keywords
+# consume, never on the actual bound values.
+_partial_signature_cache: dict[
+    tuple[Callable[..., Any], int, frozenset[str]], inspect.Signature
+] = {}
+
+
+def _cached_signature(obj: Callable[..., Any] | type) -> inspect.Signature:
+    if isinstance(obj, partial):
+        func = obj.func
+        stable_func: Callable[..., Any] = func
+        leading = 0
+        if isinstance(func, types.MethodType):
+            stable_func = func.__func__
+            leading = 1
+
+        key = (stable_func, leading + len(obj.args), frozenset(obj.keywords))
+
+        try:
+            return _partial_signature_cache[key]
+        except KeyError:
+            signature = inspect.signature(obj)
+            _partial_signature_cache[key] = signature
+
+            return signature
+
+    if isinstance(obj, types.MethodType):
+        func = obj.__func__
+
+        try:
+            return _signature_cache[func]
+        except KeyError:
+            unbound_signature = inspect.signature(func)
+            signature = unbound_signature.replace(
+                parameters=list(unbound_signature.parameters.values())[1:]
+            )
+            _signature_cache[func] = signature
+
+            return signature
+
+    try:
+        return _signature_cache[obj]
+    except KeyError:
+        signature = inspect.signature(obj)
+        _signature_cache[obj] = signature
+
+        return signature
+
+
+# The injectable type for a given Parameter only depends on its own
+# annotation and the defining callable's __globals__, both fixed once that
+# callable is registered. Since _cached_signature() means the same
+# Parameter objects are now reused across requests, this is memoized the
+# same way, keyed by identity of the __globals__ dict (itself stable for
+# the life of the module).
+_class_cache: dict[tuple[Parameter, int], type | None] = {}
+
+
+def _cached_class_for_parameter(
+    parameter: Parameter, _globals: dict[str, Any] | None
+) -> type | None:
+    key = (parameter, id(_globals))
+
+    try:
+        return _class_cache[key]
+    except KeyError:
+        result = _class_for_parameter(parameter, _globals)
+        _class_cache[key] = result
+
+        return result
+
+
+def _class_for_parameter(
+    parameter: Parameter, _globals: dict[str, Any] | None
+) -> type | None:
+    type_ = parameter.annotation
+
+    if type_ is Parameter.empty:
+        return None
+
+    # TODO: handle optionals
+
+    if isinstance(type_, types.UnionType):
+        # TODO: check that the union type is a single type optional
+        # Get the first type of the type union
+        type_ = get_args(type_)[0]
+
+    origin = get_origin(type_)
+    if origin is Annotated:
+        actual_type, *_ = get_args(type_)
+
+        if not _is_builtin_type(actual_type, _globals):
+            return type_
+
+    if isinstance(type_, TypeVar):
+        # Unbound type variables cannot be resolved; treat as primitive
+        # so the parameter's default value (if any) is used.
+        return None
+
+    type_ = get_origin(type_) or type_
+
+    if _is_builtin_type(type_, _globals):
+        return None
+
+    return type_
+
+
+def _is_builtin_type(type_: Any, _globals: dict[str, Any] | None) -> bool:
+    if isinstance(type_, str):
+        type_ = eval_type_lenient(type_, _globals, _globals)
+
+        if isinstance(type_, typing.ForwardRef):
+            type_ = type_.__forward_arg__
+
+            return type_ in _typing_builtins_strings
+
+    module = inspect.getmodule(type_)
+    if module == builtins:
+        return True
+
+    if type_ in _typing_builtins:
+        return True
+
+    return module == typing or (
+        module == collections.abc and type_.__name__ == "Callable"
+    )
+
 
 class _Scoped(TypedDict):
     bindings: dict[str | type, Any]
@@ -175,7 +320,7 @@ class Container:
                 positional,
                 keywords,
             ) = await self._resolve_signature(
-                inspect.signature(concrete), args, {}, callable=function
+                _cached_signature(concrete), args, {}, callable=function
             )
         else:
             (
@@ -383,7 +528,7 @@ class Container:
         self, callable: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> tuple[list[Any], dict[str, Any]]:
         return await self._resolve_signature(
-            inspect.signature(callable), args, kwargs, callable=callable
+            _cached_signature(callable), args, kwargs, callable=callable
         )
 
     async def _resolve_signature(
@@ -403,7 +548,7 @@ class Container:
         )
 
         for parameter in signature.parameters.values():
-            klass = self._get_class(parameter, _globals=_globals)
+            klass = _cached_class_for_parameter(parameter, _globals)
 
             if klass is None:
                 await self._resolve_primitive(
@@ -504,7 +649,7 @@ class Container:
         result: Any | list[Any]
         match parameter.kind:
             case parameter.POSITIONAL_ONLY:
-                klass = self._get_class(parameter, _globals=_globals)
+                klass = _cached_class_for_parameter(parameter, _globals)
 
                 assert klass is not None
 
@@ -537,7 +682,7 @@ class Container:
                 if parameter.name in kwargs:
                     keywords[parameter.name] = kwargs.pop(parameter.name)
                 else:
-                    klass = self._get_class(parameter, _globals=_globals)
+                    klass = _cached_class_for_parameter(parameter, _globals)
 
                     assert klass is not None
 
@@ -572,7 +717,7 @@ class Container:
                         parameter.name,
                     )
                 else:
-                    klass = self._get_class(parameter, _globals=_globals)
+                    klass = _cached_class_for_parameter(parameter, _globals)
 
                     assert klass is not None
 
@@ -588,7 +733,7 @@ class Container:
                 return
 
             case parameter.VAR_POSITIONAL:
-                klass = self._get_class(parameter, _globals=_globals)
+                klass = _cached_class_for_parameter(parameter, _globals)
 
                 assert klass is not None
 
@@ -657,62 +802,6 @@ class Container:
 
     def _mark_as_resolved(self, abstract: str | type) -> None:
         self._resolved[abstract] = True
-
-    def _get_class(
-        self, parameter: inspect.Parameter, *, _globals: dict[str, Any] | None = None
-    ) -> type | None:
-        type_ = parameter.annotation
-
-        if type_ is Parameter.empty:
-            return None
-
-        # TODO: handle optionals
-
-        if isinstance(type_, types.UnionType):
-            # TODO: check that the union type is a single type optional
-            # Get the first type of the type union
-            type_ = get_args(type_)[0]
-
-        origin = get_origin(type_)
-        if origin is Annotated:
-            actual_type, *_ = get_args(type_)
-
-            if not self._is_builtin(actual_type, _globals=_globals):
-                return type_
-
-        if isinstance(type_, TypeVar):
-            # Unbound type variables cannot be resolved; treat as primitive
-            # so the parameter's default value (if any) is used.
-            return None
-
-        type_ = get_origin(type_) or type_
-
-        if self._is_builtin(type_, _globals=_globals):
-            return None
-
-        return type_
-
-    def _is_builtin(
-        self, type_: type, *, _globals: dict[str, Any] | None = None
-    ) -> bool:
-        if isinstance(type_, str):
-            type_ = eval_type_lenient(type_, _globals, _globals)
-
-            if isinstance(type_, typing.ForwardRef):
-                type_ = type_.__forward_arg__
-
-                return type_ in _typing_builtins_strings
-
-        module = inspect.getmodule(type_)
-        if module == builtins:
-            return True
-
-        if type_ in _typing_builtins:
-            return True
-
-        return module == typing or (
-            module == collections.abc and type_.__name__ == "Callable"
-        )
 
     def _get_alias(self, abstract: str | type) -> str | type:
         if not isinstance(abstract, str):
