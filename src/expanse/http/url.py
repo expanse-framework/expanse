@@ -1,186 +1,116 @@
+"""URL facade.
+
+The parsing (scheme/netloc/path/query/…) is implemented in the Rust
+extension when available; the Python fallback lives at
+``expanse.http._python.url``. Higher-level operations that don't benefit
+from being in Rust (``from_scope``, ``from_components``, ``replace``,
+returning ``URLPath`` from ``.path``) sit in this thin subclass so both
+backends share the same conveniences.
+"""
+
+from __future__ import annotations
+
 import typing
 
+from typing import Any
 from typing import Self
 from urllib.parse import SplitResult
-from urllib.parse import parse_qs
-from urllib.parse import urlencode
 from urllib.parse import urlsplit
 
+from expanse.http._backend import _rust
+from expanse.http._python.url import QueryParameters
 from expanse.http.url_path import URLPath
 from expanse.support._utils import string_matches
-from expanse.types import Scope
 
 
-class QueryParameters:
-    def __init__(self, query_string: str) -> None:
-        self._params: dict[str, list[str]] = parse_qs(query_string)
-
-    def set(self, key: str, value: str | list[str]) -> Self:
-        if isinstance(value, str):
-            value = [value]
-
-        self._params[key] = value
-
-        return self
-
-    def append(self, key: str, value: str | list[str]) -> Self:
-        if isinstance(value, str):
-            value = [value]
-
-        if key not in self._params:
-            self._params[key] = []
-
-        self._params[key].extend(value)
-
-        return self
-
-    def remove(self, key: str) -> Self:
-        if key in self._params:
-            del self._params[key]
-
-        return self
-
-    def __str__(self) -> str:
-        return urlencode(self._params, doseq=True)
-
-    def __bool__(self) -> bool:
-        return bool(self._params)
+if typing.TYPE_CHECKING:
+    from expanse.types import Scope
 
 
-class URL:
-    __slots__ = ("_components", "_url")
+_DEFAULT_PORTS = {"http": 80, "https": 443, "ws": 80, "wss": 443}
 
-    def __init__(self, url: str = "") -> None:
-        self._url: str = url
-        self._components: SplitResult = urlsplit(url)
+
+def _build_url(
+    scheme: str,
+    path: str,
+    query_string: bytes | str = b"",
+    server: tuple[str, int | None] | None = None,
+    host_header: str | None = None,
+) -> str:
+    if host_header is not None:
+        url = f"{scheme}://{host_header}{path}"
+    elif server is None:
+        url = path
+    else:
+        host, port = server
+        default_port = _DEFAULT_PORTS[scheme]
+        if port == default_port or port is None:
+            url = f"{scheme}://{host}{path}"
+        else:
+            url = f"{scheme}://{host}:{port}{path}"
+
+    if query_string:
+        query_string = (
+            query_string.decode() if isinstance(query_string, bytes) else query_string
+        )
+        url = f"{url}?{query_string}"
+
+    return url
+
+
+if _rust is not None:
+    _URLBase = _rust.URL
+else:
+    from expanse.http._python.url import (  # type: ignore[no-redef]
+        URL as _URLBase,  # noqa: N811
+    )
+
+
+class URL(_URLBase):  # type: ignore[misc, valid-type]
+    """URL wrapping the Rust parser (or Python fallback).
+
+    Adds ``from_scope`` / ``from_components`` / ``replace`` /
+    ``is_`` / ``path_is``, and wraps ``.path`` in :class:`URLPath`.
+    """
 
     @classmethod
-    def from_scope(cls, scope: Scope) -> "URL":
-        """
-        Create a URL instance from an ASGI scope.
-        """
+    def from_scope(cls, scope: Scope) -> Self:
         scheme = scope.get("scheme", "http")
         server = scope.get("server", None)
         path = scope.get("root_path", "") + scope["path"]
         query_string = scope.get("query_string", b"")
 
-        host_header = None
+        host_header: str | None = None
         for key, value in scope["headers"]:
             if key == b"host":
                 host_header = value.decode("latin-1")
                 break
-        url = cls._build_url(scheme, path, query_string, server, host_header)
 
-        return cls(url)
-
-    @classmethod
-    def from_components(cls, **components: typing.Any) -> "URL":
-        """
-        Create a URL instance from components.
-        """
-        url = URL("").replace(**components).components.geturl()
-
-        return cls(url)
+        return cls(_build_url(scheme, path, query_string, server, host_header))
 
     @classmethod
-    def _build_url(
-        cls,
-        scheme: str,
-        path: str,
-        query_string: bytes | str = b"",
-        server: tuple[str, int | None] | None = None,
-        host_header: str | None = None,
-    ) -> str:
-        if host_header is not None:
-            url = f"{scheme}://{host_header}{path}"
-        elif server is None:
-            url = path
-        else:
-            host, port = server
-            default_port = {"http": 80, "https": 443, "ws": 80, "wss": 443}[scheme]
-            if port == default_port or port is None:
-                url = f"{scheme}://{host}{path}"
-            else:
-                url = f"{scheme}://{host}:{port}{path}"
+    def from_components(cls, **components: Any) -> Self:
+        return cls(cls("").replace(**components).components.geturl())
 
-        if query_string:
-            query_string = (
-                query_string.decode()
-                if isinstance(query_string, bytes)
-                else query_string
-            )
-            url = f"{url}?{query_string}"
-
-        return url
+    @property
+    def path(self) -> URLPath:  # type: ignore[override]
+        return URLPath(super().path)
 
     @property
     def components(self) -> SplitResult:
-        return self._components
-
-    @property
-    def full(self) -> str:
-        return self._url
-
-    @property
-    def scheme(self) -> str:
-        return self._components.scheme
-
-    @property
-    def netloc(self) -> str:
-        return self._components.netloc
-
-    @property
-    def path(self) -> str:
-        p = URLPath(self._components.path)
-
-        return p
-
-    @property
-    def query(self) -> str:
-        return self._components.query
-
-    @property
-    def fragment(self) -> str:
-        return self._components.fragment
-
-    @property
-    def username(self) -> str | None:
-        return self._components.username
-
-    @property
-    def password(self) -> str | None:
-        return self._components.password
-
-    @property
-    def hostname(self) -> str | None:
-        return self._components.hostname
-
-    @property
-    def port(self) -> int | None:
-        return self._components.port
-
-    def is_secure(self) -> bool:
-        return self.scheme == "https"
+        # Kept for backwards compatibility with call sites that peek at the
+        # urllib.parse SplitResult. We recompute rather than cache to keep
+        # the Rust/Python surfaces uniform.
+        return urlsplit(str(self))
 
     def is_(self, pattern: str | list[str]) -> bool:
-        """
-        Determine if the full URL matches a given pattern.
-        """
-        return string_matches(self._url, pattern)
+        return string_matches(str(self), pattern)
 
     def path_is(self, pattern: str | list[str]) -> bool:
-        """
-        Determine if the full URL matches a given pattern.
-        """
-        return string_matches(self.path.lstrip("/"), pattern)
+        return string_matches(str(self.path).lstrip("/"), pattern)
 
-    def replace(self, **kwargs: typing.Any) -> "URL":
-        if (
-            "username" in kwargs
-            or "password" in kwargs
-            or "hostname" in kwargs
-            or "port" in kwargs
-        ):
+    def replace(self, **kwargs: Any) -> Self:
+        if any(k in kwargs for k in ("username", "password", "hostname", "port")):
             hostname = kwargs.pop("hostname", None)
             port = kwargs.pop("port", self.port)
             username = kwargs.pop("username", self.username)
@@ -189,8 +119,7 @@ class URL:
             if hostname is None:
                 netloc = self.netloc
                 _, _, hostname = netloc.rpartition("@")
-
-                if hostname[-1] != "]":
+                if hostname[-1:] != "]":
                     hostname = hostname.rsplit(":", 1)[0]
 
             netloc = hostname
@@ -204,17 +133,8 @@ class URL:
 
             kwargs["netloc"] = netloc
 
-        components = self._components._replace(**kwargs)
+        components = urlsplit(str(self))._replace(**kwargs)
         return self.__class__(components.geturl())
 
-    def __eq__(self, other: typing.Any) -> bool:
-        return str(self) == str(other)
 
-    def __str__(self) -> str:
-        return self._url
-
-    def __repr__(self) -> str:
-        url = str(self)
-        if self.password:
-            url = str(self.replace(password="********"))
-        return f"{self.__class__.__name__}({url!r})"
+__all__ = ["URL", "QueryParameters"]

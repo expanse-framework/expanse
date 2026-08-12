@@ -8,6 +8,8 @@ use pyo3::prelude::*;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod url;
+
 #[pyfunction]
 fn _hello() -> &'static str {
     "expanse-http (Rust) is live"
@@ -17,5 +19,6 @@ fn _hello() -> &'static str {
 fn _expanse_http(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", VERSION)?;
     m.add_function(wrap_pyfunction!(_hello, m)?)?;
+    url::register(m)?;
     Ok(())
 }
