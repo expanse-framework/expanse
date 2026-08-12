@@ -36,6 +36,24 @@ cd my-app
 Your application is now available at [http://localhost:8000](http://localhost:8000), and you are ready to start building
 you project.
 
+## Rust-accelerated HTTP primitives
+
+Expanse ships a compiled Rust extension (`expanse._expanse_http`) that
+implements the low-level HTTP value types — `URL`, `HeaderBag`,
+`ResponseHeaderBag`, `Cookie`, `ContentType`, `AcceptHeader` — plus JSON
+and urlencoded body decoders, and the response header/cookie fuser used
+by every response. The extension is bundled inside the platform wheels
+on PyPI, so nothing extra is required to install.
+
+The equivalent pure-Python implementations live under
+`expanse.http._python` and are used as a fallback when the extension is
+unavailable (for example on an unsupported platform) or when
+`EXPANSE_NO_RUST=1` is set in the environment. Behavior on either path
+is identical; Rust is the source of truth if the two ever diverge.
+
+Developing on the Rust side: install the stable toolchain with `rustup`
+and rebuild the extension in-place with `uv run maturin develop`.
+
 ## Documentation
 
 [Documentation] for the current version of Expanse (as well as the development branch and recently out of support
