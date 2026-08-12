@@ -19,6 +19,7 @@ from baize.asgi import empty_receive
 from baize.asgi import empty_send
 from baize.multipart_helper import parse_async_stream
 
+from expanse.http._backend import _rust
 from expanse.http._datastructures import Address
 from expanse.http._datastructures import ContentType
 from expanse.http._datastructures import FormData
@@ -477,10 +478,14 @@ class Request:
         """
         if self.is_json():
             data = await self.body
+            charset = self.content_type.options.get("charset", "utf8")
+            if _rust is not None:
+                try:
+                    return _rust.decode_json(data, charset)
+                except ValueError as exc:
+                    raise MalformedJSONError(str(exc)) from None
             try:
-                return msgspec.json.decode(
-                    data.decode(self.content_type.options.get("charset", "utf8"))
-                )
+                return msgspec.json.decode(data.decode(charset))
             except msgspec.DecodeError as exc:
                 raise MalformedJSONError(str(exc)) from None
 
@@ -510,10 +515,13 @@ class Request:
             boundary = self.content_type.options["boundary"].encode("latin-1")
             return await self._parse_multipart(boundary, charset)
         if self.content_type == "application/x-www-form-urlencoded":
-            body = (await self.body).decode(
-                encoding=self.content_type.options.get("charset", "latin-1")
+            body = await self.body
+            charset = self.content_type.options.get("charset", "latin-1")
+            if _rust is not None:
+                return FormData(_rust.decode_urlencoded(body, charset))
+            return FormData(
+                parse_qsl(body.decode(encoding=charset), keep_blank_values=True)
             )
-            return FormData(parse_qsl(body, keep_blank_values=True))
 
         raise UnsupportedContentTypeError(
             "multipart/form-data, application/x-www-form-urlencoded"
