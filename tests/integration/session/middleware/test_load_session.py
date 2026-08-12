@@ -1,7 +1,8 @@
 from pathlib import Path
 
-import pendulum
 import pytest
+import time_machine
+import whenever
 
 from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
@@ -45,8 +46,8 @@ def test_session_is_managed_for_each_request(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now()
-    with pendulum.travel_to(now).freeze():
+    now = whenever.Instant.now()
+    with time_machine.travel(now.to_stdlib(), tick=False):
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
 
@@ -57,8 +58,7 @@ def test_session_is_managed_for_each_request(
     assert cookie.path == "/"
 
     assert (
-        cookie.expires
-        == now.add(minutes=app.config["session"]["lifetime"]).int_timestamp
+        cookie.expires == now.add(minutes=app.config["session"]["lifetime"]).timestamp()
     )
 
     # Flash data will still be available but on the next save it will be removed
@@ -99,8 +99,8 @@ def test_session_is_managed_for_each_request_with_database_store(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now()
-    with pendulum.travel_to(now).freeze():
+    now = whenever.Instant.now()
+    with time_machine.travel(now.to_stdlib(), tick=False):
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
 
@@ -110,8 +110,7 @@ def test_session_is_managed_for_each_request_with_database_store(
     assert cookie.domain is not None
     assert cookie.path == "/"
     assert (
-        cookie.expires
-        == now.add(minutes=app.config["session"]["lifetime"]).int_timestamp
+        cookie.expires == now.add(minutes=app.config["session"]["lifetime"]).timestamp()
     )
 
     # Flash data will still be available but on the next save it will be removed
@@ -157,8 +156,8 @@ def test_session_can_be_set_to_be_cleared_with_the_browser(
 
     router.get("/session", session_test).middleware(LoadSession)
 
-    now = pendulum.now("UTC")
-    with pendulum.travel_to(now).freeze():
+    now = whenever.Instant.now()
+    with time_machine.travel(now.to_stdlib(), tick=False):
         response = client.get("/session?flash=1")
         cookie = next(iter(response.cookies.jar))
 

@@ -1,8 +1,12 @@
 import logging
 import sys
 
+from logging.handlers import SysLogHandler
+from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from typing import Any
+
+import whenever
 
 from expanse.core.application import Application
 from expanse.logging.channel import GroupLogChannel
@@ -11,16 +15,21 @@ from expanse.logging.channel import SimpleLogChannel
 from expanse.logging.channel import SyncLogChannel
 from expanse.logging.config import BaseConfig
 from expanse.logging.config import ConsoleConfig
+from expanse.logging.config import DailyConfig
 from expanse.logging.config import FileConfig
 from expanse.logging.config import GroupConfig
 from expanse.logging.config import StreamConfig
+from expanse.logging.config import SyslogConfig
 from expanse.logging.exceptions import LogChannelConfigurationError
 from expanse.logging.exceptions import UnconfiguredLogChannelError
 from expanse.logging.exceptions import UnsupportedLogChannelDriverError
 from expanse.logging.filters.context import ContextFilter
+from expanse.support.duration import SingleUnitDuration
 
 
 if TYPE_CHECKING:
+    import datetime
+
     from collections.abc import Callable
 
 
@@ -163,9 +172,15 @@ class LoggingManager:
             case "stream":
                 handler = self._create_stream_handler(channel_name, config)
             case "console":
-                handler = self._create_console_channel(channel_name, config)
+                handler = self._create_console_handler(channel_name, config)
             case "file":
-                handler = self._create_file_channel(channel_name, config)
+                handler = self._create_file_handler(channel_name, config)
+            case "time_based":
+                handler = self._create_time_based_handler(channel_name, config)
+            case "daily":
+                handler = self._create_daily_handler(channel_name, config)
+            case "syslog":
+                handler = self._create_syslog_handler(channel_name, config)
 
             case _:
                 if driver not in self._handler_creators:
@@ -208,7 +223,7 @@ class LoggingManager:
 
         return handler
 
-    def _create_console_channel(
+    def _create_console_handler(
         self,
         channel_name: str,
         raw_config: dict[str, Any],
@@ -223,7 +238,7 @@ class LoggingManager:
 
         return handler
 
-    def _create_file_channel(
+    def _create_file_handler(
         self, channel_name: str, raw_config: dict[str, Any]
     ) -> logging.Handler:
         config = FileConfig.model_validate(raw_config)
@@ -234,6 +249,146 @@ class LoggingManager:
             path.parent.mkdir(parents=True, exist_ok=True)
 
         handler = logging.FileHandler(path)
+        fmt = config.format or self.DEFAULT_FORMAT
+        if config.structured:
+            from expanse.logging.formatters.structured import StructuredFormatter
+
+            handler.setFormatter(StructuredFormatter(fmt=fmt))
+        else:
+            handler.setFormatter(logging.Formatter(fmt=fmt))
+
+        handler.setLevel(config.level)
+
+        return handler
+
+    def _create_time_based_handler(
+        self, channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        from expanse.logging.config import TimeBasedConfig
+
+        config = TimeBasedConfig.model_validate(raw_config)
+        if config.every:
+            duration = SingleUnitDuration.parse(config.every)
+            interval = duration.value
+
+            match duration.unit:
+                case "seconds":
+                    when = "S"
+                case "minutes":
+                    when = "M"
+                case "hours":
+                    when = "H"
+                case "days":
+                    when = "D"
+                case "weeks":
+                    when = "D"
+                    interval *= 7
+                case _:
+                    raise LogChannelConfigurationError(
+                        f"Invalid duration unit: {duration.unit}"
+                    )
+
+            handler = TimedRotatingFileHandler(
+                filename=config.path,
+                when=when,
+                interval=interval,
+                backupCount=config.max_files,
+            )
+        elif config.on:
+            mapping = {
+                "monday": "W0",
+                "tuesday": "W1",
+                "wednesday": "W2",
+                "thursday": "W3",
+                "friday": "W4",
+                "saturday": "W5",
+                "sunday": "W6",
+            }
+
+            at_time: datetime.time | None = None
+            if config.at:
+                at_time = whenever.Time.parse_iso(config.at).to_stdlib()
+
+            handler = TimedRotatingFileHandler(
+                filename=config.path,
+                when=mapping[config.on],
+                backupCount=config.max_files,
+                atTime=at_time,
+            )
+        else:
+            raise LogChannelConfigurationError(
+                "A time based channel must have either 'every' or 'on' specified"
+            )
+
+        fmt = config.format or self.DEFAULT_FORMAT
+        if config.structured:
+            from expanse.logging.formatters.structured import StructuredFormatter
+
+            handler.setFormatter(StructuredFormatter(fmt=fmt))
+        else:
+            handler.setFormatter(logging.Formatter(fmt=fmt))
+
+        handler.setLevel(config.level)
+
+        return handler
+
+    def _create_daily_handler(
+        self, channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        config = DailyConfig.model_validate(raw_config)
+
+        return self._create_time_based_handler(
+            channel_name,
+            {
+                "every": "1 day",
+                "max_files": config.max_files,
+                "path": config.path,
+                "level": config.level,
+                "format": config.format,
+                "structured": config.structured,
+            },
+        )
+
+    def _create_syslog_handler(
+        self, channel_name: str, raw_config: dict[str, Any]
+    ) -> logging.Handler:
+        import socket
+
+        from socket import SocketKind
+
+        config = SyslogConfig.model_validate(raw_config)
+
+        address: str | tuple[str, int]
+        if config.address.startswith("/"):
+            address = config.address
+        else:
+            host, _, port = config.address.rpartition(":")
+            if not host or not port:
+                raise LogChannelConfigurationError(
+                    f"Invalid syslog address '{config.address}' for channel "
+                    f"'{channel_name}'. Expected a Unix socket path or 'host:port'."
+                )
+
+            try:
+                address = (host, int(port))
+            except ValueError as e:
+                raise LogChannelConfigurationError(
+                    f"Invalid syslog port '{port}' for channel '{channel_name}'."
+                ) from e
+
+        socktype: SocketKind | None = None
+        match config.socket_type:
+            case "udp":
+                socktype = socket.SOCK_DGRAM
+            case "tcp":
+                socktype = socket.SOCK_STREAM
+
+        handler = SysLogHandler(
+            address=address,
+            facility=SysLogHandler.facility_names[config.facility],
+            socktype=socktype,
+        )
+
         fmt = config.format or self.DEFAULT_FORMAT
         if config.structured:
             from expanse.logging.formatters.structured import StructuredFormatter

@@ -1,7 +1,7 @@
 import json
 
-import pendulum
 import pytest
+import whenever
 
 from expanse.container.container import Container
 from expanse.http.cookie import Cookie
@@ -41,9 +41,23 @@ def test_setting_headers() -> None:
 
 def test_setting_cookie() -> None:
     response = Response("Hello, World!")
-    cookie = Cookie(name="foo", value="abc123", expires=pendulum.tomorrow())
+    cookie = Cookie(
+        name="foo",
+        value="abc123",
+        expires=whenever.ZonedDateTime.now("UTC")
+        .add(days=1)
+        .start_of("day")
+        .to_stdlib(),
+    )
     response.with_cookie(cookie)
-    response.with_cookie("bar", "xyz789", expires=pendulum.tomorrow())
+    response.with_cookie(
+        "bar",
+        "xyz789",
+        expires=whenever.ZonedDateTime.now("UTC")
+        .add(days=1)
+        .start_of("day")
+        .to_stdlib(),
+    )
     assert "foo" in response.cookies
     assert response.cookies["foo"].value == "abc123"
     assert "bar" in response.cookies

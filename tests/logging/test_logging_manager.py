@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import datetime
 import logging
+import socket
 import time
 
+from logging.handlers import SysLogHandler
+from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from typing import Any
 from unittest.mock import MagicMock
@@ -20,11 +24,13 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
+    from pytest_mock import MockerFixture
+
     from expanse.core.application import Application
 
 
 @pytest.fixture()
-def manager(app: Application) -> Generator[LoggingManager]:
+def manager(app: Application, tmp_path: Path) -> Generator[LoggingManager]:
     app.config["logging"] = {
         "default": "stream",
         "channels": {
@@ -41,6 +47,24 @@ def manager(app: Application) -> Generator[LoggingManager]:
             "console": {
                 "driver": "console",
                 "level": "DEBUG",
+            },
+            "weekly": {
+                "driver": "time_based",
+                "path": str(tmp_path / "weekly.log"),
+                "every": "1 week",
+                "max_files": 5,
+            },
+            "daily": {
+                "driver": "daily",
+                "path": str(tmp_path / "daily.log"),
+                "max_files": 11,
+            },
+            "on_day": {
+                "driver": "time_based",
+                "path": str(tmp_path / "wednesday.log"),
+                "on": "wednesday",
+                "at": "12:34:56",
+                "max_files": 5,
             },
         },
     }
@@ -418,6 +442,156 @@ def test_file_channel_with_relative_path(app: Application, tmp_path: Path) -> No
 
     content = (tmp_path / "log" / "app.log").read_text()
     assert "relative path test" in content
+
+
+def test_time_based_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("weekly")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "weekly.log",
+        when="D",
+        interval=7,
+        backupCount=5,
+    )
+
+
+def test_daily_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("daily")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "daily.log",
+        when="D",
+        interval=1,
+        backupCount=11,
+    )
+
+
+def test_on_day_channel(
+    manager: LoggingManager, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    m = mocker.spy(TimedRotatingFileHandler, "__init__")
+    channel = manager.channel("on_day")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        filename=tmp_path / "wednesday.log",
+        when="W2",
+        backupCount=5,
+        atTime=datetime.time(12, 34, 56),
+    )
+
+
+def test_creates_syslog_channel(app: Application, mocker: MockerFixture) -> None:
+    mocker.patch.object(SysLogHandler, "_connect_unixsocket")
+    mocker.patch.object(SysLogHandler, "createSocket")
+    m = mocker.spy(SysLogHandler, "__init__")
+
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "syslog.example.com:5140",
+                "facility": "local3",
+                "socket_type": "tcp",
+                "level": "WARNING",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("syslog")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        address=("syslog.example.com", 5140),
+        facility=SysLogHandler.LOG_LOCAL3,
+        socktype=socket.SOCK_STREAM,
+    )
+
+    mgr.terminate()
+
+
+def test_creates_syslog_channel_with_unix_socket(
+    app: Application, mocker: MockerFixture
+) -> None:
+    mocker.patch.object(SysLogHandler, "_connect_unixsocket")
+    m = mocker.spy(SysLogHandler, "__init__")
+
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "/dev/log",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    channel = mgr.channel("syslog")
+
+    assert isinstance(channel, SimpleLogChannel)
+
+    assert m.call_args == mocker.call(
+        mocker.ANY,
+        address="/dev/log",
+        facility=SysLogHandler.LOG_USER,
+        socktype=None,
+    )
+
+    mgr.terminate()
+
+
+def test_syslog_channel_with_invalid_address_raises(app: Application) -> None:
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "not-a-valid-address",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    with pytest.raises(LogChannelConfigurationError, match="Invalid syslog address"):
+        mgr.channel("syslog")
+
+
+def test_syslog_channel_with_invalid_port_raises(app: Application) -> None:
+    app.config["logging"] = {
+        "default": "syslog",
+        "channels": {
+            "syslog": {
+                "driver": "syslog",
+                "address": "localhost:not-a-port",
+                "level": "INFO",
+            },
+        },
+    }
+    mgr = LoggingManager(app)
+
+    with pytest.raises(LogChannelConfigurationError, match="Invalid syslog port"):
+        mgr.channel("syslog")
 
 
 def test_new_drivers_can_be_added(app: Application) -> None:

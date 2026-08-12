@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import pendulum
+import whenever
 
 from expanse.contracts.routing.registrar import Registrar
 from expanse.http.responses.file import FileResponse
@@ -11,7 +11,9 @@ def test_file_response(router: Registrar, client: TestClient, tmp_path: Path) ->
     tmp_path.joinpath("test.txt").write_text("This is a test file.")
     router.get("/file", lambda: FileResponse(tmp_path.joinpath("test.txt")))
 
-    modified_at = pendulum.from_timestamp(tmp_path.joinpath("test.txt").stat().st_mtime)
+    modified_at = whenever.ZonedDateTime.from_timestamp(
+        tmp_path.joinpath("test.txt").stat().st_mtime, tz="UTC"
+    )
     response = client.get("/file")
 
     assert response.status_code == 200
@@ -20,7 +22,7 @@ def test_file_response(router: Registrar, client: TestClient, tmp_path: Path) ->
     assert response.headers["Content-Length"] == "20"
     assert "Content-Encoding" not in response.headers
     assert response.headers["Last-Modified"] == modified_at.format(
-        "ddd, DD MMM YYYY HH:mm:ss [GMT]"
+        "EEEE, DD MMM YYYY hh:mm:ss 'GMT'"
     )
     assert response.text == "This is a test file."
 

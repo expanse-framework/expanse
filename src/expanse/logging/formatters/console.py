@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import ClassVar
 from typing import Literal
 
-import pendulum
+import whenever
 
 from cleo.formatters.formatter import Formatter
 from cleo.io.outputs.buffered_output import BufferedOutput
@@ -58,17 +58,14 @@ class ConsoleFormatter(logging.Formatter):
         *,
         defaults=None,
         multiline: bool = False,
+        milliseconds: bool = False,
     ) -> None:
         super().__init__(fmt="%(message)s", style="%")
 
-        self._formatter = Formatter(decorated=True)
-        self._terminal = Terminal()
-        self._multiline = multiline
-        self._top_left_marker = "┌"
-        self._top_right_marker = "┐"
-        self._bottom_left_marker = "└"
-        self._bottom_right_marker = "┘"
-        self._vertical_marker = "│"
+        self._formatter: Formatter = Formatter(decorated=True)
+        self._terminal: Terminal = Terminal()
+        self._multiline: bool = multiline
+        self._milliseconds: bool = milliseconds
         from pygments.formatters.terminal import TerminalFormatter
 
         self._syntax_formatter = TerminalFormatter()
@@ -95,7 +92,11 @@ class ConsoleFormatter(logging.Formatter):
 
         log_message = str(record.msg) % args
         level = record.levelname
-        time = pendulum.from_timestamp(record.created, tz="local").format("HH:mm:ss")
+        time = (
+            whenever.Instant.from_timestamp(record.created)
+            .to_system_tz()
+            .format("hh:mm:ss.fff" if self._milliseconds else "hh:mm:ss")
+        )
         lines = []
         lines.append(
             "".join(
@@ -110,12 +111,12 @@ class ConsoleFormatter(logging.Formatter):
             if self._multiline:
                 lines.extend(
                     [
-                        f"  <options=bold>{k}</>: {highlight(json.dumps(v, indent=2, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).replace('\n', '\n  ')}"
+                        f"  <options=bold>{k}</>: {highlight(json.dumps(v, indent=2, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).strip().replace('\n', '\n  ')}"
                         for k, v in extra.items()
                     ]
                 )
             else:
-                lines[-1] += " " + " ".join(
+                lines[-1] += " <options=dark>·</> " + " ".join(
                     [
                         f"<options=bold>{k}</>: {highlight(json.dumps(v, sort_keys=True), lexer=Json5Lexer(), formatter=self._syntax_formatter).strip()}"
                         for k, v in extra.items()
