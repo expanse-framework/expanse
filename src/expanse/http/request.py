@@ -72,6 +72,7 @@ class Request:
         self._url: URL = URL.from_scope(scope)
         self._stream_consumed: bool = False
         self._is_disconnected: bool = False
+        self._preferred_format: str | None = None
         self.path_params: dict[str, Any] = {}
 
     @cached_property
@@ -364,6 +365,16 @@ class Request:
         """
         return header in self._trusted_headers
 
+    def prefer_response_format(self, format: str) -> Self:
+        """
+        Set the preferred response format for the request.
+
+        :param format: The preferred response format.
+        """
+        self._preferred_format = format
+
+        return self
+
     def accepts_any_content_type(self) -> bool:
         """
         Determine if the current request accepts any content type.
@@ -382,6 +393,9 @@ class Request:
         """
         Determine whether the request is asking for JSON or not.
         """
+        if self._preferred_format == "application/json":
+            return True
+
         acceptable = self.acceptable_content_types
 
         return len(acceptable) > 0 and (
