@@ -13,6 +13,7 @@ use pyo3::prelude::*;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod cookie;
 mod headers;
 mod url;
 
@@ -27,5 +28,6 @@ fn _expanse_http(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_hello, m)?)?;
     url::register(m)?;
     headers::register(m)?;
+    cookie::register(m)?;
     Ok(())
 }

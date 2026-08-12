@@ -135,7 +135,12 @@ class Response:
         :param same_site: Whether the cookie will be available for cross-site requests.
         :param partitioned: Whether the cookie is partitioned or not.
         """
-        if isinstance(name, Cookie):
+        if not isinstance(name, str):
+            # A Cookie or a Rust-side clone returned by ``Cookie.with_*``;
+            # both have a ``.name`` attribute. Duck-typed rather than
+            # isinstance-checked because the Rust ``with_*`` methods can
+            # return the base Rust Cookie type rather than a Python
+            # subclass, which would defeat isinstance(name, Cookie).
             self.cookies[name.name] = name
 
             return self
