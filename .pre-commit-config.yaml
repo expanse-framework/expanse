@@ -33,3 +33,17 @@ repos:
     hooks:
       - id: ruff
       - id: ruff-format
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        args: ["--manifest-path", "crates/expanse-http/Cargo.toml", "--"]
+      - id: clippy
+        args:
+          - "--manifest-path"
+          - "crates/expanse-http/Cargo.toml"
+          - "--all-targets"
+          - "--"
+          - "-D"
+          - "warnings"

@@ -27,8 +27,22 @@ jobs:
         with:
           python-version: 3.14
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/expanse-http
+
       - name: Install dependencies
         run: uv sync --group lint --group test
 
       - name: Run typechecking
         run: uv run mypy
+
+      - name: Run cargo fmt
+        run: cargo fmt --manifest-path crates/expanse-http/Cargo.toml --check
+
+      - name: Run cargo clippy
+        run: cargo clippy --manifest-path crates/expanse-http/Cargo.toml --all-targets -- -D warnings

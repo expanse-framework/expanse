@@ -27,6 +27,14 @@ jobs:
         with:
           python-version: 3.14
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/expanse-http
+
       - name: Create project
         run: uvx --from expanse-cli expanse new my-app
 

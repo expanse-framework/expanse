@@ -7,20 +7,68 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build
+  build-wheels:
+    name: Build wheel (${{ matrix.target.os }} / ${{ matrix.target.arch }})
+    runs-on: ${{ matrix.target.runner }}
+    strategy:
+      matrix:
+        target:
+          - { os: linux,   arch: x86_64,  runner: ubuntu-latest,   maturin-target: x86_64-unknown-linux-gnu }
+          - { os: linux,   arch: aarch64, runner: ubuntu-latest,   maturin-target: aarch64-unknown-linux-gnu }
+          - { os: macos,   arch: x86_64,  runner: macos-13,        maturin-target: x86_64-apple-darwin }
+          - { os: macos,   arch: aarch64, runner: macos-latest,    maturin-target: aarch64-apple-darwin }
+          - { os: windows, arch: x86_64,  runner: windows-latest,  maturin-target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build wheel via maturin
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out dist --strip --interpreter python3.12
+          target: ${{ matrix.target.maturin-target }}
+          manylinux: ${{ matrix.target.os == 'linux' && 'auto' || 'off' }}
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: dist
+
+  build-sdist:
+    name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Build sdist via maturin
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
 
-      - name: Build package
-        run: uv build
+      - name: Upload sdist
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-sdist
+          path: dist
 
-      - name: Upload package
+  build:
+    name: Collect artifacts
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Upload combined dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist
