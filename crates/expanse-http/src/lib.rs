@@ -18,6 +18,7 @@ mod body;
 mod content_type;
 mod cookie;
 mod headers;
+mod response;
 mod url;
 
 #[pyfunction]
@@ -35,5 +36,6 @@ fn _expanse_http(m: &Bound<'_, PyModule>) -> PyResult<()> {
     content_type::register(m)?;
     accept::register(m)?;
     body::register(m)?;
+    response::register(m)?;
     Ok(())
 }

@@ -7,6 +7,7 @@ from typing import Self
 from typing import TypeVar
 from typing import overload
 
+from expanse.http._backend import _rust
 from expanse.http.cookie import Cookie
 from expanse.http.cookie import SameSite
 from expanse.http.response_header_bag import ResponseHeaderBag
@@ -217,6 +218,10 @@ class Response:
         """
         Encodes the headers to a list of tuples with bytes.
         """
+        if _rust is not None:
+            return _rust.encode_response_headers(
+                self.headers.encode(), list(self.cookies.values())
+            )
         return self.headers.encode() + [
             (b"set-cookie", bytes(cookie)) for cookie in self.cookies.values()
         ]
