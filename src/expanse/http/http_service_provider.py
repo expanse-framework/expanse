@@ -12,7 +12,7 @@ from expanse.support.service_provider import ServiceProvider
 
 class HTTPServiceProvider(ServiceProvider):
     async def register(self) -> None:
-        self._container.scoped(ResponseAdapter)
+        self._container.singleton(ResponseAdapter)
         self._container.scoped(UploadFile, self._retrieve_upload_file)
 
     async def _retrieve_upload_file(
