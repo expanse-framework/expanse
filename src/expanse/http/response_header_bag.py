@@ -1,29 +1,32 @@
-from collections.abc import Mapping
+"""ResponseHeaderBag facade.
 
+Same pattern as :mod:`expanse.http.header_bag` — pick the Rust
+implementation when available, fall back to
+``expanse.http._python.response_header_bag``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import MutableMapping
+
+from expanse.http._backend import _rust
 from expanse.http.header_bag import HeaderBag
 
 
-class ResponseHeaderBag(HeaderBag):
-    __slots__ = ("_header_names",)
+if _rust is not None:
+    _ResponseHeaderBagBase = _rust.ResponseHeaderBag
 
-    def __init__(self, headers: Mapping[str, str] | None = None) -> None:
-        self._header_names: dict[str, str] = {}
+    class ResponseHeaderBag(  # type: ignore[misc, valid-type]
+        _ResponseHeaderBagBase, HeaderBag, MutableMapping[str, str]
+    ):
+        pass
 
-        super().__init__(headers or {})
+else:
+    from expanse.http._python.response_header_bag import (
+        ResponseHeaderBag as _PythonResponseHeaderBag,
+    )
 
-    def set(
-        self, name: str, value: str | list[str | None] | None, replace: bool = True
-    ) -> None:
-        normalized_name = self._normalize_name(name)
-        self._header_names[normalized_name] = name
+    ResponseHeaderBag = _PythonResponseHeaderBag  # type: ignore[misc, assignment]
 
-        super().set(name, value, replace)
 
-    def encode(self) -> list[tuple[bytes, bytes]]:
-        return [
-            (
-                self._header_names[name].encode("ascii"),
-                ",".join(_ for _ in value if _ is not None).encode("latin-1"),
-            )
-            for name, value in self._headers.items()
-        ]
+__all__ = ["ResponseHeaderBag"]

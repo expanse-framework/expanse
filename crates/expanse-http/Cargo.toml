@@ -18,6 +18,7 @@ pyo3 = { version = "0.22", features = ["abi3-py312", "extension-module"] }
 # (URL parsing, cookies, MIME, multipart, JSON) so we don't pull in
 # actix-web's server runtime just for value types.
 actix-http = { version = "3", default-features = false }
+indexmap = "2"
 url = "2"
 cookie = { version = "0.18", features = ["percent-encode"] }
 mime = "0.3"
