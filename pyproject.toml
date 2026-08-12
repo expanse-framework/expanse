@@ -72,8 +72,17 @@ default-groups = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.8.20"]
-build-backend = "uv_build"
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "expanse._expanse_http"
+python-source = "src"
+manifest-path = "crates/expanse-http/Cargo.toml"
+features = ["pyo3/extension-module"]
+# Compile a single abi3 wheel that runs on every supported Python 3.12+
+# interpreter. Matches `requires-python = ">=3.12"` above.
+python-packages = ["expanse"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

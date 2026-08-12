@@ -1,0 +1,30 @@
+[package]
+name = "expanse-http"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-accelerated HTTP primitives for the Expanse framework"
+license = "MIT"
+publish = false
+
+[lib]
+name = "_expanse_http"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["abi3-py312", "extension-module"] }
+
+# HTTP building blocks. actix-http gives us the HeaderMap type used by
+# actix-web; the other crates cover ground actix-http intentionally doesn't
+# (URL parsing, cookies, MIME, multipart, JSON) so we don't pull in
+# actix-web's server runtime just for value types.
+actix-http = { version = "3", default-features = false }
+url = "2"
+cookie = { version = "0.18", features = ["percent-encode"] }
+mime = "0.3"
+multer = "3"
+serde_json = "1"
+pythonize = "0.22"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
