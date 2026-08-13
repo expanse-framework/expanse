@@ -13,6 +13,8 @@ from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.encrypted import EncryptedStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 @dataclass(frozen=True)
@@ -29,10 +31,17 @@ def encryption() -> EncryptorFactory:
     return EncryptorFactory(KeyChain([Key(b"k" * 32)]), salt=b"s" * 32)
 
 
+@pytest.fixture()
+def serializer() -> Serializer:
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+
+    return Serializer(serialization_manager)
+
+
 async def test_middleware_handles_encryption_and_decryption_properly(
-    encryption: EncryptorFactory,
+    encryption: EncryptorFactory, serializer: Serializer
 ) -> None:
-    serializer = Serializer()
     middleware = HandleEncryption(encryption, serializer)
 
     envelope = Envelope.wrap(
@@ -60,14 +69,13 @@ async def test_middleware_handles_encryption_and_decryption_properly(
 
 
 async def test_middleware_does_not_encrypt_envelope_without_sensitive_stamp(
-    app: Application, encryption: EncryptorFactory
+    app: Application, encryption: EncryptorFactory, serializer: Serializer
 ) -> None:
     app.config["app.secret_key"] = "k" * 32
     app.config["encryption"] = {
         "cipher": "aes-256-gcm",
         "salt": "s" * 32,
     }
-    serializer = Serializer()
     middleware = HandleEncryption(encryption, serializer)
 
     envelope = Envelope.wrap(MyMessage(value="Hello, world!"))

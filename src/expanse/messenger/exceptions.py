@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from typing import override
 
 from expanse.messenger.envelope import Envelope
 
@@ -40,6 +41,13 @@ class MessageDecodingFailedError(SerializerError):
         Returns an envelope containing the original encoded message and the error.
         """
         return Envelope.wrap(self)
+
+    @override
+    def __reduce__(self) -> tuple[type, tuple[str, "EncodedEnvelope"]]:
+        return (
+            self.__class__,
+            (self.args[0], self.encoded_envelope),
+        )
 
 
 class UntrustedMessageTypeError(MessageDecodingFailedError):

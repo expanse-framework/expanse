@@ -80,12 +80,7 @@ class TransportManager:
             Serializer as SerializerContract,
         )
 
-        if self._container.has(SerializerContract):
-            serializer = await self._container.get(SerializerContract)
-        else:
-            from expanse.messenger.serializers.serializer import Serializer
-
-            serializer = Serializer()
+        serializer = await self._container.get(SerializerContract)
 
         return MemoryTransport(serializer)
 
@@ -97,12 +92,7 @@ class TransportManager:
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
         from expanse.messenger.transports.database.transport import DatabaseTransport
 
-        if self._container.has(SerializerContract):
-            serializer = await self._container.get(SerializerContract)
-        else:
-            from expanse.messenger.serializers.serializer import Serializer
-
-            serializer = Serializer()
+        serializer = await self._container.get(SerializerContract)
 
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),
@@ -121,12 +111,7 @@ class TransportManager:
         config = RedisTransportConfig.model_validate(raw_config)
         redis = await self._container.get(RedisManager)
 
-        if self._container.has(SerializerContract):
-            serializer = await self._container.get(SerializerContract)
-        else:
-            from expanse.messenger.serializers.serializer import Serializer
-
-            serializer = Serializer()
+        serializer = await self._container.get(SerializerContract)
 
         return RedisTransport(
             redis.connection(config.connection),

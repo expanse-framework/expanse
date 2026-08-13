@@ -1,8 +1,9 @@
-import json
 import logging
 
 from collections.abc import AsyncIterator
 from typing import Self
+
+import msgspec
 
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
@@ -21,6 +22,7 @@ from expanse.messenger.transports.redis.connection import Connection
 from expanse.redis.asynchronous.connections.connection import (
     Connection as RedisConnection,
 )
+from expanse.types.messenger import EncodedEnvelope
 
 
 logger = logging.getLogger(__name__)
@@ -60,22 +62,17 @@ class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
         delay = delay_stamp.delay if delay_stamp is not None else 0
 
         id = await self._connection.add(
-            json.dumps(encoded_envelope["body"]), encoded_envelope["headers"], delay
+            encoded_envelope["body"], encoded_envelope["headers"], delay
         )
 
         return envelope.with_stamps(TransportMessageIdStamp(id))
 
     async def receive(self) -> AsyncIterator[Envelope]:
         async for message in self._connection.get():
-            data = json.loads(message["data"])
+            data = msgspec.json.decode(message["data"], type=EncodedEnvelope)
 
             try:
-                envelope = self._serializer.decode(
-                    {
-                        "body": json.loads(data["body"]),
-                        "headers": data["headers"],
-                    }
-                )
+                envelope = self._serializer.decode(data)
             except MessageDecodingFailedError as e:
                 envelope = e.as_envelope().with_stamps(
                     TransportMessageIdStamp(message["id"])

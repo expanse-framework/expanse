@@ -9,8 +9,6 @@ from expanse.contracts.messenger.asynchronous.transport import (
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.exceptions import MessageDecodingFailedError
-from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 
@@ -20,8 +18,8 @@ if TYPE_CHECKING:
 
 
 class MemoryTransport(TransportContract):
-    def __init__(self, serializer: SerializerContract | None = None) -> None:
-        self._serializer = serializer or Serializer()
+    def __init__(self, serializer: SerializerContract) -> None:
+        self._serializer: SerializerContract = serializer
         self._current_id: int = 0
         self._sent: list[EncodedEnvelope] = []
         self._acknowledged: list[EncodedEnvelope] = []
@@ -63,15 +61,9 @@ class MemoryTransport(TransportContract):
             ):
                 self._in_flight.add(message_id)
 
-                try:
-                    yield self._serializer.decode(encoded_envelope)
-                except MessageDecodingFailedError as e:
-                    # If decoding fails, make an envelope
-                    yield e.as_envelope().with_stamps(
-                        TransportMessageIdStamp(message_id)
-                    )
-
-                    continue
+                yield self._serializer.decode(encoded_envelope).with_stamps(
+                    TransportMessageIdStamp(message_id)
+                )
 
     async def acknowledge(self, envelope: Envelope) -> None:
         encoded_envelope = self._serializer.encode(envelope)

@@ -1,5 +1,6 @@
 import os
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -7,10 +8,12 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.redis.transport import RedisTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
@@ -22,29 +25,38 @@ class FooMessage:
     value: str
 
 
+@pytest.fixture()
 def make_manager(
-    messenger_config: dict[str, Any] | None = None,
-) -> TransportManager:
-    container = Container()
-    registry = Registry()
-    config = Config(
-        {
-            "messenger": messenger_config or {},
-            "redis": {
-                "connections": {
-                    "default": {
-                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/15"
+    serializer: Serializer,
+) -> Callable[[dict[str, Any] | None], TransportManager]:
+    def _make_manager(
+        messenger_config: dict[str, Any] | None = None,
+    ) -> TransportManager:
+        container = Container()
+        registry = Registry()
+        config = Config(
+            {
+                "messenger": messenger_config or {},
+                "redis": {
+                    "connections": {
+                        "default": {
+                            "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/15"
+                        }
                     }
-                }
-            },
-        }
-    )
-    container.instance(Config, config)
+                },
+            }
+        )
+        container.instance(Config, config)
+        container.instance(SerializerContract, serializer)
 
-    return TransportManager(container, config, registry)
+        return TransportManager(container, config, registry)
+
+    return _make_manager
 
 
-async def test_transport_returns_default_transport() -> None:
+async def test_transport_returns_default_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transport": "memory",
@@ -59,7 +71,9 @@ async def test_transport_returns_default_transport() -> None:
     assert isinstance(transport, MemoryTransport)
 
 
-async def test_transport_returns_named_transport() -> None:
+async def test_transport_returns_named_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transport": "memory",
@@ -75,7 +89,9 @@ async def test_transport_returns_named_transport() -> None:
     assert isinstance(transport, SyncTransport)
 
 
-async def test_transport_caches_transport_instance() -> None:
+async def test_transport_caches_transport_instance(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transport": "memory",
@@ -91,7 +107,9 @@ async def test_transport_caches_transport_instance() -> None:
     assert first is second
 
 
-async def test_transport_creates_memory_transport() -> None:
+async def test_transport_creates_memory_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -105,7 +123,9 @@ async def test_transport_creates_memory_transport() -> None:
     assert isinstance(transport, MemoryTransport)
 
 
-async def test_transport_creates_sync_transport() -> None:
+async def test_transport_creates_sync_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -119,7 +139,9 @@ async def test_transport_creates_sync_transport() -> None:
     assert isinstance(transport, SyncTransport)
 
 
-async def test_transport_creates_redis_transport() -> None:
+async def test_transport_creates_redis_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -133,20 +155,26 @@ async def test_transport_creates_redis_transport() -> None:
     assert isinstance(transport, RedisTransport)
 
 
-async def test_get_default_transport_name_returns_configured_name() -> None:
+async def test_get_default_transport_name_returns_configured_name(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager({"transport": "my_transport"})
 
     assert manager.get_default_transport_name() == "my_transport"
 
 
-async def test_get_default_transport_name_raises_when_not_configured() -> None:
-    manager = make_manager()
+async def test_get_default_transport_name_raises_when_not_configured(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
+    manager = make_manager({})
 
     with pytest.raises(NoDefaultTransportError):
         manager.get_default_transport_name()
 
 
-async def test_transport_raises_for_unconfigured_transport() -> None:
+async def test_transport_raises_for_unconfigured_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -159,7 +187,9 @@ async def test_transport_raises_for_unconfigured_transport() -> None:
         await manager.transport("unknown")
 
 
-async def test_transport_raises_when_driver_missing() -> None:
+async def test_transport_raises_when_driver_missing(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -174,7 +204,9 @@ async def test_transport_raises_when_driver_missing() -> None:
         await manager.transport("broken")
 
 
-async def test_transport_raises_for_unsupported_driver() -> None:
+async def test_transport_raises_for_unsupported_driver(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -189,7 +221,9 @@ async def test_transport_raises_for_unsupported_driver() -> None:
         await manager.transport("custom")
 
 
-async def test_transport_without_name_raises_when_no_default() -> None:
+async def test_transport_without_name_raises_when_no_default(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {
@@ -202,7 +236,9 @@ async def test_transport_without_name_raises_when_no_default() -> None:
         await manager.transport()
 
 
-async def test_different_transports_are_cached_independently() -> None:
+async def test_different_transports_are_cached_independently(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
     manager = make_manager(
         {
             "transports": {

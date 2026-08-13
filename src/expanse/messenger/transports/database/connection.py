@@ -1,11 +1,12 @@
-import json
+import base64
 
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from typing import Any
 from typing import NamedTuple
 from typing import cast
+
+import msgspec
 
 from sqlalchemy import column
 from sqlalchemy import or_
@@ -14,6 +15,7 @@ from sqlalchemy import table
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.exceptions import TransportError
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
+from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
 class MessageRow(NamedTuple):
@@ -43,7 +45,9 @@ class Connection:
             column("delivered_at"),
         )
 
-    async def send(self, body: str, headers: dict[str, Any], delay: int = 0) -> int:
+    async def send(
+        self, body: bytes, headers: EncodedEnvelopeHeaders, delay: int = 0
+    ) -> int:
         """
         Store a message to the database.
 
@@ -55,8 +59,8 @@ class Connection:
         available_at = now + timedelta(milliseconds=delay)
 
         insert_stmt = self._table.insert().values(
-            body=body,
-            headers=json.dumps(headers),
+            body=base64.b64encode(body).decode(),
+            headers=msgspec.json.encode(headers).decode(),
             queue_name=self._config.queue_name,
             created_at=now,
             available_at=available_at,

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Any
 
 import pytest
 
@@ -9,11 +8,10 @@ from expanse.encryption.key_chain import KeyChain
 from expanse.encryption.signer import Signer
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
+from expanse.messenger.serializers.serializer import Serializer as InnerSerializer
 from expanse.messenger.serializers.signing_serializer import SigningSerializer
-from expanse.messenger.serializers.strict_serializer import (
-    StrictSerializer as InnerSerializer,
-)
-from expanse.messenger.trusted_collection import TrustedCollection
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 from expanse.types.messenger import EncodedEnvelope
 
 
@@ -45,39 +43,36 @@ class FakeSigner(SignerContract):
         return self.verifies
 
 
-def _make_encoded_envelope() -> EncodedEnvelope:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
-    inner = InnerSerializer(trusted_collection=trusted_collection)
-
+def _make_encoded_envelope(inner: InnerSerializer) -> EncodedEnvelope:
     return inner.encode(Envelope.wrap(Foo(foo="bar")))
 
 
-def test_encode_adds_a_hex_encoded_signature_header() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
+@pytest.fixture()
+def inner_serializer() -> InnerSerializer:
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
 
+    return InnerSerializer(serialization_manager)
+
+
+def test_encode_adds_a_hex_encoded_signature_header(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner(signature=b"\x01\x02\x03")
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
 
-    assert encoded["headers"]["sign"] == "010203"
+    assert encoded["headers"]["sign"] == "AQID"
     assert len(signer.sign_calls) == 1
     assert signer.sign_calls[0][1] == b"expanse/messenger/serialization/sign"
 
 
-def test_decode_verifies_the_signature_and_delegates_to_the_inner_serializer() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_decode_verifies_the_signature_and_delegates_to_the_inner_serializer(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner(signature=b"\x01\x02\x03", verifies=True)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
     decoded = serializer.decode(encoded)
@@ -92,13 +87,13 @@ def test_decode_verifies_the_signature_and_delegates_to_the_inner_serializer() -
     assert purpose == b"expanse/messenger/serialization/sign"
 
 
-def test_decode_raises_when_the_signature_header_is_missing() -> None:
+def test_decode_raises_when_the_signature_header_is_missing(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner()
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=TrustedCollection()), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
-    encoded = _make_encoded_envelope()
+    encoded = _make_encoded_envelope(inner_serializer)
 
     with pytest.raises(MessageDecodingFailedError, match="Missing signature"):
         serializer.decode(encoded)
@@ -106,14 +101,11 @@ def test_decode_raises_when_the_signature_header_is_missing() -> None:
     assert signer.verify_calls == []
 
 
-def test_decode_raises_when_the_signature_is_invalid() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_decode_raises_when_the_signature_is_invalid(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner(signature=b"\x01\x02\x03", verifies=False)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
 
@@ -121,19 +113,15 @@ def test_decode_raises_when_the_signature_is_invalid() -> None:
         serializer.decode(encoded)
 
 
-def test_decode_raises_when_the_body_has_been_tampered_with() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_decode_raises_when_the_body_has_been_tampered_with(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner(signature=b"\x01\x02\x03", verifies=True)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
-    tampered: dict[str, Any] = dict(encoded["body"])
-    tampered["d"] = '{"foo":"tampered"}'
-    encoded["body"] = tampered  # type: ignore[typeddict-item]
+    tampered = b'{"foo":"tampered"}'
+    encoded["body"] = tampered
 
     signer.verifies = False
 
@@ -141,19 +129,14 @@ def test_decode_raises_when_the_body_has_been_tampered_with() -> None:
         serializer.decode(encoded)
 
 
-def test_round_trip_with_a_real_signer() -> None:
+def test_round_trip_with_a_real_signer(inner_serializer: InnerSerializer) -> None:
     """
     End-to-end test with the real HMAC-based signer, exercising the actual
     hex encoding/decoding of the signature header.
     """
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
     key_chain = KeyChain([Key(b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb")])
     signer = Signer(key_chain)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     envelope = Envelope.wrap(Foo(foo="bar"))
     encoded = serializer.encode(envelope)
@@ -166,15 +149,12 @@ def test_round_trip_with_a_real_signer() -> None:
     assert message.foo == "bar"
 
 
-def test_round_trip_with_a_real_signer_rejects_a_tampered_signature() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_round_trip_with_a_real_signer_rejects_a_tampered_signature(
+    inner_serializer: InnerSerializer,
+) -> None:
     key_chain = KeyChain([Key(b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb")])
     signer = Signer(key_chain)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
     encoded["headers"]["sign"] = "00" * (len(encoded["headers"]["sign"]) // 2)
@@ -183,31 +163,25 @@ def test_round_trip_with_a_real_signer_rejects_a_tampered_signature() -> None:
         serializer.decode(encoded)
 
 
-def test_round_trip_with_a_real_signer_rejects_tampered_headers() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_round_trip_with_a_real_signer_rejects_tampered_headers(
+    inner_serializer: InnerSerializer,
+) -> None:
     key_chain = KeyChain([Key(b"ZFggd3nBWJcNTUV94n3OpJzDipzC2UZb")])
     signer = Signer(key_chain)
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
-    encoded["headers"]["stamps"] = ["tampered"]
+    encoded["headers"]["stamps"] = [b"tampered"]
 
     with pytest.raises(MessageDecodingFailedError, match="Invalid signature"):
         serializer.decode(encoded)
 
 
-def test_decode_raises_when_the_signature_header_is_not_valid_hex() -> None:
-    trusted_collection = TrustedCollection()
-    trusted_collection.trust(Foo)
-
+def test_decode_raises_when_the_signature_header_is_not_valid_hex(
+    inner_serializer: InnerSerializer,
+) -> None:
     signer = FakeSigner()
-    serializer = SigningSerializer(
-        InnerSerializer(trusted_collection=trusted_collection), signer
-    )
+    serializer = SigningSerializer(inner_serializer, signer)
 
     encoded = serializer.encode(Envelope.wrap(Foo(foo="bar")))
     encoded["headers"]["sign"] = "not-hex"

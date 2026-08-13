@@ -37,6 +37,7 @@ class MessengerServiceProvider(ServiceProvider):
 
         self._container.singleton(Registry)
         self._container.singleton(TrustedCollection)
+        self._container.singleton(SerializationManager)
         self._container.singleton(SerializerContract, self._create_serializer)
         self._container.singleton(RetryStrategyManager)
         self._container.singleton(MiddlewareStack)
@@ -62,24 +63,19 @@ class MessengerServiceProvider(ServiceProvider):
         await self._container.on_resolved(
             AsyncSession, self._attach_resolved_session_to_transactional_bus
         )
+        await self._container.on_resolved(
+            SerializationManager, self._register_serializers
+        )
 
     async def _create_serializer(self, container: Container) -> "SerializerContract":
+        from expanse.messenger.serializers.serializer import Serializer
+
         config = await container.get(Config)
         messenger_config: dict[str, Any] = config.get("messenger", {})
 
-        strict: bool = messenger_config.get("strict", False)
         serializer: SerializerContract
-        if strict:
-            from expanse.messenger.serializers.strict_serializer import StrictSerializer
 
-            serializer = StrictSerializer(
-                await container.get(TrustedCollection),
-                await container.get(SerializationManager),
-            )
-        else:
-            from expanse.messenger.serializers.serializer import Serializer
-
-            serializer = Serializer(await container.get(SerializationManager))
+        serializer = Serializer(await container.get(SerializationManager))
 
         sign: bool = messenger_config.get("sign", True)
         if sign:
@@ -164,3 +160,35 @@ class MessengerServiceProvider(ServiceProvider):
             return
 
         bus.attach_session(session)
+
+    async def _register_serializers(
+        self, serialization_manager: SerializationManager, container: Container
+    ) -> None:
+        from expanse.serialization.serializers.dataclass import DataclassSerializer
+        from expanse.serialization.serializers.msgspec import MsgSpecSerializer
+        from expanse.serialization.serializers.pickle import PickleSerializer
+        from expanse.serialization.serializers.pydantic import PydanticSerializer
+
+        config = await container.get(Config)
+        is_strict = config.get("messenger.strict", False)
+
+        trusted_collection = await container.get(TrustedCollection)
+
+        serialization_manager.register_serializer(
+            DataclassSerializer().restrict(trusted_collection.class_names)
+            if is_strict
+            else DataclassSerializer()
+        )
+        serialization_manager.register_serializer(
+            PydanticSerializer().restrict(trusted_collection.class_names)
+            if is_strict
+            else PydanticSerializer()
+        )
+        serialization_manager.register_serializer(
+            MsgSpecSerializer().restrict(trusted_collection.class_names)
+            if is_strict
+            else MsgSpecSerializer()
+        )
+        serialization_manager.register_serializer(
+            PickleSerializer().restrict(trusted_collection.class_names)
+        )

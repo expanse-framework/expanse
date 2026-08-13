@@ -24,9 +24,10 @@ class TrustedCollection:
     def class_names(self):
         return self._class_names
 
-    def trust(self, klass: type[Any]) -> Self:
-        self._classes.add(klass)
-        self._class_names.add(class_to_name(klass))
+    def trust(self, *klass: type[Any]) -> Self:
+        for k in klass:
+            self._classes.add(k)
+            self._class_names.add(class_to_name(k))
 
         return self
 
@@ -44,6 +45,7 @@ class TrustedCollection:
 
     def get_default_classes(self) -> set[type[Any]]:
         from expanse.jobs.stamps.job import JobStamp
+        from expanse.messenger.exceptions import MessageDecodingFailedError
         from expanse.messenger.stamps.context import ContextStamp
         from expanse.messenger.stamps.delay import DelayStamp
         from expanse.messenger.stamps.encrypted import EncryptedStamp
@@ -73,4 +75,7 @@ class TrustedCollection:
             TransportStamp,
             TransportMessageIdStamp,
             UniqueStamp,
+            # MessageDecodingFailedError is also trusted by default, as it is used to wrap decoding errors in an envelope
+            # and is not a message type that can be instantiated from untrusted data.
+            MessageDecodingFailedError,
         }

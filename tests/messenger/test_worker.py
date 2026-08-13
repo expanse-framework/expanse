@@ -14,6 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from _pytest.logging import LogCaptureFixture
+from pytest_mock import MockerFixture
 
 from expanse.cache.asynchronous.cache import Cache
 from expanse.cache.asynchronous.stores.memory import MemoryStore
@@ -24,18 +25,22 @@ from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
 from expanse.logging.context import Context
 from expanse.logging.filters.context import ContextFilter
 from expanse.logging.utils import _set_context
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.locks.unique import UniqueLock
+from expanse.messenger.middleware.handle_failed_decoding import HandleFailedDecoding
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.middleware.propagate_context import PropagateContext
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.context import ContextStamp
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
@@ -49,6 +54,9 @@ from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
+from expanse.serialization.serializers.pickle import PickleSerializer
 from expanse.support._utils import class_to_name
 
 
@@ -212,6 +220,13 @@ async def container() -> Container:
     container = Container()
     await LoggingServiceProvider(container).register()
 
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+    serialization_manager.register_serializer(
+        PickleSerializer().restrict({class_to_name(MessageDecodingFailedError)})
+    )
+    container.instance(SerializerContract, Serializer(serialization_manager))
+
     return container
 
 
@@ -256,7 +271,7 @@ def config() -> Config:
                     "default": {
                         "type": "multiplier",
                         "max_retries": 3,
-                        "delay": 10,
+                        "delay": 1,
                         "multiplier": 2,
                         "jitter": 0.0,
                     }
@@ -388,11 +403,11 @@ async def test_worker_retries_message_when_retry_strategy_allows_it(
 
     delay_stamp = retried_envelope.stamp(DelayStamp)
     assert delay_stamp is not None
-    assert delay_stamp.delay == 10
+    assert delay_stamp.delay == 1
 
     assert (
         caplog.messages[0]
-        == "Message handling failed, sending for retry 1 with a delay of 10s. Error: Message handling failed for message <class 'method'>: transient failure"
+        == "Message handling failed, sending for retry 1 with a delay of 1s. Error: Message handling failed for message <class 'method'>: transient failure"
     )
 
 
@@ -1466,3 +1481,60 @@ async def test_worker_does_not_release_when_envelope_has_no_unique_stamp(
     # Note: no Cache bound in the container. If _release_unique_lock is invoked
     # for this envelope, container.get(Cache) would raise.
     await worker.run(limit=1)
+
+
+async def test_worker_can_handle_message_decoding_errors(
+    worker: Worker,
+    transport_manager: TransportManager,
+    mocker: MockerFixture,
+    middleware_stack: MiddlewareStack,
+    container: Container,
+) -> None:
+    serializer = await container.get(SerializerContract)
+
+    _ = mocker.patch.object(
+        serializer,
+        "decode",
+        wraps=serializer.decode,
+        side_effect=[
+            MessageDecodingFailedError(
+                "Failed to decode",
+                {
+                    "body": b"",
+                    "headers": {"stamps": []},
+                },
+            ).as_envelope(),
+            *[mocker.DEFAULT] * 11,
+        ],
+    )
+
+    transport = await transport_manager.transport("memory")
+    assert isinstance(transport, MemoryTransport)
+    failure_transport = await transport_manager.transport("failed")
+    assert isinstance(failure_transport, MemoryTransport)
+
+    _ = await transport.send(Envelope.wrap(WorkerMessage(value="foo")))
+
+    middleware_stack.use([HandleFailedDecoding])
+    await worker.run(limit=1)
+
+    # The message has been sent back to the transport
+    assert len(transport.sent) == 2
+
+    # Exhaust retries
+    await worker.run(limit=3, sleep=0)
+
+    # The message has been discarded
+    assert await anext(transport.receive(), None) is None
+    # and send to the failure transport
+    assert len(failure_transport.sent) == 1
+
+    # The envelope should contain the original decoding error
+    envelope = failure_transport.sent[0]
+    error = envelope.open()
+    assert isinstance(error, MessageDecodingFailedError)
+    assert str(error) == "Failed to decode"
+    assert error.encoded_envelope == {
+        "body": b"",
+        "headers": {"stamps": []},
+    }
