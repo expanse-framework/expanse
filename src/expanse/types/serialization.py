@@ -2,6 +2,5 @@ from typing import TypedDict
 
 
 class Encoded(TypedDict):
-    d: str
-    t: str
+    d: bytes
     s: str

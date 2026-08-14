@@ -162,7 +162,7 @@ async def test_messages_are_dispatched_after_transaction_is_committed(
         assert len(messages) == 1
         assert (
             messages[0].body
-            == '{"d": "{\\"content\\":\\"test message\\"}", "t": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage", "s": "dataclass"}'
+            == "AAAACWRhdGFjbGFzcwAAAFN0ZXN0cy5pbnRlZ3JhdGlvbi5tZXNzZW5nZXIuYXN5bmNocm9ub3VzLnRlc3RfdHJhbnNhY3Rpb25hbF9tZXNzYWdlX2J1cy5UZXN0TWVzc2FnZQAAABp7ImNvbnRlbnQiOiJ0ZXN0IG1lc3NhZ2UifQ=="
         )
 
 
@@ -198,5 +198,5 @@ async def test_messages_are_cleared_after_transaction_is_rolled_back(
         assert len(messages) == 1
         assert (
             messages[0].body
-            == '{"d": "{\\"content\\":\\"message after rollback\\"}", "t": "tests.integration.messenger.asynchronous.test_transactional_message_bus.TestMessage", "s": "dataclass"}'
+            == "AAAACWRhdGFjbGFzcwAAAFN0ZXN0cy5pbnRlZ3JhdGlvbi5tZXNzZW5nZXIuYXN5bmNocm9ub3VzLnRlc3RfdHJhbnNhY3Rpb25hbF9tZXNzYWdlX2J1cy5UZXN0TWVzc2FnZQAAACR7ImNvbnRlbnQiOiJtZXNzYWdlIGFmdGVyIHJvbGxiYWNrIn0="
         )

@@ -12,7 +12,6 @@ from expanse.configuration.config import Config
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransportError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
 
     from treat.mock import Mockery
 
+    from expanse.messenger.serializers.serializer import Serializer
     from expanse.redis.asynchronous.connections.connection import (
         Connection as RedisConnection,
     )
@@ -59,7 +59,9 @@ async def redis_connection() -> AsyncGenerator[RedisConnection]:
 
 
 @pytest.fixture()
-async def redis_transport(redis_connection: RedisConnection) -> RedisTransport:
+async def redis_transport(
+    redis_connection: RedisConnection, serializer: Serializer
+) -> RedisTransport:
     transport_config = RedisTransportConfig(
         stream=STREAM,
         group="test_group",
@@ -68,7 +70,7 @@ async def redis_transport(redis_connection: RedisConnection) -> RedisTransport:
     return RedisTransport(
         redis_connection,
         transport_config,
-        Serializer(),
+        serializer,
     )
 
 
@@ -162,7 +164,7 @@ async def test_reject_raises_without_transport_message_id_stamp(
 
 
 async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
-    redis_connection: RedisConnection,
+    redis_connection: RedisConnection, serializer: Serializer
 ) -> None:
     transport = RedisTransport(
         redis_connection,
@@ -171,7 +173,7 @@ async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(),
+        serializer,
     )
 
     await transport.send(Envelope.wrap(RedisMessage(value="pending")))
@@ -192,7 +194,7 @@ async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
 
 
 async def test_unacknowledged_message_is_claimed_by_another_consumer(
-    redis_connection: RedisConnection,
+    redis_connection: RedisConnection, serializer: Serializer
 ) -> None:
     consumer_a = RedisTransport(
         redis_connection,
@@ -201,7 +203,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(),
+        serializer,
     )
     # Consumer B uses idle_time=0 so it can immediately claim consumer A's pending messages
     consumer_b = RedisTransport(
@@ -212,7 +214,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
             consumer="consumer_b",
             idle_time=0,
         ),
-        Serializer(),
+        serializer,
     )
 
     await consumer_a.send(Envelope.wrap(RedisMessage(value="pending")))
@@ -264,7 +266,7 @@ async def test_only_expired_delayed_messages_are_moved_to_the_stream(
 
 
 async def test_transport_keep_alive_prevents_message_from_being_claimed(
-    redis_connection: RedisConnection,
+    redis_connection: RedisConnection, serializer: Serializer
 ) -> None:
     """keep_alive resets the idle clock so another consumer cannot steal the message."""
     consumer_a = RedisTransport(
@@ -274,7 +276,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
             group="test_group",
             consumer="consumer_a",
         ),
-        Serializer(),
+        serializer,
     )
     # consumer_b claims messages idle for ≥100 ms; claim_interval=0 so it always tries
     consumer_b = RedisTransport(
@@ -286,7 +288,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
             idle_time=100,  # ms
             claim_interval=0,
         ),
-        Serializer(),
+        serializer,
     )
 
     await consumer_a.send(Envelope.wrap(RedisMessage(value="alive")))
@@ -307,7 +309,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
 
 
 async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
-    redis_connection: RedisConnection,
+    redis_connection: RedisConnection, serializer: Serializer
 ) -> None:
     transport = RedisTransport(
         redis_connection,
@@ -317,7 +319,7 @@ async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
             consumer="test_consumer",
             idle_time=60,
         ),
-        Serializer(),
+        serializer,
     )
 
     await transport.send(Envelope.wrap(RedisMessage(value="too-long")))

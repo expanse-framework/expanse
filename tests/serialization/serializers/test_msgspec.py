@@ -1,15 +1,10 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import msgspec
 
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.msgspec import MsgSpecSerializer
-
-
-if TYPE_CHECKING:
-    from expanse.types.serialization import Encoded
 
 
 class SimpleStruct(msgspec.Struct):
@@ -37,18 +32,15 @@ def test_encode_msgspec_struct() -> None:
 
     encoded = serializer.encode(obj)
 
-    assert encoded["d"] == '{"name":"Alice","age":30}'
-    assert encoded["t"] == "tests.serialization.serializers.test_msgspec.SimpleStruct"
-    assert encoded["s"] == "msgspec"
+    assert (
+        encoded
+        == b'\x00\x00\x009tests.serialization.serializers.test_msgspec.SimpleStruct\x00\x00\x00\x19{"name":"Alice","age":30}'
+    )
 
 
 def test_decode_msgspec_struct() -> None:
     serializer = MsgSpecSerializer()
-    encoded: Encoded = {
-        "d": '{"name":"Alice","age":30}',
-        "t": "tests.serialization.serializers.test_msgspec.SimpleStruct",
-        "s": "msgspec",
-    }
+    encoded = b'\x00\x00\x009tests.serialization.serializers.test_msgspec.SimpleStruct\x00\x00\x00\x19{"name":"Alice","age":30}'
 
     obj = serializer.decode(encoded)
 

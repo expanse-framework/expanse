@@ -1,6 +1,8 @@
-import json
+import base64
 
 from collections.abc import AsyncIterator
+
+import msgspec
 
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport as KeepAliveTransportContract,
@@ -10,11 +12,11 @@ from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
 from expanse.messenger.transports.database.connection import Connection
+from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
 class DatabaseTransport(KeepAliveTransportContract):
@@ -22,12 +24,12 @@ class DatabaseTransport(KeepAliveTransportContract):
         self,
         config: DatabaseTransportConfig,
         db: AsyncDatabaseManager,
-        serializer: SerializerContract | None = None,
+        serializer: SerializerContract,
     ) -> None:
         self._config: DatabaseTransportConfig = config
         self._db: AsyncDatabaseManager = db
         self._connection: Connection = Connection(self._db, self._config)
-        self._serializer: SerializerContract = serializer or Serializer()
+        self._serializer: SerializerContract = serializer
 
     async def send(self, envelope: Envelope) -> Envelope:
         encoded_envelope = self._serializer.encode(envelope)
@@ -35,7 +37,7 @@ class DatabaseTransport(KeepAliveTransportContract):
         delay = delay_stamp.delay if delay_stamp is not None else 0
 
         message_row_id = await self._connection.send(
-            body=json.dumps(encoded_envelope["body"]),
+            body=encoded_envelope["body"],
             headers=encoded_envelope["headers"],
             delay=delay,
         )
@@ -51,8 +53,10 @@ class DatabaseTransport(KeepAliveTransportContract):
         try:
             envelope = self._serializer.decode(
                 {
-                    "body": json.loads(message_row.body),
-                    "headers": json.loads(message_row.headers),
+                    "body": base64.b64decode(message_row.body.encode()),
+                    "headers": msgspec.json.decode(
+                        message_row.headers, type=EncodedEnvelopeHeaders
+                    ),
                 }
             )
         except MessageDecodingFailedError as e:

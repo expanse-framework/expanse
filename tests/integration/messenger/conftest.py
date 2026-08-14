@@ -12,6 +12,8 @@ from sqlalchemy import text
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.database_manager import DatabaseManager
 from expanse.messenger.serializers.serializer import Serializer
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 if TYPE_CHECKING:
@@ -22,9 +24,19 @@ if TYPE_CHECKING:
     from expanse.testing.command_tester import CommandTester
 
 
+@pytest.fixture()
+def serializer() -> SerializerContract:
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+
+    return Serializer(serialization_manager)
+
+
 @pytest.fixture(autouse=True)
-def configure_messenger(app: Application) -> None:
-    app.container.instance(SerializerContract, Serializer())
+def configure_messenger(app: Application, serializer: Serializer) -> None:
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+    app.container.instance(SerializerContract, serializer)
 
 
 @pytest.fixture()

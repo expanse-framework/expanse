@@ -6,13 +6,17 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.messenger.asynchronous.message_bus import MessageBus
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
+from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 @pytest.fixture()
@@ -61,6 +65,10 @@ def bus(
     transport_manager: TransportManager,
     middleware_stack: MiddlewareStack,
 ) -> MessageBus:
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+    container.instance(SerializerContract, Serializer(serialization_manager))
+
     return MessageBus(transport_manager, container, middleware_stack)
 
 

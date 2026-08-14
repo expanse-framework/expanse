@@ -1,4 +1,4 @@
-from typing import Any
+import base64
 
 import msgspec
 
@@ -7,7 +7,7 @@ from expanse.contracts.messenger.serializer import Serializer as SerializerContr
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.types.messenger import EncodedEnvelope
-from expanse.types.serialization import Encoded
+from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
 class SigningSerializer(SerializerContract):
@@ -24,10 +24,12 @@ class SigningSerializer(SerializerContract):
     def encode(self, envelope: Envelope) -> EncodedEnvelope:
         encoded = self._inner_serializer.encode(envelope)
 
-        encoded["headers"]["sign"] = self._signer.sign(
-            self._signing_payload(encoded["body"], encoded["headers"]),
-            purpose=self._PURPOSE,
-        ).hex()
+        encoded["headers"]["sign"] = base64.b64encode(
+            self._signer.sign(
+                self._signing_payload(encoded["body"], encoded["headers"]),
+                purpose=self._PURPOSE,
+            )
+        ).decode()
 
         return encoded
 
@@ -41,8 +43,10 @@ class SigningSerializer(SerializerContract):
             )
 
         try:
-            raw_signature = bytes.fromhex(signature)
-            unsigned_headers = {k: v for k, v in headers.items() if k != "sign"}
+            raw_signature = base64.b64decode(signature)
+            unsigned_headers = headers.copy()
+            if "sign" in unsigned_headers:
+                del unsigned_headers["sign"]
             payload = self._signing_payload(encoded_envelope["body"], unsigned_headers)
         except (TypeError, ValueError, msgspec.EncodeError) as e:
             raise MessageDecodingFailedError(
@@ -56,5 +60,5 @@ class SigningSerializer(SerializerContract):
 
         return self._inner_serializer.decode(encoded_envelope)
 
-    def _signing_payload(self, body: Encoded, headers: dict[str, Any]) -> bytes:
+    def _signing_payload(self, body: bytes, headers: EncodedEnvelopeHeaders) -> bytes:
         return msgspec.json.encode({"body": body, "headers": headers})

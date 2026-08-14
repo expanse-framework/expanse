@@ -2,19 +2,15 @@ from typing import Any
 
 from expanse.serialization.exceptions import UnconfiguredSerializerError
 from expanse.serialization.exceptions import UnserializableObjectError
-from expanse.serialization.serializers.dataclass import DataclassSerializer
-from expanse.serialization.serializers.msgspec import MsgSpecSerializer
-from expanse.serialization.serializers.pydantic import PydanticSerializer
 from expanse.serialization.serializers.serializer import Serializer
 
 
 class SerializationManager:
     def __init__(self) -> None:
-        self._serializers: dict[str, Serializer[Any]] = {
-            "msgspec": MsgSpecSerializer(),
-            "dataclass": DataclassSerializer(),
-            "pydantic": PydanticSerializer(),
-        }
+        self._serializers: dict[str, Serializer[Any]] = {}
+
+    def register_serializer(self, serializer: Serializer[Any]) -> None:
+        self._serializers[serializer.name] = serializer
 
     def serializer(self, name: str) -> Serializer[Any]:
         if name not in self._serializers:

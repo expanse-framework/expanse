@@ -9,6 +9,8 @@ from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 @dataclass
@@ -17,7 +19,11 @@ class FooMessage:
 
 
 def make_transport() -> MemoryTransport:
-    serializer = Serializer()
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+
+    serializer = Serializer(serialization_manager)
+
     return MemoryTransport(serializer)
 
 

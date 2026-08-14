@@ -1,11 +1,12 @@
 import base64
-import json
 import secrets
 import time
 
 from collections.abc import AsyncIterator
 from typing import Any
 from typing import cast
+
+import msgspec
 
 from redis.exceptions import ResponseError
 
@@ -14,6 +15,8 @@ from expanse.messenger.transports.redis.config import RedisTransportConfig
 from expanse.redis.asynchronous.connections.connection import (
     Connection as RedisConnection,
 )
+from expanse.types.messenger import EncodedEnvelope
+from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
 class Connection:
@@ -26,7 +29,9 @@ class Connection:
         self._last_pending_message_id: str | None = None
         self._next_claim: float = 0.0
 
-    async def add(self, body: str, headers: dict[str, Any], delay: int = 0) -> str:
+    async def add(
+        self, body: bytes, headers: EncodedEnvelopeHeaders, delay: int = 0
+    ) -> str:
         """
         Add a message to the Redis stream.
 
@@ -44,12 +49,16 @@ class Connection:
             score = now + delay
             if not await self._connection.zadd(
                 self._queue,
-                {json.dumps({"body": body, "headers": headers, "uid": id}): score},
+                {
+                    msgspec.json.encode(
+                        {"body": body, "headers": headers, "uid": id}
+                    ): score
+                },
                 nx=True,
             ):
                 raise RuntimeError("Failed to add message to Redis stream")
         else:
-            message = json.dumps({"body": body, "headers": headers})
+            message = msgspec.json.encode({"body": body, "headers": headers})
             id = cast(
                 "str",
                 await self._connection.xadd(
@@ -180,10 +189,10 @@ class Connection:
                 break
 
             try:
-                data = json.loads(message)
+                data = msgspec.json.decode(message, type=EncodedEnvelope)
                 body = data["body"]
                 headers = data["headers"]
-            except (json.JSONDecodeError, KeyError):
+            except (msgspec.DecodeError, KeyError):
                 # If the message is not in the expected format, we skip it and remove it from the sorted set to prevent it from blocking other messages.
                 await self._connection.zrem(self._queue, message)
                 continue

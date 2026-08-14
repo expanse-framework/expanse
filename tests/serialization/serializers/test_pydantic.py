@@ -1,15 +1,10 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import msgspec
 
 from pydantic import BaseModel
 
 from expanse.serialization.serializers.pydantic import PydanticSerializer
-
-
-if TYPE_CHECKING:
-    from expanse.types.serialization import Encoded
 
 
 class SimpleModel(BaseModel):
@@ -37,18 +32,15 @@ def test_encode_pydantic_model() -> None:
 
     encoded = serializer.encode(obj)
 
-    assert encoded["d"] == '{"name":"Alice","age":30}'
-    assert encoded["t"] == "tests.serialization.serializers.test_pydantic.SimpleModel"
-    assert encoded["s"] == "pydantic"
+    assert (
+        encoded
+        == b'\x00\x00\x009tests.serialization.serializers.test_pydantic.SimpleModel\x00\x00\x00\x19{"name":"Alice","age":30}'
+    )
 
 
 def test_decode_pydantic_model() -> None:
     serializer = PydanticSerializer()
-    encoded: Encoded = {
-        "d": '{"name":"Alice","age":30}',
-        "t": "tests.serialization.serializers.test_pydantic.SimpleModel",
-        "s": "pydantic",
-    }
+    encoded = b'\x00\x00\x009tests.serialization.serializers.test_pydantic.SimpleModel\x00\x00\x00\x19{"name":"Alice","age":30}'
 
     obj = serializer.decode(encoded)
 

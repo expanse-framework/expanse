@@ -15,13 +15,18 @@ from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.synchronous.message_bus import MessageBus
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.serialization.serialization_manager import SerializationManager
+from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 @pytest.fixture()
 def container() -> Container:
     container = Container()
 
-    container.instance(SerializerContract, Serializer())
+    serialization_manager = SerializationManager()
+    serialization_manager.register_serializer(DataclassSerializer())
+    container.instance(SerializerContract, Serializer(serialization_manager))
+
     return container
 
 
