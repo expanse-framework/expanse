@@ -23,6 +23,9 @@ class Encryptor(EncryptorContract):
         Cipher.AES_256_GCM: AES256GCMCipher
     }
 
+    # The minimum size a data must be before it is compressed.
+    COMPRESS_THRESHOLD: ClassVar[int] = 114
+
     def __init__(
         self,
         key_chain: KeyChain,
@@ -42,7 +45,6 @@ class Encryptor(EncryptorContract):
             Secret[bytes].wrap(salt) if salt is not None else None
         )
         self._purpose: bytes | None = purpose
-        self._purpose = purpose
         self._store_key_references: bool = store_key_references
 
     def has_compression(self) -> bool:
@@ -86,14 +88,17 @@ class Encryptor(EncryptorContract):
         cipher = cipher_class(key.value)
 
         encoded: bytes = value.encode()
-        if self._compress:
+        compressed = self._compress and len(encoded) > self.COMPRESS_THRESHOLD
+        if compressed:
             encoded = self._compressor.compress(encoded)
 
         encrypted = cipher.encrypt(
             encoded,
-            additional_data=self._build_additional_data(kid=self._secret_key.id),
+            additional_data=self._build_additional_data(
+                compress=compressed, kid=self._secret_key.id
+            ),
         )
-        if self._compress:
+        if compressed:
             encrypted.headers["z"] = 1
 
         if self._store_key_references:
@@ -173,15 +178,19 @@ class Encryptor(EncryptorContract):
         if compress is None:
             compress = self._compress
 
-        additional_data: list[bytes] = [b"1" if compress else b"0"]
+        additional_data: bytes = b"\x01" if compress else b"\x00"
 
         if self._store_key_references and kid is not None:
-            additional_data.append(kid.encode())
+            additional_data += self._encode_field(kid.encode())
 
         if self._purpose:
-            additional_data.append(self._purpose)
+            additional_data += self._encode_field(self._purpose)
 
-        return b"\x00".join(additional_data)
+        return additional_data
+
+    @staticmethod
+    def _encode_field(data: bytes) -> bytes:
+        return len(data).to_bytes(4, "big") + data
 
     @classmethod
     def generate_random_key(cls, cipher: Cipher = Cipher.AES_256_GCM) -> str:

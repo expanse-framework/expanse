@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import hmac
+import secrets
 
 from expanse.encryption.ciphers.base_cipher import BaseCipher
 from expanse.encryption.errors import DecryptionError
@@ -17,7 +17,7 @@ class AES256GCMCipher(BaseCipher):
         from cryptography.hazmat.primitives.ciphers.algorithms import AES
         from cryptography.hazmat.primitives.ciphers.modes import GCM
 
-        iv = self._generate_iv(data)
+        iv = self._generate_iv()
         cipher = Cipher(AES(self._secret.reveal()), GCM(iv), backend=default_backend())
 
         encryptor = cipher.encryptor()
@@ -65,5 +65,5 @@ class AES256GCMCipher(BaseCipher):
 
         return decrypted
 
-    def _generate_iv(self, data: bytes) -> bytes:
-        return hmac.digest(self._secret.reveal(), data, "sha256")[: self.iv_length]
+    def _generate_iv(self) -> bytes:
+        return secrets.token_bytes(self.iv_length)

@@ -46,9 +46,37 @@ def test_encryptor_can_encrypt_data(
     assert isinstance(message.payload, bytes)
     assert "iv" in message.headers
     assert "at" in message.headers
-    assert message.headers["z"] == 1
 
-    assert compress.call_count == 2
+    assert compress.call_count == 0
+
+
+def test_encryptor_does_not_compress_small_payloads_by_default(
+    encryptor: Encryptor, mocker: MockerFixture
+) -> None:
+    compress = mocker.spy(ZlibCompressor, "compress")
+
+    assert encryptor.has_compression()
+
+    message = encryptor.encrypt_raw("Hello, World!")
+
+    assert "z" not in message.headers
+    assert compress.call_count == 0
+
+
+def test_encryptor_compresses_payloads_above_the_threshold_by_default(
+    encryptor: Encryptor, mocker: MockerFixture
+) -> None:
+    compress = mocker.spy(ZlibCompressor, "compress")
+
+    large_value = "a" * (Encryptor.COMPRESS_THRESHOLD + 1)
+    message = encryptor.encrypt_raw(large_value)
+
+    assert message.headers["z"] == 1
+    assert compress.call_count == 1
+
+    decrypted = encryptor.decrypt(message.encode())
+
+    assert decrypted == large_value
 
 
 def test_encryptor_can_encrypt_data_without_compression(
@@ -76,11 +104,11 @@ def test_encryptor_can_decrypt_messages(
 ) -> None:
     decompress = mocker.spy(ZlibCompressor, "decompress")
 
-    encrypted_string = encryptor.encrypt("Hello, World!")
+    encrypted_string = encryptor.encrypt("t" * (Encryptor.COMPRESS_THRESHOLD + 1))
 
     decrypted = encryptor.decrypt(encrypted_string)
 
-    assert decrypted == "Hello, World!"
+    assert decrypted == "t" * (Encryptor.COMPRESS_THRESHOLD + 1)
 
     assert decompress.call_count == 1
 
