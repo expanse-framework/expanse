@@ -27,7 +27,11 @@ class EncryptorFactory(EncryptorFactoryContract):
         self._key_chain = key_chain
         self._salt = salt
 
-    def make(self, compress: bool = True, purpose: bytes | None = None) -> "Encryptor":
+    def make(
+        self,
+        compress: bool = True,
+        purpose: bytes | None = None,
+    ) -> "Encryptor":
         return Encryptor(
             self._key_chain, salt=self._salt, purpose=purpose, compress=compress
         )

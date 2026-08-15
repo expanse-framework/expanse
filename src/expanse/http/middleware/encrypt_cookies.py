@@ -38,7 +38,7 @@ class EncryptCookies:
             if cookie.value is None:
                 continue
 
-            value = self._encryption.encrypt(cookie.value)
+            value = self._encryption.encrypt(cookie.value, compress=False)
             response.cookies[name] = cookie.with_value(value)
 
         return response
