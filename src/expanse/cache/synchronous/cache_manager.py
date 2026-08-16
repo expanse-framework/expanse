@@ -162,7 +162,7 @@ class CacheManager:
 
         return MemoryStore(
             max_items=config.max_items,
-            max_size=config.max_size,
+            max_size=config.max_size.to_bytes() if config.max_size else None,
             default_ttl=config.default_ttl,
         )
 
