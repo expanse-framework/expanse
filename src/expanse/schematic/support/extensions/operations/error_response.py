@@ -23,10 +23,11 @@ class ErrorResponseExtension(OperationExtension):
 
         if (
             body_param
-            and body_param.pydantic_model
+            and body_param.validation_model
             and not operation.responses.has_response("422")
         ):
-            # If the body parameter is a Pydantic model, any validation error will lead to a 422 response.
+            # If the body parameter is a Pydantic model or msgspec struct, any
+            # validation error will lead to a 422 response.
             operation.responses.add_response(
                 "422",
                 OpenAPIResponse("Validation Error"),

@@ -8,7 +8,7 @@ from typing import Self
 from typing import get_args
 from typing import get_origin
 
-from pydantic import BaseModel
+import msgspec
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
@@ -28,6 +28,8 @@ from expanse.routing.route_group import RouteGroup
 from expanse.support._concurrency import should_run_as_async
 from expanse.support._concurrency import sync_to_async
 from expanse.support._concurrency import warn_about_implicit_async_safe_status
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
 
@@ -168,21 +170,36 @@ class Router(RouterContract):
                 ):
                     arguments[name] = parameter.annotation(await request.form)
 
-                elif get_origin(parameter.annotation) is Annotated and issubclass(
-                    (origin_args := get_args(parameter.annotation))[0], BaseModel
+                elif get_origin(parameter.annotation) is Annotated and (
+                    is_pydantic_model(
+                        (origin_args := get_args(parameter.annotation))[0]
+                    )
+                    or is_msgspec_struct(origin_args[0])
                 ):
-                    validation_model: type[BaseModel] = origin_args[0]
+                    validation_model = origin_args[0]
 
                     data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
 
                     if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type]
-                        arguments[name] = validation_model.model_validate(
-                            await request.json
+                        raw = await request.json
+
+                        arguments[name] = (
+                            validation_model.model_validate(raw)
+                            if is_pydantic_model(validation_model)
+                            else msgspec.convert(
+                                raw, type=validation_model, strict=False
+                            )
                         )
 
                     elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type]
-                        arguments[name] = validation_model.model_validate(
-                            request.query_params
+                        arguments[name] = (
+                            validation_model.model_validate(request.query_params)
+                            if is_pydantic_model(validation_model)
+                            else msgspec.convert(
+                                request.query_params,
+                                type=validation_model,
+                                strict=False,
+                            )
                         )
 
             if isinstance(route.endpoint, tuple):

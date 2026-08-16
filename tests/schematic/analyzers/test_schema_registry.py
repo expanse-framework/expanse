@@ -6,6 +6,8 @@ from typing import Annotated
 from typing import ClassVar
 from uuid import UUID
 
+import msgspec
+
 from pydantic import BaseModel
 from sqlalchemy import MetaData
 from sqlalchemy.orm import Mapped
@@ -26,6 +28,14 @@ class Color(Enum):
 
 class UserModel(BaseModel):
     """A user model."""
+
+    name: str
+    email: str
+    age: int | None = None
+
+
+class UserStruct(msgspec.Struct):
+    """A user struct."""
 
     name: str
     email: str
@@ -195,3 +205,66 @@ def test_schema_generator_creates_component_references_for_annotated_models() ->
 
     assert "UserModel" in components.schemas
     assert components.schemas["UserModel"].title == "UserModel"
+
+
+def test_schema_generator_handles_msgspec_structs() -> None:
+    components = Components()
+    generator = SchemaRegistry(components)
+
+    reference = generator.generate_from_type(UserStruct)
+
+    assert isinstance(reference, Reference)
+    assert "UserStruct" in components.schemas
+
+    schema = components.schemas["UserStruct"]
+    assert schema.type is not None
+    assert schema.type.name == "object"
+    assert schema.title == "UserStruct"
+    assert "name" in schema.properties
+    assert "email" in schema.properties
+    assert "age" in schema.properties
+
+    assert "name" in schema.required
+    assert "email" in schema.required
+    assert "age" not in schema.required
+
+
+def test_schema_generator_extracts_msgspec_field_descriptions() -> None:
+    class UserWithDocs(msgspec.Struct):
+        """A documented user struct."""
+
+        name: str
+
+    generator = SchemaRegistry(Components())
+    schema = generator.generate_from_msgspec(UserWithDocs)
+
+    assert schema.description == "A documented user struct."
+
+
+def test_schema_generator_handles_nested_msgspec_structs() -> None:
+    class Address(msgspec.Struct):
+        street: str
+        city: str
+
+    class UserWithAddress(msgspec.Struct):
+        name: str
+        address: Address
+
+    components = Components()
+    generator = SchemaRegistry(components)
+    schema = generator.generate_from_msgspec(UserWithAddress)
+
+    assert isinstance(schema, Schema)
+    assert "address" in schema.properties
+    assert isinstance(schema.properties["address"], Reference)
+    assert "Address" in components.schemas
+
+
+def test_schema_generator_creates_component_references_for_annotated_structs() -> None:
+    components = Components()
+    generator = SchemaRegistry(components)
+
+    generator.generate_from_type(Annotated[User, UserStruct])
+
+    assert "UserStruct" in components.schemas
+    assert components.schemas["UserStruct"].title == "UserStruct"

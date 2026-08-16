@@ -5,6 +5,8 @@ from typing import Any
 from typing import get_args
 from typing import get_origin
 
+import msgspec
+
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -13,9 +15,19 @@ from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.url import QueryParameters
 from expanse.pagination.offset.paginator import Paginator
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 
 
 class OffsetPaginationLinks(BaseModel):
+    next: str | None
+    prev: str | None
+    first: str
+    last: str
+    self: str
+
+
+class OffsetPaginationLinksStruct(msgspec.Struct):
     next: str | None
     prev: str | None
     first: str
@@ -127,14 +139,33 @@ class Envelope:
         paginator_class = PaginatorWithLinks if self._with_links else PaginatorModel
         paginator = paginator_class.create(data, request)
 
+        if is_msgspec_struct(model):
+            content = msgspec.to_builtins(
+                msgspec.convert(
+                    paginator, type=model, from_attributes=True, strict=False
+                )
+            )
+
+            return json(content)
+
+        assert is_pydantic_model(model)
+
         return json(model.model_validate(paginator, from_attributes=True).model_dump())
 
-    def get_model(self, model: Any) -> type[BaseModel]:
+    def get_model(self, model: Any) -> type[BaseModel] | type[msgspec.Struct]:
         """
-        Create a Pydantic model for the envelope structure.
+        Create a model for the envelope structure, matching the kind of the
+        item DTO (Pydantic model or msgspec struct), so the whole envelope is
+        serialized through a single, consistent library.
 
         The model is dynamic based on the envelope configuration.
         """
+        if is_msgspec_struct(model):
+            return self._get_msgspec_model(model)
+
+        return self._get_pydantic_model(model)
+
+    def _get_pydantic_model(self, model: Any) -> type[BaseModel]:
         from pydantic import BaseModel
 
         __dict__: dict[str, Any] = {}
@@ -165,6 +196,29 @@ class Envelope:
         base_model = type(model_name, (BaseModel,), __dict__)
 
         return base_model
+
+    def _get_msgspec_model(self, model: Any) -> type[msgspec.Struct]:
+        positive_int = Annotated[int, msgspec.Meta(ge=1)]
+
+        fields: list[tuple[str, Any] | tuple[str, Any, Any]] = [
+            ("items", list[model]),
+            ("previous_page", positive_int | None),
+            ("current_page", positive_int),
+            ("first_page", positive_int),
+            ("last_page", positive_int),
+            ("total", int),
+            ("next_page", positive_int | None, None),
+        ]
+        rename = {"items": "data"}
+
+        model_name: str = (
+            "OffsetEnvelopeWithoutLinks" if not self._with_links else "OffsetEnvelope"
+        )
+
+        if self._with_links:
+            fields.append(("links", OffsetPaginationLinksStruct))
+
+        return msgspec.defstruct(model_name, fields, rename=rename, kw_only=True)
 
 
 __all__ = ["Envelope"]

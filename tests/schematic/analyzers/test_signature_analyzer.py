@@ -1,5 +1,7 @@
 from typing import Annotated
 
+import msgspec
+
 from pydantic import BaseModel
 
 from expanse.http.json import JSON
@@ -11,6 +13,14 @@ from expanse.schematic.analyzers.signature_analyzer import SignatureAnalyzer
 
 class UserModel(BaseModel):
     """A user model."""
+
+    name: str
+    email: str
+    age: int | None = None
+
+
+class UserStruct(msgspec.Struct):
+    """A user struct."""
 
     name: str
     email: str
@@ -46,7 +56,25 @@ def test_signature_analyzer_detects_json_body_with_pydantic():
     assert info.body_parameter is not None
     assert info.body_parameter.name == "user"
     assert info.body_parameter.kind == "body"
-    assert info.body_parameter.pydantic_model == UserModel
+    assert info.body_parameter.validation_model == UserModel
+    assert info.body_parameter.data_source == JSON
+
+
+def test_signature_analyzer_detects_json_body_with_msgspec():
+    """Test that JSON body with a msgspec struct is correctly identified."""
+
+    def handler(user: Annotated[UserStruct, JSON]) -> dict:
+        return {"user": user.name}
+
+    route = Route.post("/users", handler)
+    analyzer = SignatureAnalyzer()
+
+    info = analyzer.analyze(route)
+
+    assert info.body_parameter is not None
+    assert info.body_parameter.name == "user"
+    assert info.body_parameter.kind == "body"
+    assert info.body_parameter.validation_model == UserStruct
     assert info.body_parameter.data_source == JSON
 
 
@@ -64,7 +92,24 @@ def test_signature_analyzer_detects_query_with_pydantic():
     assert len(info.query_parameters) == 1
     assert info.query_parameters[0].name == "filters"
     assert info.query_parameters[0].kind == "query"
-    assert info.query_parameters[0].pydantic_model == UserModel
+    assert info.query_parameters[0].validation_model == UserModel
+
+
+def test_signature_analyzer_detects_query_with_msgspec():
+    """Test that query parameters with a msgspec struct are correctly identified."""
+
+    def handler(filters: Annotated[UserStruct, Query]) -> dict:
+        return {"filters": filters.name}
+
+    route = Route.get("/users", handler)
+    analyzer = SignatureAnalyzer()
+
+    info = analyzer.analyze(route)
+
+    assert len(info.query_parameters) == 1
+    assert info.query_parameters[0].name == "filters"
+    assert info.query_parameters[0].kind == "query"
+    assert info.query_parameters[0].validation_model == UserStruct
 
 
 def test_signature_analyzer_detects_dependencies():

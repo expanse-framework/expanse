@@ -1,5 +1,3 @@
-import contextlib
-
 from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Sequence
@@ -169,21 +167,31 @@ class ResponseAdapter:
             origin = get_origin(type_)
 
             if origin is Annotated:
-                from pydantic import BaseModel
+                from expanse.support._model_types import is_msgspec_struct
+                from expanse.support._model_types import is_pydantic_model
 
                 _, annotation = get_args(type_)
-                is_pydantic_model = False
 
-                with contextlib.suppress(TypeError):
-                    is_pydantic_model = issubclass(annotation, BaseModel)
-
-                if is_pydantic_model:
-                    assert issubclass(annotation, BaseModel)
+                if is_pydantic_model(annotation):
 
                     async def _serializer(model: Any) -> dict[str, Any]:
                         return annotation.model_validate(
                             model, from_attributes=True
                         ).model_dump()
+
+                    serializer = _serializer
+                elif is_msgspec_struct(annotation):
+                    import msgspec
+
+                    async def _serializer(model: Any) -> dict[str, Any]:
+                        return msgspec.to_builtins(
+                            msgspec.convert(
+                                model,
+                                type=annotation,
+                                strict=False,
+                                from_attributes=True,
+                            )
+                        )
 
                     serializer = _serializer
 

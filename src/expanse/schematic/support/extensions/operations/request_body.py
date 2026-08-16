@@ -23,8 +23,8 @@ class RequestBodyExtension(OperationExtension):
         signature_info = route_info.signature
         body_param = signature_info.body_parameter
 
-        if body_param and body_param.pydantic_model:
-            # Create request body with Pydantic model
+        if body_param and body_param.validation_model:
+            # Create request body with a Pydantic model or msgspec struct
             request_body = RequestBody()
             request_body.set_required(body_param.is_required)
 
@@ -35,7 +35,7 @@ class RequestBodyExtension(OperationExtension):
                     request_body.set_description(param_doc.description)
 
             reference, _ = self._schema_registry.get_or_create_component_schema(
-                body_param.pydantic_model
+                body_param.validation_model
             )
             media_type = MediaType(reference)
             content_type = "application/json"
