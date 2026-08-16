@@ -5,10 +5,12 @@ from typing import Annotated
 from typing import Self
 from typing import TypeVar
 
+import msgspec
+
 from pydantic import BaseModel
 
 
-T = TypeVar("T", bound=BaseModel)
+T = TypeVar("T", bound=BaseModel | msgspec.Struct)
 
 if TYPE_CHECKING:
     from typing import Union

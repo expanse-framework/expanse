@@ -9,6 +9,8 @@ from typing import Any
 from typing import Self
 from typing import TypeVar
 
+import msgspec
+
 from cleo.io.outputs.output import Output
 from crashtest.inspector import Inspector
 from pydantic import ValidationError
@@ -23,6 +25,7 @@ from expanse.core.http.exceptions import HTTPException
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
+from expanse.support._model_types import parse_msgspec_validation_error
 
 
 if TYPE_CHECKING:
@@ -37,7 +40,11 @@ class ExceptionHandler(ExceptionHandlerContract):
     def __init__(self, container: Container) -> None:
         self._container = container
 
-        self._dont_report: set[type[Exception]] = {HTTPException, ValidationError}
+        self._dont_report: set[type[Exception]] = {
+            HTTPException,
+            ValidationError,
+            msgspec.ValidationError,
+        }
         self._raise_unhandled_exceptions: bool = False
         self._exception_preparers: dict[type, Callable[[Any], Exception]] = {}
 
@@ -73,6 +80,9 @@ class ExceptionHandler(ExceptionHandlerContract):
 
         if isinstance(e, ValidationError):
             return await self._render_validation_exception(e, request)
+
+        if isinstance(e, msgspec.ValidationError):
+            return await self._render_msgspec_validation_exception(e, request)
 
         return await self._render_exception_response(request, e)
 
@@ -197,6 +207,25 @@ class ExceptionHandler(ExceptionHandlerContract):
                 )
 
             from expanse.http.helpers import json
+
+            return json(content, status_code=422)
+
+        http_exception = HTTPException(422, str(e))
+
+        return await self._render_http_exception(http_exception, request)
+
+    async def _render_msgspec_validation_exception(
+        self, e: msgspec.ValidationError, request: Request
+    ) -> Response:
+        if request.expects_json() or request.is_json():
+            message, loc = parse_msgspec_validation_error(e)
+
+            content = {
+                "code": "validation_error",
+                "detail": [
+                    {"loc": loc, "message": message, "type": "validation_error"}
+                ],
+            }
 
             return json(content, status_code=422)
 

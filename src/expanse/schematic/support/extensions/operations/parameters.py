@@ -3,9 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import override
 
+import msgspec
+
 from expanse.schematic.analyzers.schema_registry import SchemaRegistry
 from expanse.schematic.openapi.parameter import Parameter
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 
 
 if TYPE_CHECKING:
@@ -40,12 +44,12 @@ class ParametersExtension(OperationExtension):
 
         # Query parameters
         for param_info in route_info.signature.query_parameters:
-            if param_info.pydantic_model:
+            if is_pydantic_model(param_info.validation_model):
                 # Generate parameters from Pydantic model fields
                 for (
                     field_name,
                     field_info,
-                ) in param_info.pydantic_model.model_fields.items():
+                ) in param_info.validation_model.model_fields.items():
                     parameter = Parameter(field_name, "query")
                     parameter.set_required(field_info.is_required())
 
@@ -58,6 +62,19 @@ class ParametersExtension(OperationExtension):
                     # Add description from field
                     if field_info.description:
                         parameter.set_description(field_info.description)
+
+                    operation.add_parameter(parameter)
+            elif is_msgspec_struct(param_info.validation_model):
+                # Generate parameters from msgspec struct fields. Field-level
+                # descriptions/constraints (via Annotated[X, msgspec.Meta(...)])
+                # are already surfaced by generate_from_type, so no separate
+                # description wiring is needed here.
+                for struct_field in msgspec.structs.fields(param_info.validation_model):
+                    parameter = Parameter(struct_field.name, "query")
+                    parameter.set_required(struct_field.required)
+
+                    schema = self._schema_registry.generate_from_type(struct_field.type)
+                    parameter.set_schema(schema)
 
                     operation.add_parameter(parameter)
             else:

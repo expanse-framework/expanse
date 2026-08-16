@@ -1,6 +1,7 @@
 from typing import Annotated
 from typing import ClassVar
 
+import msgspec
 import pytest
 
 from pydantic import BaseModel
@@ -52,6 +53,13 @@ class UserSchema(BaseModel):
     email: str
 
 
+class UserStruct(msgspec.Struct):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+
 async def paginated(
     session: AsyncSession,
 ) -> Paginator[Annotated[User, UserSchema]]:
@@ -71,6 +79,30 @@ async def paginated_no_links(
 async def paginated_headers(
     session: AsyncSession,
 ) -> Annotated[Paginator[Annotated[User, UserSchema]], Headers()]:
+    paginator = await session.paginate(select(User).order_by(User.id), per_page=2)
+
+    return paginator
+
+
+async def paginated_msgspec(
+    session: AsyncSession,
+) -> Paginator[Annotated[User, UserStruct]]:
+    paginator = await session.paginate(select(User).order_by(User.id), per_page=2)
+
+    return paginator
+
+
+async def paginated_no_links_msgspec(
+    session: AsyncSession,
+) -> Annotated[Paginator[Annotated[User, UserStruct]], Envelope(with_links=False)]:
+    paginator = await session.paginate(select(User).order_by(User.id), per_page=2)
+
+    return paginator
+
+
+async def paginated_headers_msgspec(
+    session: AsyncSession,
+) -> Annotated[Paginator[Annotated[User, UserStruct]], Headers()]:
     paginator = await session.paginate(select(User).order_by(User.id), per_page=2)
 
     return paginator
@@ -401,5 +433,107 @@ def test_session_pagination_headers_keeps_query_parameters(
             "first_name": "First3",
             "last_name": "Last3",
             "email": "foo3@bar.com",
+        },
+    ]
+
+
+async def test_session_pagination_is_properly_serialized_msgspec(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    assert response.json() == {
+        "data": [
+            {
+                "id": 1,
+                "first_name": "First0",
+                "last_name": "Last0",
+                "email": "foo0@bar.com",
+            },
+            {
+                "id": 2,
+                "first_name": "First1",
+                "last_name": "Last1",
+                "email": "foo1@bar.com",
+            },
+        ],
+        "next_page": 2,
+        "previous_page": None,
+        "current_page": 1,
+        "first_page": 1,
+        "last_page": 26,
+        "total": 51,
+        "links": {
+            "next": "http://testserver/paginated?page=2",
+            "prev": None,
+            "first": "http://testserver/paginated?page=1",
+            "last": "http://testserver/paginated?page=26",
+            "self": "http://testserver/paginated?page=1",
+        },
+    }
+
+
+async def test_session_pagination_with_no_links_msgspec(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_no_links_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    assert response.json() == {
+        "data": [
+            {
+                "id": 1,
+                "first_name": "First0",
+                "last_name": "Last0",
+                "email": "foo0@bar.com",
+            },
+            {
+                "id": 2,
+                "first_name": "First1",
+                "last_name": "Last1",
+                "email": "foo1@bar.com",
+            },
+        ],
+        "next_page": 2,
+        "previous_page": None,
+        "current_page": 1,
+        "first_page": 1,
+        "last_page": 26,
+        "total": 51,
+    }
+
+
+def test_session_pagination_headers_msgspec(router: Router, client: TestClient) -> None:
+    router.get("/paginated", paginated_headers_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "51"
+    links = response.headers["Link"]
+    assert links == ", ".join(
+        [
+            '<http://testserver/paginated?page=2>; rel="next"',
+            '<http://testserver/paginated?page=1>; rel="first"',
+            '<http://testserver/paginated?page=26>; rel="last"',
+            '<http://testserver/paginated?page=1>; rel="self"',
+        ]
+    )
+
+    assert response.json() == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
         },
     ]

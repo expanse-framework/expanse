@@ -14,15 +14,19 @@ from typing import get_args
 from typing import get_origin
 from typing import get_type_hints
 
-from pydantic import BaseModel
-
 from expanse.http.form import Form
 from expanse.http.json import JSON
 from expanse.http.query import Query
 from expanse.http.request import Request
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 
 
 if TYPE_CHECKING:
+    import msgspec
+
+    from pydantic import BaseModel
+
     from expanse.routing.route import Route
 
 
@@ -33,7 +37,7 @@ class ParameterInfo:
     default: Any
     kind: Literal["path", "query", "body", "header", "form", "dependency"]
     is_required: bool
-    pydantic_model: type[BaseModel] | None = None
+    validation_model: type[BaseModel] | type[msgspec.Struct] | None = None
     data_source: type[JSON] | type[Query] | Form | None = None
 
 
@@ -123,14 +127,16 @@ class SignatureAnalyzer:
                 kind="body",
                 is_required=is_required,
                 data_source=Form,
-                pydantic_model=annotation._model,
+                validation_model=annotation._model,
             )
 
-        # Check if it's an Annotated Pydantic model (JSON or Query)
+        # Check if it's an Annotated Pydantic model or msgspec struct (JSON or Query)
         if get_origin(annotation) is Annotated:
             args = get_args(annotation)
-            if len(args) >= 2 and self._is_pydantic_model(args[0]):
-                pydantic_model = args[0]
+            if len(args) >= 2 and (
+                is_pydantic_model(args[0]) or is_msgspec_struct(args[0])
+            ):
+                validation_model = args[0]
                 data_type = args[1]
 
                 # Check if data_type is JSON or Query class
@@ -144,19 +150,19 @@ class SignatureAnalyzer:
                         default=default,
                         kind="body" if is_body else "query",
                         is_required=is_required,
-                        pydantic_model=pydantic_model,
+                        validation_model=validation_model,
                         data_source=data_type,
                     )
 
-        # Check if it's a standalone Pydantic model (assume body)
-        if self._is_pydantic_model(annotation):
+        # Check if it's a standalone Pydantic model or msgspec struct (assume body)
+        if is_pydantic_model(annotation) or is_msgspec_struct(annotation):
             return ParameterInfo(
                 name=name,
                 annotation=annotation,
                 default=default,
                 kind="body",
                 is_required=is_required,
-                pydantic_model=annotation,
+                validation_model=annotation,
             )
 
         # TODO: Support full union types
@@ -184,12 +190,6 @@ class SignatureAnalyzer:
             )
 
         return None
-
-    def _is_pydantic_model(self, annotation: Any) -> bool:
-        try:
-            return isinstance(annotation, type) and issubclass(annotation, BaseModel)
-        except TypeError:
-            return False
 
     def _is_form_parameter(self, annotation: Any) -> bool:
         try:

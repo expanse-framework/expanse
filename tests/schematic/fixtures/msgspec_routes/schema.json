@@ -1,0 +1,460 @@
+{
+  "components": {
+    "schemas": {
+      "CursorPaginationLinksStruct": {
+        "properties": {
+          "next": {
+            "nullable": true,
+            "type": "string"
+          },
+          "prev": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "title": "CursorPaginationLinksStruct",
+        "type": "object"
+      },
+      "OffsetPaginationLinksStruct": {
+        "properties": {
+          "first": {
+            "type": "string"
+          },
+          "last": {
+            "type": "string"
+          },
+          "next": {
+            "nullable": true,
+            "type": "string"
+          },
+          "prev": {
+            "nullable": true,
+            "type": "string"
+          },
+          "self": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "next",
+          "prev",
+          "first",
+          "last",
+          "self"
+        ],
+        "title": "OffsetPaginationLinksStruct",
+        "type": "object"
+      },
+      "UserRequest": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "UserRequest",
+        "type": "object"
+      },
+      "UserResponse": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "description": "Location of the validation error",
+            "items": {
+              "type": "string"
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "The complete error message of the validation error",
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "description": "The type of validation error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "This is a test API.",
+    "title": "API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/cursor-paginated/envelope/default": {
+      "get": {
+        "operationId": "cursor_paginated_envelope_default",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "type": "array"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/CursorPaginationLinksStruct"
+                    },
+                    "next_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links"
+                  ],
+                  "title": "EnvelopeModel",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default cursor paginated envelope example."
+      }
+    },
+    "/api/cursor-paginated/envelope/no-links": {
+      "get": {
+        "operationId": "cursor_paginated_envelope_no_links",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "type": "array"
+                    },
+                    "next_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "previous_cursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "title": "EnvelopeModel",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Cursor paginated example without links in the envelope."
+      }
+    },
+    "/api/cursor-paginated/headers/default": {
+      "get": {
+        "operationId": "cursor_paginated_headers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Link": {
+                "description": "Links to specific pages, in the format defined by\n[RFC 5988](https://tools.ietf.org/html/rfc5988#section-5).\nThis will include a link with relation type `next` to the\nnext page, if there is a next page.                ",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cursor paginated example with links in headers."
+      }
+    },
+    "/api/paginated/envelope/default": {
+      "get": {
+        "operationId": "paginated_envelope_default",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "type": "array"
+                    },
+                    "first_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "last_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/OffsetPaginationLinksStruct"
+                    },
+                    "next_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "previous_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "previous_page",
+                    "current_page",
+                    "first_page",
+                    "last_page",
+                    "total",
+                    "links"
+                  ],
+                  "title": "OffsetEnvelope",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Default paginated envelope example."
+      }
+    },
+    "/api/paginated/envelope/no-links": {
+      "get": {
+        "operationId": "paginated_envelope_no_links",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "current_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/UserResponse"
+                      },
+                      "type": "array"
+                    },
+                    "first_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "last_page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "next_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "previous_page": {
+                      "minimum": 1,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "previous_page",
+                    "current_page",
+                    "first_page",
+                    "last_page",
+                    "total"
+                  ],
+                  "title": "OffsetEnvelopeWithoutLinks",
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Paginated example without links in the envelope."
+      }
+    },
+    "/api/paginated/headers/default": {
+      "get": {
+        "operationId": "paginated_headers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Link": {
+                "description": "Links to specific pages, in the format defined by\n[RFC 5988](https://tools.ietf.org/html/rfc5988#section-5).\nThis will include a link with relation type `next` to the\nnext page, if there is a next page.                ",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paginated example with links in headers."
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "api.user.list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "nullable": true,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "post": {
+        "operationId": "api.user.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        }
+      }
+    }
+  }
+}

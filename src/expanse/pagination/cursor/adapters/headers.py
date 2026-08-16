@@ -5,12 +5,15 @@ from typing import Self
 from typing import get_args
 from typing import get_origin
 
+import msgspec
+
 from expanse.http.helpers import json
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.url import QueryParameters
 from expanse.pagination.cursor.cursor import Cursor
 from expanse.pagination.cursor.cursor_paginator import CursorPaginator
+from expanse.support._model_types import is_msgspec_struct
 
 
 @dataclass(frozen=True)
@@ -47,10 +50,21 @@ class Headers:
 
         if origin is Annotated:
             _, page_model = get_args(item_type)
-            items = [
-                page_model.model_validate(item, from_attributes=True).model_dump()
-                for item in data.items
-            ]
+
+            if is_msgspec_struct(page_model):
+                items = [
+                    msgspec.to_builtins(
+                        msgspec.convert(
+                            item, type=page_model, from_attributes=True, strict=False
+                        )
+                    )
+                    for item in data.items
+                ]
+            else:
+                items = [
+                    page_model.model_validate(item, from_attributes=True).model_dump()
+                    for item in data.items
+                ]
 
         links = []
 

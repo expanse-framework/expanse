@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Annotated
 
+import msgspec
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
@@ -28,6 +30,11 @@ class UserData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserStruct(msgspec.Struct):
+    first_name: str
+    email: str
+
+
 async def serialize_dataclass() -> Foo:
     return Foo("bar")
 
@@ -37,6 +44,14 @@ async def serialize_with_pydantic_model() -> Annotated[User, UserData]:
 
 
 async def serialize_list_with_pydantic_model() -> list[Annotated[User, UserData]]:
+    return [User("John", "Doe", "john@doe.com"), User("Jane", "Doe", "jane@doe.com")]
+
+
+async def serialize_with_msgspec_struct() -> Annotated[User, UserStruct]:
+    return User("John", "Doe", "john@doe.com")
+
+
+async def serialize_list_with_msgspec_struct() -> list[Annotated[User, UserStruct]]:
     return [User("John", "Doe", "john@doe.com"), User("Jane", "Doe", "jane@doe.com")]
 
 
@@ -64,6 +79,29 @@ async def test_list_of_objects_can_be_serialized_with_pydantic_models(
     client: TestClient, router: Router
 ) -> None:
     router.get("/", serialize_list_with_pydantic_model)
+
+    response = client.get("/")
+
+    assert response.json() == [
+        {"first_name": "John", "email": "john@doe.com"},
+        {"first_name": "Jane", "email": "jane@doe.com"},
+    ]
+
+
+async def test_objects_can_be_serialized_with_msgspec_structs(
+    client: TestClient, router: Router
+) -> None:
+    router.get("/", serialize_with_msgspec_struct)
+
+    response = client.get("/")
+
+    assert response.json() == {"first_name": "John", "email": "john@doe.com"}
+
+
+async def test_list_of_objects_can_be_serialized_with_msgspec_structs(
+    client: TestClient, router: Router
+) -> None:
+    router.get("/", serialize_list_with_msgspec_struct)
 
     response = client.get("/")
 

@@ -19,7 +19,8 @@ from typing import get_origin
 from typing import override
 from uuid import UUID
 
-from pydantic import BaseModel
+import msgspec
+
 from pydantic.json_schema import _MODE_TITLE_MAPPING
 from pydantic.json_schema import CoreModeRef
 from pydantic.json_schema import CoreRef
@@ -34,11 +35,14 @@ from expanse.schematic.openapi.types import IntegerType
 from expanse.schematic.openapi.types import NumberType
 from expanse.schematic.openapi.types import ObjectType
 from expanse.schematic.openapi.types import StringType
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 
 
 if typing.TYPE_CHECKING:
     from pathlib import Path
 
+    from pydantic import BaseModel
     from pydantic.fields import FieldInfo
 
     from expanse.schematic.openapi.components import Components
@@ -129,8 +133,12 @@ class SchemaRegistry:
             return Schema().set_nullable(True)
 
         # Pydantic models
-        if self._is_pydantic_model(type_hint):
+        if is_pydantic_model(type_hint):
             return self.generate_from_pydantic(type_hint)
+
+        # msgspec structs
+        if is_msgspec_struct(type_hint):
+            return self.get_or_create_component_schema(type_hint)[0]
 
         # Simple types
         if type_hint in (str, bytes):
@@ -216,7 +224,7 @@ class SchemaRegistry:
             if (
                 hasattr(items_type, "__tablename__")
                 and len(args) >= 2
-                and issubclass(args[1], BaseModel)
+                and (is_pydantic_model(args[1]) or is_msgspec_struct(args[1]))
             ):
                 # Annotated SQLAlchemy model
                 return self.get_or_create_component_schema(args[1])[0]
@@ -247,6 +255,27 @@ class SchemaRegistry:
 
         return schema
 
+    def generate_from_msgspec(self, model: type[msgspec.Struct]) -> Schema:
+        raw_schema = msgspec.json.schema(
+            model, ref_template="#/components/schemas/{name}"
+        )
+
+        defs = raw_schema.get("$defs", {})
+        own_schema = defs.pop(model.__name__, None) or raw_schema
+
+        schema = Schema.from_dict(own_schema, ObjectType())
+
+        assert isinstance(schema, Schema)
+
+        for def_name, raw_def_schema in defs.items():
+            def_schema = Schema.from_dict(raw_def_schema, ObjectType())
+
+            assert isinstance(def_schema, Schema)
+
+            self._components.schemas[def_name] = def_schema
+
+        return schema
+
     def _generate_field_schema(self, field_info: FieldInfo) -> Schema | Reference:
         return self.generate_from_type(field_info.annotation)
 
@@ -269,19 +298,21 @@ class SchemaRegistry:
 
         return schema
 
-    def _is_pydantic_model(self, type_hint: Any) -> bool:
-        try:
-            return isinstance(type_hint, type) and issubclass(type_hint, BaseModel)
-        except TypeError:
-            return False
-
     def get_or_create_component_schema(
-        self, model: type[BaseModel], type: Literal["request", "response"] = "request"
+        self,
+        model: type[BaseModel] | type[msgspec.Struct],
+        type: Literal["request", "response"] = "request",
     ) -> tuple[Reference, Schema]:
         component_name = model.__name__
 
         if component_name not in self._components.schemas:
-            schema = self.generate_from_pydantic(model, type=type)
+            if is_pydantic_model(model):
+                schema = self.generate_from_pydantic(model, type=type)
+            else:
+                assert is_msgspec_struct(model)
+
+                schema = self.generate_from_msgspec(model)
+
             self._components.schemas[component_name] = schema
         else:
             schema = self._components.schemas[component_name]

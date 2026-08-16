@@ -2,6 +2,7 @@ from typing import Annotated
 from typing import ClassVar
 from urllib.parse import urlencode
 
+import msgspec
 import pytest
 
 from pydantic import BaseModel
@@ -65,6 +66,13 @@ class UserSchema(BaseModel):
     email: str
 
 
+class UserStruct(msgspec.Struct):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+
 async def paginated(
     session: AsyncSession,
 ) -> CursorPaginator[Annotated[User, UserSchema]]:
@@ -90,6 +98,38 @@ async def paginated_no_links(
 async def paginated_headers(
     session: AsyncSession,
 ) -> Annotated[CursorPaginator[Annotated[User, UserSchema]], Headers()]:
+    paginator = await session.cursor_paginate(
+        select(User).order_by(User.id), per_page=2
+    )
+
+    return paginator
+
+
+async def paginated_msgspec(
+    session: AsyncSession,
+) -> CursorPaginator[Annotated[User, UserStruct]]:
+    paginator = await session.cursor_paginate(
+        select(User).order_by(User.id), per_page=2
+    )
+
+    return paginator
+
+
+async def paginated_no_links_msgspec(
+    session: AsyncSession,
+) -> Annotated[
+    CursorPaginator[Annotated[User, UserStruct]], Envelope(with_links=False)
+]:
+    paginator = await session.cursor_paginate(
+        select(User).order_by(User.id), per_page=2
+    )
+
+    return paginator
+
+
+async def paginated_headers_msgspec(
+    session: AsyncSession,
+) -> Annotated[CursorPaginator[Annotated[User, UserStruct]], Headers()]:
     paginator = await session.cursor_paginate(
         select(User).order_by(User.id), per_page=2
     )
@@ -373,3 +413,92 @@ async def test_session_cursor_pagination_with_headers_keeps_query_parameters(
     links = parse_link_header(response.headers["Link"])
     next_link = links["next"]
     assert next_link.startswith("http://testserver/paginated?foo=bar&baz=qux&cursor=")
+
+
+async def test_session_cursor_pagination_is_properly_serialized_msgspec(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    data = response.json()
+    assert data["data"] == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
+        },
+    ]
+    assert data["next_cursor"] is not None
+    assert data["previous_cursor"] is None
+    assert (
+        data["links"]["next"]
+        == f"http://testserver/paginated?{urlencode({'cursor': data['next_cursor']})}"
+    )
+    assert data["links"]["prev"] is None
+
+
+async def test_session_cursor_pagination_with_no_links_msgspec(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_no_links_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    data = response.json()
+    assert data["data"] == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
+        },
+    ]
+    assert data["next_cursor"] is not None
+    assert data["previous_cursor"] is None
+    assert "links" not in data
+
+
+async def test_session_cursor_pagination_with_headers_is_properly_serialized_msgspec(
+    router: Router, client: TestClient
+) -> None:
+    router.get("/paginated", paginated_headers_msgspec)
+
+    response = client.get("/paginated", headers={"Accept": "application/json"})
+
+    assert response.json() == [
+        {
+            "id": 1,
+            "first_name": "First0",
+            "last_name": "Last0",
+            "email": "foo0@bar.com",
+        },
+        {
+            "id": 2,
+            "first_name": "First1",
+            "last_name": "Last1",
+            "email": "foo1@bar.com",
+        },
+    ]
+
+    links = parse_link_header(response.headers["Link"])
+
+    assert "next" in links
+    assert links["next"].startswith("http://testserver/paginated?cursor=")
+
+    assert "self" in links
+    assert links["self"] == "http://testserver/paginated"

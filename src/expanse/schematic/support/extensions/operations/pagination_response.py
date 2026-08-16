@@ -17,6 +17,8 @@ from expanse.schematic.openapi.schema import Schema
 from expanse.schematic.openapi.types import ArrayType
 from expanse.schematic.openapi.types import StringType
 from expanse.schematic.support.extensions.operations.extension import OperationExtension
+from expanse.support._model_types import is_msgspec_struct
+from expanse.support._model_types import is_pydantic_model
 
 
 if TYPE_CHECKING:
@@ -110,9 +112,7 @@ class PaginationResponseExtension(OperationExtension):
 
         if isinstance(adapter, Envelope):
             model = adapter.get_model(item_model)
-            schema = self._schema_registry.generate_from_pydantic(
-                model, type="response"
-            )
+            schema = self._generate_envelope_schema(model)
         elif isinstance(adapter, Headers):
             ref, _ = self._schema_registry.get_or_create_component_schema(
                 item_model, type="response"
@@ -147,9 +147,7 @@ class PaginationResponseExtension(OperationExtension):
 
         if isinstance(adapter, Envelope):
             model = adapter.get_model(item_model)
-            schema = self._schema_registry.generate_from_pydantic(
-                model, type="response"
-            )
+            schema = self._generate_envelope_schema(model)
         elif isinstance(adapter, Headers):
             ref, _ = self._schema_registry.get_or_create_component_schema(
                 item_model, type="response"
@@ -170,3 +168,11 @@ class PaginationResponseExtension(OperationExtension):
             headers["Link"] = header
 
         return schema, headers
+
+    def _generate_envelope_schema(self, model: Any) -> Schema:
+        if is_pydantic_model(model):
+            return self._schema_registry.generate_from_pydantic(model, type="response")
+
+        assert is_msgspec_struct(model)
+
+        return self._schema_registry.generate_from_msgspec(model)
