@@ -2,8 +2,10 @@ from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Generator
 from contextlib import contextmanager
+from functools import partial
 from typing import TYPE_CHECKING
 from typing import Annotated
+from typing import Any
 from typing import Self
 from typing import get_args
 from typing import get_origin
@@ -36,6 +38,107 @@ from expanse.types.routing import Endpoint
 
 if TYPE_CHECKING:
     from expanse.core.http.middleware.middleware import Middleware
+
+
+class _ArgumentBinder:
+    """
+    How to pull one endpoint parameter's value out of a request, decided
+    once per route (see `_compile_argument_binders()`) instead of being
+    re-derived from the signature's type annotations on every request.
+    """
+
+    __slots__ = ("is_async", "name", "resolve")
+
+    def __init__(
+        self, name: str, is_async: bool, resolve: Callable[[Request], Any]
+    ) -> None:
+        self.name = name
+        self.is_async = is_async
+        self.resolve = resolve
+
+
+def _bind_path_param(request: Request, *, name: str) -> Any:
+    return request.path_params[name]
+
+
+async def _bind_form(request: Request, *, annotation: type[Form]) -> Form:
+    return annotation(await request.form)
+
+
+async def _bind_json(request: Request, *, model: Any, is_pydantic: bool) -> Any:
+    raw = await request.json
+
+    if is_pydantic:
+        return model.model_validate(raw)
+
+    return msgspec.convert(raw, type=model, strict=False)
+
+
+def _bind_query(request: Request, *, model: Any, is_pydantic: bool) -> Any:
+    if is_pydantic:
+        return model.model_validate(request.query_params)
+
+    return msgspec.convert(request.query_params, type=model, strict=False)
+
+
+def _compile_argument_binders(route: Route) -> list[_ArgumentBinder]:
+    """
+    Precomputes, once per route, how each parameter that needs a value
+    pulled from the request (path params, form/JSON/query-validated models)
+    should be bound. Parameters not covered here are left for DI to
+    resolve.
+    """
+    binders: list[_ArgumentBinder] = []
+
+    for name, parameter in route.signature.parameters.items():
+        if name in route.param_names:
+            binders.append(
+                _ArgumentBinder(name, False, partial(_bind_path_param, name=name))
+            )
+            continue
+
+        annotation = parameter.annotation
+
+        if isinstance(annotation, type) and issubclass(annotation, Form):
+            binders.append(
+                _ArgumentBinder(name, True, partial(_bind_form, annotation=annotation))
+            )
+            continue
+
+        if get_origin(annotation) is not Annotated:
+            continue
+
+        validation_model, data_type = get_args(annotation)
+
+        if not (
+            is_pydantic_model(validation_model) or is_msgspec_struct(validation_model)
+        ):
+            continue
+
+        is_pydantic = is_pydantic_model(validation_model)
+
+        if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type]
+            binders.append(
+                _ArgumentBinder(
+                    name,
+                    True,
+                    partial(
+                        _bind_json, model=validation_model, is_pydantic=is_pydantic
+                    ),
+                )
+            )
+        elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type]
+            binders.append(
+                _ArgumentBinder(
+                    name,
+                    False,
+                    partial(
+                        _bind_query, model=validation_model, is_pydantic=is_pydantic
+                    ),
+                )
+            )
+
+    return binders
 
 
 class Router(RouterContract):
@@ -95,6 +198,8 @@ class Router(RouterContract):
         return route
 
     def add_route(self, route: Route) -> Route:
+        route.argument_binders = _compile_argument_binders(route)
+
         self._finder.add(route)
 
         return route
@@ -158,49 +263,16 @@ class Router(RouterContract):
         return await Pipeline(container).use(pipes).send(request).to(handler)
 
     def _route_handler(self, route: Route, container: Container) -> RequestHandler:
+        binders: list[_ArgumentBinder] = route.argument_binders
+
         async def handler(request: Request) -> Response:
-            arguments = {}
+            arguments: dict[str, Any] = {}
 
-            for name, parameter in route.signature.parameters.items():
-                if name in route.param_names:
-                    arguments[name] = request.path_params[name]
-
-                elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, Form
-                ):
-                    arguments[name] = parameter.annotation(await request.form)
-
-                elif get_origin(parameter.annotation) is Annotated and (
-                    is_pydantic_model(
-                        (origin_args := get_args(parameter.annotation))[0]
-                    )
-                    or is_msgspec_struct(origin_args[0])
-                ):
-                    validation_model = origin_args[0]
-
-                    data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
-
-                    if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type]
-                        raw = await request.json
-
-                        arguments[name] = (
-                            validation_model.model_validate(raw)
-                            if is_pydantic_model(validation_model)
-                            else msgspec.convert(
-                                raw, type=validation_model, strict=False
-                            )
-                        )
-
-                    elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type]
-                        arguments[name] = (
-                            validation_model.model_validate(request.query_params)
-                            if is_pydantic_model(validation_model)
-                            else msgspec.convert(
-                                request.query_params,
-                                type=validation_model,
-                                strict=False,
-                            )
-                        )
+            for binder in binders:
+                if binder.is_async:
+                    arguments[binder.name] = await binder.resolve(request)
+                else:
+                    arguments[binder.name] = binder.resolve(request)
 
             if isinstance(route.endpoint, tuple):
                 instance: type = await container.get(route.endpoint[0])
