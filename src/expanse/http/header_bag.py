@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from collections.abc import MutableMapping
+from functools import lru_cache
 from typing import Literal
 from typing import TypeVar
 from typing import overload
@@ -8,15 +9,19 @@ from typing import overload
 T = TypeVar("T")
 
 
+@lru_cache(maxsize=512)
+def _normalize_header_name(name: str) -> str:
+    return name.lower()
+
+
 class HeaderBag(MutableMapping[str, str]):
-    __slots__ = ("_headers", "_normalized")
+    __slots__ = ("_headers",)
 
     def __init__(self, headers: Mapping[str, str] | None = None) -> None:
         if headers is None:
             headers = {}
 
         self._headers: dict[str, list[str | None]] = {}
-        self._normalized: dict[str, str] = {}
 
         for header_name, header_value in headers.items():
             self.set(header_name, header_value)
@@ -74,12 +79,7 @@ class HeaderBag(MutableMapping[str, str]):
             del self._headers[name]
 
     def _normalize_name(self, name: str) -> str:
-        if name in self._normalized:
-            return self._normalized[name]
-
-        self._normalized[name] = name.lower()
-
-        return self._normalized[name]
+        return _normalize_header_name(name)
 
     def __getitem__(self, name: str) -> str:
         name = self._normalize_name(name)
