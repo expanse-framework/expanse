@@ -43,7 +43,13 @@ class Pipeline:
         _set_container(self._container)
 
         try:
-            pipeline = await self._build_pipeline(handler)
+            # Skip the closure-wrapping loop entirely when there's nothing
+            # to wrap - the empty-pipeline case (no global/route middleware)
+            # is the common one, and exception handling below still applies
+            # unchanged either way.
+            pipeline = (
+                handler if not self._pipes else await self._build_pipeline(handler)
+            )
             return await pipeline(self._request)
         except Exception as e:
             from expanse.contracts.debug.exception_handler import ExceptionHandler
