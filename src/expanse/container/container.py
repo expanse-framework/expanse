@@ -227,7 +227,12 @@ class Container:
         }
 
         self._terminating_callbacks: list[_Callback] = []
-        self._lock = AsyncRLock()
+
+        # Built lazily, on first actual use in _resolve(). ScopedContainer
+        # overrides _resolve() and never acquires this lock at all, so this
+        # keeps every per-request ScopedContainer from constructing (and
+        # immediately discarding) an AsyncRLock it can never use.
+        self._lock: AsyncRLock | None = None
 
     def register(
         self,
@@ -466,6 +471,21 @@ class Container:
     async def _resolve(self, abstract: str) -> Any: ...
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
+        # Fast path: once a binding is built (the overwhelmingly common case
+        # for singletons resolved on every request - Config, Router, and
+        # friends), there's nothing left to protect, so skip the lock
+        # entirely instead of paying for it on every single lookup. This is
+        # safe as a plain double-checked-locking pattern: on a miss here we
+        # still fall through to the locked, authoritative check in
+        # _do_resolve() below, so a not-yet-built singleton is still only
+        # ever built once under concurrent access.
+        alias = self._get_alias(abstract)
+        if alias in self._instances:
+            return self._instances[alias]
+
+        if self._lock is None:
+            self._lock = AsyncRLock()
+
         async with self._lock:
             return await self._do_resolve(abstract)
 
@@ -822,21 +842,24 @@ class ScopedContainer(Container):
         super().__init__()
 
         self._base_container = base_container
+        scoped = base_container._scoped
+
+        # Most requests don't touch any scoped bindings at all, so skip
+        # these copies - built fresh on every request - when there's
+        # nothing to copy, rather than allocating an empty dict/list/dict
+        # via comprehension every time.
 
         # Bind scoped bindings from the base container
-        self._bindings.update(
-            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
-        )
+        if scoped["bindings"]:
+            self._bindings.update({k: {**v} for k, v in scoped["bindings"].items()})
 
         # Setup terminating callbacks
-        self._terminating_callbacks = [
-            *self._base_container._scoped["terminating_callbacks"]
-        ]
+        if scoped["terminating_callbacks"]:
+            self._terminating_callbacks = [*scoped["terminating_callbacks"]]
 
         # Setup resolving callbacks
-        self._after_resolving_callbacks = {
-            **self._base_container._scoped["after_resolving_callbacks"]
-        }
+        if scoped["after_resolving_callbacks"]:
+            self._after_resolving_callbacks = {**scoped["after_resolving_callbacks"]}
 
     def bound(self, abstract: str | type) -> bool:
         return self._base_container.bound(abstract) or super().bound(abstract)
