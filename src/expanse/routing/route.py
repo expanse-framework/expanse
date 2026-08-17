@@ -2,6 +2,7 @@ import inspect
 import re
 import types
 
+from typing import Any
 from typing import Self
 
 from expanse.core.http.middleware.middleware import Middleware
@@ -57,6 +58,11 @@ class Route:
         self._param_names: set[str] | None = None
 
         self._middlewares: list[type[Middleware] | str] = []
+
+        # Populated once by Router.add_route(): how each parameter should be
+        # bound from the request, precomputed instead of being re-derived
+        # from the signature's annotations on every single dispatch.
+        self.argument_binders: list[Any] = []
 
     @classmethod
     def get(cls, path: str, endpoint: Endpoint, *, name: str | None = None) -> Self:
