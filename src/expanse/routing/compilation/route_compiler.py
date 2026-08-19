@@ -1,3 +1,6 @@
+import inspect
+import types
+
 from functools import partial
 from typing import Annotated
 from typing import Any
@@ -15,13 +18,57 @@ from expanse.routing.compilation.compiled_route import CompiledRoute
 from expanse.routing.route import Route
 from expanse.support._model_types import is_msgspec_struct
 from expanse.support._model_types import is_pydantic_model
+from expanse.types.routing import Endpoint
 
 
 class RouteCompiler:
     def compile(self, route: Route) -> CompiledRoute:
-        return CompiledRoute(self._compile_argument_binders(route))
+        handler, signature, is_async = self._compile_handler(route)
 
-    def _compile_argument_binders(self, route: Route) -> list[ArgumentBinder]:
+        return CompiledRoute(
+            handler,
+            signature,
+            is_async,
+            self._compile_argument_binders(route, signature),
+        )
+
+    def _compile_handler(
+        self, route: Route
+    ) -> tuple[Endpoint | tuple[type, str], inspect.Signature, bool]:
+        endpoint = route.endpoint
+
+        if (
+            isinstance(endpoint, types.FunctionType)
+            and "." in endpoint.__qualname__
+            and not inspect.ismethod(endpoint)
+            and "<locals>" not in endpoint.__qualname__
+        ):
+            # We have an instance method, so we will retrieve the corresponding class,
+            # resolve it and call the method.
+            class_name, func_name = endpoint.__qualname__.rsplit(".", maxsplit=1)
+            class_: type = endpoint.__globals__[class_name]
+
+            endpoint = (class_, func_name)
+
+        if isinstance(endpoint, tuple):
+            handler_method = getattr(endpoint[0], endpoint[1])
+            is_async = inspect.iscoroutinefunction(handler_method)
+
+            signature = inspect.signature(handler_method)
+            signature = inspect.Signature(
+                list(signature.parameters.values())[1:],
+                return_annotation=signature.return_annotation,
+            )
+
+        else:
+            is_async = inspect.iscoroutinefunction(endpoint)
+            signature = inspect.signature(endpoint)
+
+        return endpoint, signature, is_async
+
+    def _compile_argument_binders(
+        self, route: Route, signature: inspect.Signature
+    ) -> list[ArgumentBinder]:
         """
         Precomputes, once per route, how each parameter that needs a value
         pulled from the request (path params, form/JSON/query-validated models)
@@ -30,7 +77,7 @@ class RouteCompiler:
         """
         binders: list[ArgumentBinder] = []
 
-        for name, parameter in route.signature.parameters.items():
+        for name, parameter in signature.parameters.items():
             if name in route.param_names:
                 binders.append(
                     ArgumentBinder(
