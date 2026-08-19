@@ -1,6 +1,4 @@
-import inspect
 import re
-import types
 
 from typing import TYPE_CHECKING
 from typing import Self
@@ -25,36 +23,8 @@ class Route:
     ) -> None:
         self.path: str = path
         self._compiled: CompiledRoute | None = None
-
-        self.signature: inspect.Signature
-        if (
-            isinstance(endpoint, types.FunctionType)
-            and "." in endpoint.__qualname__
-            and not inspect.ismethod(endpoint)
-            and "<locals>" not in endpoint.__qualname__
-        ):
-            # We have an instance method, so we will retrieve the corresponding class,
-            # resolve it and call the method.
-            class_name, func_name = endpoint.__qualname__.rsplit(".", maxsplit=1)
-            class_: type = endpoint.__globals__[class_name]
-
-            endpoint = (class_, func_name)
-
-        if isinstance(endpoint, tuple):
-            handler_method = getattr(endpoint[0], endpoint[1])
-            self.is_async = inspect.iscoroutinefunction(handler_method)
-
-            signature = inspect.signature(handler_method)
-            self.signature = inspect.Signature(
-                list(signature.parameters.values())[1:],
-                return_annotation=signature.return_annotation,
-            )
-
-        else:
-            self.is_async = inspect.iscoroutinefunction(endpoint)
-            self.signature = inspect.signature(endpoint)
-
         self.endpoint: Endpoint | tuple[type, str] = endpoint
+
         if isinstance(method, str):
             method = [method]
 

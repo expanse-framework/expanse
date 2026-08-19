@@ -149,32 +149,33 @@ class Router(RouterContract):
 
     def _route_handler(self, route: Route, container: Container) -> RequestHandler:
         async def handler(request: Request) -> Response:
-            arguments = await route.compile().bind(request)
+            compiled = route.compile()
+            arguments, _ = await compiled.bind(request)
 
-            if isinstance(route.endpoint, tuple):
-                instance: type = await container.get(route.endpoint[0])
-                endpoint = getattr(instance, route.endpoint[1])
+            if isinstance(compiled.handler, tuple):
+                instance: type = await container.get(compiled.handler[0])
+                handler = getattr(instance, compiled.handler[1])
             else:
-                endpoint = route.endpoint
+                handler = compiled.handler
 
             positional, keywords = await container._resolve_signature(
-                route.signature, kwargs=arguments, callable=endpoint
+                compiled.signature, kwargs=arguments, callable=handler
             )
 
-            if route.is_async:
-                raw_response = await endpoint(*positional, **keywords)
-            elif not should_run_as_async(endpoint):
-                warn_about_implicit_async_safe_status(endpoint, self._config)
+            if compiled.is_async:
+                raw_response = await handler(*positional, **keywords)
+            elif not should_run_as_async(handler):
+                warn_about_implicit_async_safe_status(handler, self._config)
 
-                raw_response = endpoint(*positional, **keywords)
+                raw_response = handler(*positional, **keywords)
             else:
-                raw_response = await sync_to_async(endpoint, *positional, **keywords)
+                raw_response = await sync_to_async(handler, *positional, **keywords)
 
             # Do not go through the response adapter if the response is already a Response instance
             if isinstance(raw_response, Response):
                 return raw_response
 
-            declared_response_type = route.signature.return_annotation
+            declared_response_type = compiled.signature.return_annotation
 
             adapter = await container.get(ResponseAdapter)
 
