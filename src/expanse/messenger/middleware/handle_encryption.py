@@ -34,7 +34,7 @@ class HandleEncryption:
         self, envelope: Envelope, next_call: Callable[[Envelope], Awaitable[Envelope]]
     ) -> Envelope:
         if envelope.has_stamp(ReceivedStamp):
-            if not envelope.has_stamp(SensitiveStamp):
+            if not envelope.has_stamp(EncryptedStamp):
                 return await next_call(envelope)
 
             return await next_call(self._decrypt(envelope))
@@ -55,7 +55,7 @@ class HandleEncryption:
         # and the same stamps as the original envelope.
         message = EncryptedMessage(data=encrypted_payload)
 
-        return Envelope.wrap(message, stamps=[*envelope.stamps(), EncryptedStamp()])
+        return Envelope.wrap(message, stamps=[EncryptedStamp()])
 
     def _decrypt(self, envelope: Envelope) -> Envelope:
         stamp = envelope.stamp(EncryptedStamp)
