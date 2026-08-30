@@ -137,12 +137,13 @@ class Worker:
         async def consume(concurrent: bool = True) -> None:
             worker_transport = transport
 
-            if isinstance(worker_transport, WorkerAwareTransport) and concurrent:
+            if concurrent:
                 worker_id = generate_random_string(8, restricted=True)
                 context = await self._container.get(Context)
                 context["worker.id"] = worker_id
 
-                worker_transport = worker_transport.clone_for_worker(worker_id)
+                if isinstance(transport, WorkerAwareTransport):
+                    worker_transport = transport.clone_for_worker(worker_id)
 
             while not self._stop_event.is_set():
                 if limit is not None and handled_messages >= limit:
@@ -430,12 +431,15 @@ class Worker:
                 return envelope
 
             # Build the middleware pipeline and process the envelope through it.
+            # We need to reverse the middleware stack to ensure messages are properly
+            # processed. For instance, if messages with a context to propagate have been
+            # encrypted, we need to decrypt them first.
             return await (
                 Pipeline[Envelope, Envelope]()
                 .use(
                     [
                         (await container.get(m)).handle
-                        for m in self._middleware_stack.middleware
+                        for m in self._middleware_stack.middleware[::-1]
                     ]
                 )
                 .send(envelope.with_stamps(ReceivedStamp()))
@@ -470,7 +474,7 @@ class Worker:
             await UniqueLock(await self._container.get(Cache)).release(envelope)
 
     def _has_already_been_handled(
-        self, envelope: Envelope, handler: MessageHandler
+        self, envelope: Envelope, handler: MessageHandler[Any]
     ) -> bool:
         handler_identifier = f"{handler.__module__}.{handler.__qualname__}"
         for handled_stamp in envelope.stamps(HandledStamp):

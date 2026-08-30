@@ -2,6 +2,7 @@ import logging
 
 from collections.abc import AsyncIterator
 from typing import Self
+from typing import override
 
 import msgspec
 
@@ -45,6 +46,7 @@ class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
             extra={"group": config.group, "consumer": config.consumer},
         )
 
+    @override
     def clone_for_worker(self, worker_id: str) -> Self:
         config = self._config.model_copy(
             update={"consumer": f"{self._config.consumer}-{worker_id}"}

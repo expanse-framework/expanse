@@ -6,3 +6,5 @@ class EncryptedStamp:
     """
     A stamp used to mark messages as encrypted.
     """
+
+    purpose: str

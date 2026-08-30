@@ -26,6 +26,10 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
+from expanse.encryption.encryption_manager import EncryptionManager
+from expanse.encryption.encryptor_factory import EncryptorFactory
+from expanse.encryption.key import Key
+from expanse.encryption.key_chain import KeyChain
 from expanse.jobs.asynchronous.job import Job as AsyncJob
 from expanse.jobs.stamps.job import JobStamp
 from expanse.logging.context import Context
@@ -35,6 +39,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.locks.unique import UniqueLock
+from expanse.messenger.middleware.handle_encryption import HandleEncryption
 from expanse.messenger.middleware.handle_failed_decoding import HandleFailedDecoding
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.middleware.propagate_context import PropagateContext
@@ -46,6 +51,7 @@ from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
+from expanse.messenger.stamps.sensitive import SensitiveStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
@@ -58,6 +64,7 @@ from expanse.serialization.serialization_manager import SerializationManager
 from expanse.serialization.serializers.dataclass import DataclassSerializer
 from expanse.serialization.serializers.pickle import PickleSerializer
 from expanse.support._utils import class_to_name
+from expanse.support.asynchronous.pipeline import Pipeline
 
 
 class ContextLogRecord(Protocol):
@@ -1538,3 +1545,48 @@ async def test_worker_can_handle_message_decoding_errors(
         "body": b"",
         "headers": {"stamps": []},
     }
+
+
+async def test_worker_processes_messages_through_a_reversed_middleware_stack(
+    worker: Worker,
+    transport_manager: TransportManager,
+    middleware_stack: MiddlewareStack,
+    container: Container,
+    serializer: Serializer,
+    registry: Registry,
+) -> None:
+    encryption = EncryptionManager(EncryptorFactory(KeyChain([Key(b"k" * 32)])))
+    context = Context()
+    container.instance(Context, context)
+    container.instance(EncryptionManager, encryption)
+    middleware_stack.use([PropagateContext, HandleEncryption])
+
+    transport = await transport_manager.transport()
+    assert isinstance(transport, MemoryTransport)
+    await (
+        Pipeline[Envelope, Envelope]()
+        .use(
+            [
+                PropagateContext(Context(foo="bar")).handle,
+                HandleEncryption(encryption, serializer).handle,
+            ]
+        )
+        .send(Envelope.wrap(WorkerMessage(value="baz"), stamps=[SensitiveStamp()]))
+        .to(transport.send)
+        .run()
+    )
+
+    assert len(transport.sent) == 1
+
+    foo: str | None = None
+
+    async def handler(message: WorkerMessage, context: Context) -> None:
+        nonlocal foo
+
+        foo = context.get("foo")
+
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert foo == "bar"

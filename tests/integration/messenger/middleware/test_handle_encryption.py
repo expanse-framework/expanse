@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from expanse.core.application import Application
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor_factory import EncryptorFactory
 from expanse.encryption.key import Key
 from expanse.encryption.key_chain import KeyChain
@@ -27,8 +28,10 @@ async def next_call(envelope: Envelope) -> Envelope:
 
 
 @pytest.fixture()
-def encryption() -> EncryptorFactory:
-    return EncryptorFactory(KeyChain([Key(b"k" * 32)]), salt=b"s" * 32)
+def encryption() -> EncryptionManager:
+    return EncryptionManager(
+        EncryptorFactory(KeyChain([Key(b"k" * 32)]), salt=b"s" * 32)
+    )
 
 
 @pytest.fixture()
@@ -40,7 +43,7 @@ def serializer() -> Serializer:
 
 
 async def test_middleware_handles_encryption_and_decryption_properly(
-    encryption: EncryptorFactory, serializer: Serializer
+    encryption: EncryptionManager, serializer: Serializer
 ) -> None:
     middleware = HandleEncryption(encryption, serializer)
 
@@ -69,7 +72,7 @@ async def test_middleware_handles_encryption_and_decryption_properly(
 
 
 async def test_middleware_does_not_encrypt_envelope_without_sensitive_stamp(
-    app: Application, encryption: EncryptorFactory, serializer: Serializer
+    app: Application, encryption: EncryptionManager, serializer: Serializer
 ) -> None:
     app.config["app.secret_key"] = "k" * 32
     app.config["encryption"] = {
