@@ -5,12 +5,13 @@ from typing import Any
 
 import msgspec
 
-from expanse.contracts.encryption.encryptor_factory import EncryptorFactory
 from expanse.contracts.messenger.serializer import Serializer
+from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.encrypted import EncryptedStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
+from expanse.support._utils import class_to_name
 from expanse.types.messenger import EncodedEnvelope
 
 
@@ -24,10 +25,10 @@ class HandleEncryption:
     Middleware to encrypt/decrypt messages upon sending and reception.
     """
 
-    _purpose: bytes = b"expanse/messenger/encryption"
+    _purpose: str = "expanse/messenger/encryption"
 
-    def __init__(self, encryption: EncryptorFactory, serializer: Serializer) -> None:
-        self._encryption: EncryptorFactory = encryption
+    def __init__(self, encryption: EncryptionManager, serializer: Serializer) -> None:
+        self._encryption: EncryptionManager = encryption
         self._serializer: Serializer = serializer
 
     async def handle(
@@ -48,14 +49,14 @@ class HandleEncryption:
         # We need to serialize the message before encrypting it.
         encoded_envelope = self._serializer.encode(envelope)
         payload = msgspec.json.encode(encoded_envelope).decode()
-        encryptor = self._encryption.make(purpose=self._purpose)
-        encrypted_payload = encryptor.encrypt(payload)
+        purpose = f"{self._purpose}/{class_to_name(type(envelope.open()))}"
+        encrypted_payload = self._encryption.encrypt(payload, purpose=purpose)
 
         # Create a new envelope with the encrypted message
         # and the same stamps as the original envelope.
         message = EncryptedMessage(data=encrypted_payload)
 
-        return Envelope.wrap(message, stamps=[EncryptedStamp()])
+        return Envelope.wrap(message, stamps=[EncryptedStamp(purpose=purpose)])
 
     def _decrypt(self, envelope: Envelope) -> Envelope:
         stamp = envelope.stamp(EncryptedStamp)
@@ -64,8 +65,9 @@ class HandleEncryption:
         message = envelope.open()
         assert isinstance(message, EncryptedMessage)
 
-        encryptor = self._encryption.make(purpose=self._purpose)
-        decrypted_payload = encryptor.decrypt(message.data)
+        decrypted_payload = self._encryption.decrypt(
+            message.data, purpose=stamp.purpose
+        )
 
         decoded_envelope = msgspec.json.decode(
             decrypted_payload.encode(),
