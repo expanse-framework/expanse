@@ -65,7 +65,7 @@ class SignatureAnalyzer:
         # Resolve string annotations to actual types
         try:
             type_hints = get_type_hints(func, include_extras=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort type hint resolution
             # If we can't resolve type hints, fall back to raw annotations
             type_hints = {}
 
@@ -199,6 +199,6 @@ class SignatureAnalyzer:
 
     def _is_query_parameter(self, annotation: Any) -> bool:
         try:
-            return isinstance(annotation, type) and issubclass(annotation, Query)  # type: ignore[arg-type]
+            return isinstance(annotation, type) and issubclass(annotation, Query)  # type: ignore[arg-type, misc]
         except TypeError:
             return False

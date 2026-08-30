@@ -125,7 +125,7 @@ class RouteGroup(Registrar):
             if not route.path:
                 route_path = self.prefix
             else:
-                route_path = "/".join([self.prefix, route.path]).replace("//", "/")
+                route_path = f"{self.prefix}/{route.path}".replace("//", "/")
         else:
             route_path = route.path
 

@@ -50,7 +50,7 @@ class Form[T: BaseModel | msgspec.Struct]:
             form_data = self._submitted
 
         if self._model and is_pydantic_model(self._model):
-            for field_name, _field_info in self._model.model_fields.items():
+            for field_name in self._model.model_fields:
                 self.fields[field_name] = Field(
                     name=field_name, value=form_data.get(field_name)
                 )

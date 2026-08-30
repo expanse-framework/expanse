@@ -50,11 +50,11 @@ def test_a_named_connection_can_be_injected(
         "connections": {
             "default": {
                 "driver": "redis",
-                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/0",
+                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/0",
             },
             "no_backoff": {
                 "driver": "redis",
-                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/1",
+                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/1",
                 "backoff": None,
             },
         },

@@ -582,9 +582,9 @@ class Request:
         headers = base_scope["headers"]
         header_names = {header[0] for header in headers}
 
-        for default_header in default_headers:
+        for default_header, default_value in default_headers.items():
             if default_header not in header_names:
-                headers.append((default_header, default_headers[default_header]))
+                headers.append((default_header, default_value))
 
         url = URL(raw_url)
 

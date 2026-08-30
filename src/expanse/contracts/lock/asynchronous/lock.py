@@ -1,5 +1,6 @@
 from abc import ABC
 from abc import abstractmethod
+from typing import Self
 
 
 class Lock(ABC):
@@ -41,7 +42,7 @@ class Lock(ABC):
         """
         ...
 
-    async def __aenter__(self) -> "Lock":
+    async def __aenter__(self) -> Self:
         await self.acquire()
 
         return self

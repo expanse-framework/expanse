@@ -3,7 +3,6 @@ import os
 from collections.abc import Iterable
 from collections.abc import Mapping
 from tempfile import SpooledTemporaryFile
-from typing import Any
 from typing import NamedTuple
 from urllib.parse import parse_qsl
 from urllib.parse import urlencode
@@ -47,7 +46,7 @@ class ContentType:
     def __str__(self) -> str:
         return self.type + "".join(f"; {k}={v}" for k, v in self.options.items())
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, str):
             return NotImplemented
         return self.type == other

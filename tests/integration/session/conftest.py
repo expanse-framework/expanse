@@ -33,11 +33,11 @@ async def setup_databases(
             "sqlite": {"driver": "sqlite", "database": tmp_path.joinpath("db.sqlite")},
             "postgresql": {
                 "driver": "postgresql",
-                "url": f"postgresql://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', 5432)}/expanse",
+                "url": f"postgresql://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', '5432')}/expanse",
             },
             "mysql": {
                 "driver": "mysql",
-                "url": f"mysql://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', 3306)}/expanse",
+                "url": f"mysql://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', '3306')}/expanse",
             },
         },
     }

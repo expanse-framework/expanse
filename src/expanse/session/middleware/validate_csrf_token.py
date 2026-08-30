@@ -52,7 +52,7 @@ class ValidateCSRFToken:
         if not token and (header := request.headers.get("X-XSRF-TOKEN")):
             try:
                 token = self._encryption.decrypt(header)
-            except Exception:
+            except Exception:  # noqa: BLE001 - an undecryptable token is simply invalid
                 token = ""
 
         return token

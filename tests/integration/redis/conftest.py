@@ -20,7 +20,7 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
         "connection": "default",
         "connections": {
             "default": {
-                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/0"
+                "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/0"
             }
         },
     }
@@ -37,7 +37,7 @@ async def setup_redis(app: Application) -> AsyncGenerator[None]:
                     "connection": "connection-0",
                     "connections": {
                         f"connection-{i}": {
-                            "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/{i}"
+                            "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/{i}"
                         }
                         for i in range(16)
                     },

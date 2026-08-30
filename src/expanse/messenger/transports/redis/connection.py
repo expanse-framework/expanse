@@ -152,7 +152,7 @@ class Connection:
                 message_ids=[message_id],
                 justid=True,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - surfaced as TransportError
             raise TransportError(
                 f"Failed to keep message with ID {message_id} alive: {e}"
             )
@@ -181,7 +181,7 @@ class Connection:
                 # If the message is not yet due, we put it back in the sorted set and break the loop to wait for the next check.
                 try:
                     await self._connection.zadd(self._queue, {message: score}, nx=True)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - surfaced as TransportError
                     raise TransportError(
                         f"Failed to re-add delayed message to Redis sorted set: {e}"
                     )
@@ -199,7 +199,7 @@ class Connection:
 
             try:
                 await self.add(body, headers)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - surfaced as TransportError
                 raise TransportError(
                     f"Failed to add delayed message to Redis stream: {e}"
                 )
@@ -255,7 +255,7 @@ class Connection:
                 1,
                 idle=self._config.idle_time * 1000,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - surfaced as TransportError
             raise TransportError(
                 f"Failed to retrieve pending messages from Redis stream: {e}"
             )
@@ -286,7 +286,7 @@ class Connection:
                 message_ids=[pending[0]["message_id"]],
                 justid=True,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - surfaced as TransportError
             raise TransportError(
                 f"Failed to claim pending message with ID {pending[0]['message_id']}: {e}"
             )

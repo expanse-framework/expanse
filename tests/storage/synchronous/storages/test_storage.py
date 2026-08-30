@@ -209,10 +209,8 @@ def test_as_download_iterator_yields_multiple_chunks_for_large_file(
 
     response = store.as_download("large.bin")
 
-    chunks: list[bytes] = []
     it = cast("Callable[[], Iterable[bytes]]", response.iterator)
-    for chunk in it():
-        chunks.append(chunk)
+    chunks: list[bytes] = list(it())
 
     assert len(chunks) > 1, "large file should be streamed in multiple chunks"
     assert b"".join(chunks) == content

@@ -203,7 +203,8 @@ class Migrator:
                 try:
                     path = Path(status_msg[11:]).relative_to(self._app.base_path)
                     status_msg = f"Generating <c1>{path}</c1>"
-                except Exception:
+                except ValueError:
+                    # The path is not relative to the base path
                     pass
             elif status_msg.startswith("Creating directory "):
                 try:
@@ -216,7 +217,8 @@ class Migrator:
                             path = Path(m.group(1))
 
                         status_msg = f"Creating directory <c1>{path}</c1>"
-                except Exception:
+                except ValueError:
+                    # The path is not relative to the base path
                     pass
 
             status_msg = f"{status_msg}..."

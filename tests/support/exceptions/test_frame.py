@@ -27,7 +27,7 @@ def test_frame() -> None:
 
     try:
         nested_exception()
-    except Exception as e:
+    except RuntimeError as e:
         assert e.__traceback__ is not None
         frame_info = inspect.getinnerframes(e.__traceback__)[0]
         other_frame = Frame(frame_info)

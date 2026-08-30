@@ -46,7 +46,7 @@ class Message:
     def decode(cls, value: str) -> "Message":
         try:
             decoded = urlsafe_b64decode(value.encode()).decode()
-        except Exception:
+        except (ValueError, TypeError):
             raise MessageDecodeError("Invalid message")
 
         return cls.load(decoded)

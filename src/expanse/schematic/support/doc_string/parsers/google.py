@@ -10,7 +10,9 @@ class GoogleDocStringParser(DocStringParser):
     @classmethod
     def can_handle(cls, doc_string: str) -> bool:
         return (
-            re.search(r"(Args|Returns|Raises|Yields|Examples):\s*$", doc_string, re.M)
+            re.search(
+                r"(Args|Returns|Raises|Yields|Examples):\s*$", doc_string, re.MULTILINE
+            )
             is not None
         )
 

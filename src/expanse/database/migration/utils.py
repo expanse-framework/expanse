@@ -89,7 +89,7 @@ class IOHandler(logging.Handler):
                 self._io.write_error_line(msg)
             elif msg:
                 self._io.write_line(msg)
-        except Exception:
+        except Exception:  # noqa: BLE001 - logging handlers must never propagate
             self.handleError(record)
 
 

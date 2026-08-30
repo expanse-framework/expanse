@@ -65,7 +65,7 @@ class Serializer(SerializerContract):
             try:
                 stamp: Stamp = self._decode(raw_stamp)
                 stamps.append(stamp)
-            except Exception:
+            except Exception:  # noqa: BLE001 - any decode failure is a decoding error
                 raise MessageDecodingFailedError(
                     "Failed to decode stamp",
                     encoded_envelope=encoded_envelope,

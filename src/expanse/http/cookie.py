@@ -116,7 +116,7 @@ class Cookie:
     def max_age(self) -> int:
         max_age: int = int(self._expires - time.time())
 
-        return max_age if max_age > 0 else 0
+        return max(0, max_age)
 
     def with_value(self, value: str | None) -> Self:
         """
@@ -189,10 +189,10 @@ class Cookie:
 
     def _clone(
         self,
-        value: str | None | EllipsisType = ...,
+        value: str | EllipsisType | None = ...,
         expires: int | datetime | EllipsisType = ...,
-        domain: str | None | EllipsisType = ...,
-        path: str | None | EllipsisType = ...,
+        domain: str | EllipsisType | None = ...,
+        path: str | EllipsisType | None = ...,
         secure: bool | EllipsisType = ...,
         http_only: bool | EllipsisType = ...,
         same_site: SameSite | EllipsisType = ...,
@@ -214,8 +214,7 @@ class Cookie:
         if isinstance(expires, datetime):
             expires = int(expires.timestamp())
 
-        if expires < 0:
-            expires = 0
+        expires = max(expires, 0)
 
         return expires
 
