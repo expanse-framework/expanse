@@ -13,7 +13,7 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel | msgspec.Struct)
 
 if TYPE_CHECKING:
-    Query = T
+    type Query[T: BaseModel | msgspec.Struct] = T
 else:
 
     class Query:

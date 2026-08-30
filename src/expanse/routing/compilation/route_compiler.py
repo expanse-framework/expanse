@@ -109,7 +109,7 @@ class RouteCompiler:
 
             is_pydantic = is_pydantic_model(validation_model)
 
-            if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type]
+            if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type, misc]
                 binders.append(
                     ArgumentBinder(
                         name,
@@ -121,7 +121,7 @@ class RouteCompiler:
                         ),
                     )
                 )
-            elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type]
+            elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type, misc]
                 binders.append(
                     ArgumentBinder(
                         name,

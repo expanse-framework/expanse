@@ -199,6 +199,6 @@ class SignatureAnalyzer:
 
     def _is_query_parameter(self, annotation: Any) -> bool:
         try:
-            return isinstance(annotation, type) and issubclass(annotation, Query)  # type: ignore[arg-type]
+            return isinstance(annotation, type) and issubclass(annotation, Query)  # type: ignore[arg-type, misc]
         except TypeError:
             return False

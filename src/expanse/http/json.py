@@ -13,7 +13,7 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel | msgspec.Struct)
 
 if TYPE_CHECKING:
-    JSON = T
+    type JSON[T: BaseModel | msgspec.Struct] = T
 else:
 
     class JSON:
