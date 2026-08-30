@@ -37,8 +37,8 @@ class ParameterInfo:
     default: Any
     kind: Literal["path", "query", "body", "header", "form", "dependency"]
     is_required: bool
-    validation_model: type[BaseModel] | type[msgspec.Struct] | None = None
-    data_source: type[JSON] | type[Query] | Form | None = None
+    validation_model: type[BaseModel | msgspec.Struct] | None = None
+    data_source: type[JSON | Query] | Form | None = None
 
 
 @dataclass
@@ -53,7 +53,7 @@ class SignatureInfo:
 
 class SignatureAnalyzer:
     def analyze(self, route: Route) -> SignatureInfo:
-        signature = route.signature
+        signature = route.compile().signature
         info = SignatureInfo()
 
         # Get the actual function for type hint resolution

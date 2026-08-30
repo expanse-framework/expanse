@@ -1,11 +1,14 @@
-import inspect
 import re
-import types
 
+from typing import TYPE_CHECKING
 from typing import Self
 
 from expanse.core.http.middleware.middleware import Middleware
 from expanse.types.routing import Endpoint
+
+
+if TYPE_CHECKING:
+    from expanse.routing.compilation.compiled_route import CompiledRoute
 
 
 class Route:
@@ -19,36 +22,9 @@ class Route:
         name: str | None = None,
     ) -> None:
         self.path: str = path
-
-        self.signature: inspect.Signature
-        if (
-            isinstance(endpoint, types.FunctionType)
-            and "." in endpoint.__qualname__
-            and not inspect.ismethod(endpoint)
-            and "<locals>" not in endpoint.__qualname__
-        ):
-            # We have an instance method, so we will retrieve the corresponding class,
-            # resolve it and call the method.
-            class_name, func_name = endpoint.__qualname__.rsplit(".", maxsplit=1)
-            class_: type = endpoint.__globals__[class_name]
-
-            endpoint = (class_, func_name)
-
-        if isinstance(endpoint, tuple):
-            handler_method = getattr(endpoint[0], endpoint[1])
-            self.is_async = inspect.iscoroutinefunction(handler_method)
-
-            signature = inspect.signature(handler_method)
-            self.signature = inspect.Signature(
-                list(signature.parameters.values())[1:],
-                return_annotation=signature.return_annotation,
-            )
-
-        else:
-            self.is_async = inspect.iscoroutinefunction(endpoint)
-            self.signature = inspect.signature(endpoint)
-
+        self._compiled: CompiledRoute | None = None
         self.endpoint: Endpoint | tuple[type, str] = endpoint
+
         if isinstance(method, str):
             method = [method]
 
@@ -115,3 +91,15 @@ class Route:
         self._middlewares = list(middlewares) + self._middlewares
 
         return self
+
+    def compile(self) -> "CompiledRoute":
+        if self._compiled is not None:
+            return self._compiled
+
+        from expanse.routing.compilation.route_compiler import RouteCompiler
+
+        compiler = RouteCompiler()
+
+        self._compiled = compiler.compile(self)
+
+        return self._compiled

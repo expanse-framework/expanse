@@ -3,21 +3,13 @@ from collections.abc import Callable
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-from typing import Annotated
 from typing import Self
-from typing import get_args
-from typing import get_origin
-
-import msgspec
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.routing.route_collection import RouteCollection
 from expanse.contracts.routing.router import Router as RouterContract
 from expanse.core.http.exceptions import HTTPException
-from expanse.http.form import Form
-from expanse.http.json import JSON
-from expanse.http.query import Query
 from expanse.http.request import Request
 from expanse.http.response import Response
 from expanse.http.response_adapter import ResponseAdapter
@@ -28,8 +20,6 @@ from expanse.routing.route_group import RouteGroup
 from expanse.support._concurrency import should_run_as_async
 from expanse.support._concurrency import sync_to_async
 from expanse.support._concurrency import warn_about_implicit_async_safe_status
-from expanse.support._model_types import is_msgspec_struct
-from expanse.support._model_types import is_pydantic_model
 from expanse.types.http.middleware import RequestHandler
 from expanse.types.routing import Endpoint
 
@@ -159,73 +149,33 @@ class Router(RouterContract):
 
     def _route_handler(self, route: Route, container: Container) -> RequestHandler:
         async def handler(request: Request) -> Response:
-            arguments = {}
+            compiled = route.compile()
+            arguments, _ = await compiled.bind(request)
 
-            for name, parameter in route.signature.parameters.items():
-                if name in route.param_names:
-                    arguments[name] = request.path_params[name]
-
-                elif isinstance(parameter.annotation, type) and issubclass(
-                    parameter.annotation, Form
-                ):
-                    arguments[name] = parameter.annotation(await request.form)
-
-                elif get_origin(parameter.annotation) is Annotated and (
-                    is_pydantic_model(
-                        (origin_args := get_args(parameter.annotation))[0]
-                    )
-                    or is_msgspec_struct(origin_args[0])
-                ):
-                    validation_model = origin_args[0]
-
-                    data_type: type[JSON] | type[Query] | JSON | Query = origin_args[1]
-
-                    if isinstance(data_type, JSON) or issubclass(data_type, JSON):  # type: ignore[arg-type]
-                        raw = await request.json
-
-                        arguments[name] = (
-                            validation_model.model_validate(raw)
-                            if is_pydantic_model(validation_model)
-                            else msgspec.convert(
-                                raw, type=validation_model, strict=False
-                            )
-                        )
-
-                    elif isinstance(data_type, Query) or issubclass(data_type, Query):  # type: ignore[arg-type]
-                        arguments[name] = (
-                            validation_model.model_validate(request.query_params)
-                            if is_pydantic_model(validation_model)
-                            else msgspec.convert(
-                                request.query_params,
-                                type=validation_model,
-                                strict=False,
-                            )
-                        )
-
-            if isinstance(route.endpoint, tuple):
-                instance: type = await container.get(route.endpoint[0])
-                endpoint = getattr(instance, route.endpoint[1])
+            if isinstance(compiled.handler, tuple):
+                instance: type = await container.get(compiled.handler[0])
+                handler = getattr(instance, compiled.handler[1])
             else:
-                endpoint = route.endpoint
+                handler = compiled.handler
 
             positional, keywords = await container._resolve_signature(
-                route.signature, kwargs=arguments, callable=endpoint
+                compiled.signature, kwargs=arguments, callable=handler
             )
 
-            if route.is_async:
-                raw_response = await endpoint(*positional, **keywords)
-            elif not should_run_as_async(endpoint):
-                warn_about_implicit_async_safe_status(endpoint, self._config)
+            if compiled.is_async:
+                raw_response = await handler(*positional, **keywords)
+            elif not should_run_as_async(handler):
+                warn_about_implicit_async_safe_status(handler, self._config)
 
-                raw_response = endpoint(*positional, **keywords)
+                raw_response = handler(*positional, **keywords)
             else:
-                raw_response = await sync_to_async(endpoint, *positional, **keywords)
+                raw_response = await sync_to_async(handler, *positional, **keywords)
 
             # Do not go through the response adapter if the response is already a Response instance
             if isinstance(raw_response, Response):
                 return raw_response
 
-            declared_response_type = route.signature.return_annotation
+            declared_response_type = compiled.signature.return_annotation
 
             adapter = await container.get(ResponseAdapter)
 

@@ -42,26 +42,8 @@ logger = logging.getLogger(__name__)
 
 _Callback = Callable[..., None] | Callable[..., Awaitable[None]]
 
-# inspect.signature() re-walks the MRO, unwraps partials/descriptors, and
-# rebuilds a Signature object from scratch every time it's called; for
-# functions and classes (registered once, at startup) that work never
-# changes, so we memoize it across the many scoped containers created over
-# the life of the process. Bound methods are obtained fresh per request
-# (e.g. `getattr(instance, name)` on a request-scoped instance), so we
-# never cache by the bound method's own identity - that would pin the
-# instance in memory and never hit anyway. Instead we cache by `__func__`,
-# the underlying plain function shared by every instance of the class, and
-# strip its leading `self`/`cls` parameter (same approach as Route, which
-# does this once at registration time via the class rather than an
-# instance).
 _signature_cache: dict[Callable[..., Any] | type, inspect.Signature] = {}
 
-# Similarly, `partial(callback, instance)` (e.g. after_resolving callbacks,
-# which rebuild that partial on every resolution to bind the freshly
-# resolved instance) produces a fresh, uncacheable-by-identity object each
-# time even though its resulting signature never changes: it only depends
-# on which parameter slots `callback` + the pre-supplied args/keywords
-# consume, never on the actual bound values.
 _partial_signature_cache: dict[
     tuple[Callable[..., Any], int, frozenset[str]], inspect.Signature
 ] = {}
@@ -227,7 +209,8 @@ class Container:
         }
 
         self._terminating_callbacks: list[_Callback] = []
-        self._lock = AsyncRLock()
+
+        self._lock: AsyncRLock | None = None
 
     def register(
         self,
@@ -466,6 +449,13 @@ class Container:
     async def _resolve(self, abstract: str) -> Any: ...
 
     async def _resolve(self, abstract: str | type[T]) -> Any | T:
+        alias = self._get_alias(abstract)
+        if alias in self._instances:
+            return self._instances[alias]
+
+        if self._lock is None:
+            self._lock = AsyncRLock()
+
         async with self._lock:
             return await self._do_resolve(abstract)
 
@@ -822,21 +812,19 @@ class ScopedContainer(Container):
         super().__init__()
 
         self._base_container = base_container
+        scoped = base_container._scoped
 
         # Bind scoped bindings from the base container
-        self._bindings.update(
-            {k: {**v} for k, v in self._base_container._scoped["bindings"].items()}
-        )
+        if scoped["bindings"]:
+            self._bindings.update({k: {**v} for k, v in scoped["bindings"].items()})
 
         # Setup terminating callbacks
-        self._terminating_callbacks = [
-            *self._base_container._scoped["terminating_callbacks"]
-        ]
+        if scoped["terminating_callbacks"]:
+            self._terminating_callbacks = [*scoped["terminating_callbacks"]]
 
         # Setup resolving callbacks
-        self._after_resolving_callbacks = {
-            **self._base_container._scoped["after_resolving_callbacks"]
-        }
+        if scoped["after_resolving_callbacks"]:
+            self._after_resolving_callbacks = {**scoped["after_resolving_callbacks"]}
 
     def bound(self, abstract: str | type) -> bool:
         return self._base_container.bound(abstract) or super().bound(abstract)

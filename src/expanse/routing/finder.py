@@ -119,13 +119,15 @@ class Finder(RouteCollection):
                 # Dynamic
                 if token not in node["children"]:
                     converter: Callable[[str], Any] | None = None
+                    # We need to compile the route to have access to the signature
+                    compiled = route.compile()
                     if (
-                        param in route.signature.parameters
-                        and route.signature.parameters[param].annotation
-                        and route.signature.parameters[param].annotation
+                        param in compiled.signature.parameters
+                        and compiled.signature.parameters[param].annotation
+                        and compiled.signature.parameters[param].annotation
                         is not Parameter.empty
                     ):
-                        converter = route.signature.parameters[param].annotation
+                        converter = compiled.signature.parameters[param].annotation
 
                     node["children"][token] = {
                         "routes": {},
