@@ -267,13 +267,9 @@ def test_session_pagination_headers(router: Router, client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["X-Total-Count"] == "51"
     links = response.headers["Link"]
-    assert links == ", ".join(
-        [
-            '<http://testserver/paginated?page=2>; rel="next"',
-            '<http://testserver/paginated?page=1>; rel="first"',
-            '<http://testserver/paginated?page=26>; rel="last"',
-            '<http://testserver/paginated?page=1>; rel="self"',
-        ]
+    assert (
+        links
+        == '<http://testserver/paginated?page=2>; rel="next", <http://testserver/paginated?page=1>; rel="first", <http://testserver/paginated?page=26>; rel="last", <http://testserver/paginated?page=1>; rel="self"'
     )
 
     assert response.json() == [
@@ -304,14 +300,9 @@ def test_session_pagination_headers_with_page(
     assert response.status_code == 200
     assert response.headers["X-Total-Count"] == "51"
     links = response.headers["Link"]
-    assert links == ", ".join(
-        [
-            '<http://testserver/paginated?page=3>; rel="next"',
-            '<http://testserver/paginated?page=1>; rel="prev"',
-            '<http://testserver/paginated?page=1>; rel="first"',
-            '<http://testserver/paginated?page=26>; rel="last"',
-            '<http://testserver/paginated?page=2>; rel="self"',
-        ]
+    assert (
+        links
+        == '<http://testserver/paginated?page=3>; rel="next", <http://testserver/paginated?page=1>; rel="prev", <http://testserver/paginated?page=1>; rel="first", <http://testserver/paginated?page=26>; rel="last", <http://testserver/paginated?page=2>; rel="self"'
     )
 
     assert response.json() == [
@@ -342,13 +333,9 @@ def test_session_pagination_headers_for_last_page(
     assert response.status_code == 200
     assert response.headers["X-Total-Count"] == "51"
     links = response.headers["Link"]
-    assert links == ", ".join(
-        [
-            '<http://testserver/paginated?page=25>; rel="prev"',
-            '<http://testserver/paginated?page=1>; rel="first"',
-            '<http://testserver/paginated?page=26>; rel="last"',
-            '<http://testserver/paginated?page=26>; rel="self"',
-        ]
+    assert (
+        links
+        == '<http://testserver/paginated?page=25>; rel="prev", <http://testserver/paginated?page=1>; rel="first", <http://testserver/paginated?page=26>; rel="last", <http://testserver/paginated?page=26>; rel="self"'
     )
 
     assert response.json() == [
@@ -379,14 +366,9 @@ def test_session_pagination_headers_keeps_query_parameters(
     assert response.status_code == 200
     assert response.headers["X-Total-Count"] == "51"
     links = response.headers["Link"]
-    assert links == ", ".join(
-        [
-            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=3>; rel="next"',
-            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="prev"',
-            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="first"',
-            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=26>; rel="last"',
-            '<http://testserver/paginated?foo=bar+bar&baz=qux&page=2>; rel="self"',
-        ]
+    assert (
+        links
+        == '<http://testserver/paginated?foo=bar+bar&baz=qux&page=3>; rel="next", <http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="prev", <http://testserver/paginated?foo=bar+bar&baz=qux&page=1>; rel="first", <http://testserver/paginated?foo=bar+bar&baz=qux&page=26>; rel="last", <http://testserver/paginated?foo=bar+bar&baz=qux&page=2>; rel="self"'
     )
 
     assert response.json() == [

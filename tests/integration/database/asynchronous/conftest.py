@@ -28,19 +28,19 @@ async def setup_additional_databases(
         {
             "postgresql_psycopg": {
                 "driver": "postgresql",
-                "url": f"postgresql+psycopg://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', 5432)}/expanse",
+                "url": f"postgresql+psycopg://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', '5432')}/expanse",
             },
             "postgresql_asyncpg": {
                 "driver": "postgresql",
-                "url": f"postgresql+asyncpg://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', 5432)}/expanse",
+                "url": f"postgresql+asyncpg://postgres:password@127.0.0.1:{os.getenv('POSTGRES_TEST_PORT', '5432')}/expanse",
             },
             "mysql_asyncmy": {
                 "driver": "mysql",
-                "url": f"mysql+asyncmy://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', 3306)}/expanse",
+                "url": f"mysql+asyncmy://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', '3306')}/expanse",
             },
             "mysql_aiomysql": {
                 "driver": "mysql",
-                "url": f"mysql+aiomysql://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', 3306)}/expanse",
+                "url": f"mysql+aiomysql://root:password@127.0.0.1:{os.getenv('MYSQL_TEST_PORT', '3306')}/expanse",
             },
         }
     )

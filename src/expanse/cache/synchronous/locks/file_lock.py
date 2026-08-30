@@ -5,6 +5,7 @@ from typing import override
 
 from filelock import BaseFileLock as _BaseFileLock
 from filelock import FileLock as _FileLock
+from filelock import Timeout
 
 from expanse.cache.synchronous.locks.lock import Lock
 
@@ -28,7 +29,7 @@ class FileLock(Lock):
             self._lock.acquire(blocking=False)
 
             return True
-        except BaseException:
+        except (Timeout, OSError):
             return False
 
     @override
@@ -36,14 +37,14 @@ class FileLock(Lock):
         if force:
             try:
                 os.remove(self._lock.lock_file)
-            except Exception:
+            except OSError:
                 return False
 
             return True
 
         try:
             self._lock.release(True)
-        except Exception:
+        except OSError:
             return False
 
         return True

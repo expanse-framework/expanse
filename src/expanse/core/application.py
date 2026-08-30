@@ -244,7 +244,7 @@ class Application:
                     try:
                         await self.bootstrap()
                         await self.boot()
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - report any bootstrap failure to the ASGI server
                         await send(
                             {
                                 "type": "lifespan.startup.failed",

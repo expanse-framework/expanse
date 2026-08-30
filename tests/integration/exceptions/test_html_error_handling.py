@@ -18,8 +18,12 @@ class ExceptionRenderer(BaseExceptionRenderer):
         return "Rendered"
 
 
+class InternalError(Exception):
+    pass
+
+
 async def error() -> Response:
-    raise Exception("Internal error")
+    raise InternalError("Internal error")
 
 
 async def forbidden() -> Response:

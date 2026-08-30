@@ -653,14 +653,14 @@ class Container:
                 else:
                     try:
                         result = await self.get(self._get_alias(klass))
-                    except Exception as e:
+                    except Exception:
                         if not args:
-                            raise e
+                            raise
 
                         arg = args[0]
 
                         if not isinstance(arg, klass):
-                            raise e
+                            raise
 
                         result = args.pop(0)
 
@@ -686,14 +686,14 @@ class Container:
                     else:
                         try:
                             result = await self.get(self._get_alias(klass))
-                        except Exception as e:
+                        except Exception:
                             if not args:
-                                raise e
+                                raise
 
                             arg = args[0]
 
                             if not isinstance(arg, klass):
-                                raise e
+                                raise
 
                             result = args.pop(0)
 

@@ -1,3 +1,7 @@
+class CustomError(Exception):
+    pass
+
+
 async def foo() -> None:
     """
     Calls a function that will raise and exception.
@@ -8,4 +12,4 @@ async def foo() -> None:
 
 
 async def bar() -> None:
-    raise Exception("Custom exception")
+    raise CustomError("Custom exception")

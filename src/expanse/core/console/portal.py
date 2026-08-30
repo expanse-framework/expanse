@@ -51,7 +51,7 @@ class Portal:
     async def handle(self, input: Input, output: Output | None = None) -> int:
         try:
             await self.bootstrap()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - top-level CLI boundary
             io = IO(
                 input,
                 output or StreamOutput(sys.stdout),
@@ -71,7 +71,7 @@ class Portal:
 
         try:
             return await self.console.run(input, output, output)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - top-level CLI boundary
             handler = await self._app.container.get(ExceptionHandler)
 
             await handler.report(e)

@@ -300,7 +300,7 @@ class SchemaRegistry:
 
     def get_or_create_component_schema(
         self,
-        model: type[BaseModel] | type[msgspec.Struct],
+        model: type[BaseModel | msgspec.Struct],
         type: Literal["request", "response"] = "request",
     ) -> tuple[Reference, Schema]:
         component_name = model.__name__

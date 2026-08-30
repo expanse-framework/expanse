@@ -99,8 +99,7 @@ class URLGenerator:
 
             name = raw_name
 
-            if name.startswith("*"):
-                name = name[1:]
+            name = name.removeprefix("*")
 
             expected.add(raw_name)
 
@@ -113,8 +112,7 @@ class URLGenerator:
                     f"Parameter [{name}] does not match the regex [{regex}]"
                 )
 
-            if name.startswith("*"):
-                name = name[1:]
+            name = name.removeprefix("*")
 
             if regex:
                 path = path.replace(f"{{{raw_name}:{regex}}}", f"{{{raw_name}}}", 1)

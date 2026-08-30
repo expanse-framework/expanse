@@ -207,7 +207,7 @@ class URL:
         components = self._components._replace(**kwargs)
         return self.__class__(components.geturl())
 
-    def __eq__(self, other: typing.Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return str(self) == str(other)
 
     def __str__(self) -> str:

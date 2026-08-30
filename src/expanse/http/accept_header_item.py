@@ -15,8 +15,8 @@ class AcceptHeaderItem:
         self._index: int = 0
 
         attributes = attributes or {}
-        for name, value in attributes.items():
-            self.set_attribute(name, value)
+        for name, attribute_value in attributes.items():
+            self.set_attribute(name, attribute_value)
 
     @classmethod
     def from_string(cls, item: str) -> Self:

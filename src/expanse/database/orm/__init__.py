@@ -15,8 +15,9 @@ from sqlalchemy.sql.schema import _ServerDefaultArgument
 
 
 def column[T](
-    __name_pos: str | _TypeEngineArgument | SchemaEventTarget | None = None,
-    __type_pos: _TypeEngineArgument | SchemaEventTarget | None = None,
+    name_pos: str | _TypeEngineArgument | SchemaEventTarget | None = None,
+    type_pos: _TypeEngineArgument | SchemaEventTarget | None = None,
+    /,
     *args: SchemaEventTarget,
     init: bool = False,
     repr: _NoArg | bool = _NoArg.NO_ARG,
@@ -52,8 +53,8 @@ def column[T](
     **kw: Any,
 ) -> MappedColumn:
     return mapped_column(
-        __name_pos,
-        __type_pos,
+        name_pos,
+        type_pos,
         *args,
         init=init,
         repr=repr,

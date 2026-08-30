@@ -487,7 +487,7 @@ class Console:
         ):
             io.interactive(False)
 
-        shell_verbosity = int(os.getenv("SHELL_VERBOSITY", 0))
+        shell_verbosity = int(os.getenv("SHELL_VERBOSITY", "0"))
         if shell_verbosity == -1:
             io.set_verbosity(Verbosity.QUIET)
         elif shell_verbosity == 1:

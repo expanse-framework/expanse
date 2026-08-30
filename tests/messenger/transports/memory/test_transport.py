@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from dataclasses import dataclass
 
 import pytest
@@ -98,8 +100,6 @@ async def test_receive_skips_delayed_envelope() -> None:
 
 
 async def test_receive_returns_envelope_after_delay_expires() -> None:
-    import time
-
     transport = make_transport()
     envelope = Envelope.wrap(FooMessage(value="delayed")).with_stamps(
         DelayStamp(delay=100)
@@ -108,7 +108,7 @@ async def test_receive_returns_envelope_after_delay_expires() -> None:
 
     assert [e async for e in transport.receive()] == []
 
-    time.sleep(0.15)
+    await asyncio.sleep(0.15)
 
     result = [e async for e in transport.receive()]
     assert len(result) == 1

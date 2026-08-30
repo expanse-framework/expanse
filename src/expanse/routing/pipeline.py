@@ -51,7 +51,7 @@ class Pipeline:
             from expanse.contracts.debug.exception_handler import ExceptionHandler
 
             if not self._container.has(ExceptionHandler):
-                raise e
+                raise
 
             exception_handler = await self._container.get(ExceptionHandler)
 

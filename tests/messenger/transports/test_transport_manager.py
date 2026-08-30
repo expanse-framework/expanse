@@ -40,7 +40,7 @@ def make_manager(
                 "redis": {
                     "connections": {
                         "default": {
-                            "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/15"
+                            "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/15"
                         }
                     }
                 },

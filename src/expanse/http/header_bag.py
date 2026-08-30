@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from collections.abc import MutableMapping
 from functools import lru_cache
-from typing import Literal
 from typing import TypeVar
 from typing import overload
 
@@ -30,7 +29,7 @@ class HeaderBag(MutableMapping[str, str]):
     def all(self, key: str) -> list[str | None]: ...
 
     @overload
-    def all(self, key: Literal[None] = None) -> dict[str, list[str | None]]: ...
+    def all(self, key: None = None) -> dict[str, list[str | None]]: ...
 
     def all(
         self, key: str | None = None

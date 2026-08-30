@@ -17,7 +17,7 @@ from expanse.session.asynchronous.stores.wrapper import AsyncWrapperStore
 
 if TYPE_CHECKING:
     from expanse.http.request import Request
-    from expanse.session.asynchronous.stores.store import AsyncStore as AsyncStore
+    from expanse.session.asynchronous.stores.store import AsyncStore
     from expanse.session.synchronous.stores.store import Store
 
 

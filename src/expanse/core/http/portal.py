@@ -47,7 +47,7 @@ class Portal:
                 from expanse.contracts.debug.exception_handler import ExceptionHandler
 
                 if not self._app.container.has(ExceptionHandler):
-                    raise e
+                    raise
 
                 exception_handler = await self._app.container.get(ExceptionHandler)
 

@@ -4,8 +4,12 @@ from expanse.http.response import Response
 from expanse.testing.client import TestClient
 
 
+class InternalError(Exception):
+    pass
+
+
 async def error() -> Response:
-    raise Exception("Internal error")
+    raise InternalError("Internal error")
 
 
 async def forbidden() -> Response:
@@ -23,9 +27,9 @@ def test_unhandled_exceptions_are_returned_with_debug_information_if_debug_mode(
     assert response.status_code == 500
     data = response.json()
     assert data["message"] == "Internal error"
-    assert data["exception"] == "Exception"
+    assert data["exception"] == "InternalError"
     assert data["file"] == str(__file__)
-    assert data["line"] == 8
+    assert data["line"] == 12
     assert "traceback" in data
 
 

@@ -319,7 +319,7 @@ async def test_manager_can_create_redis_store(app: Application) -> None:
                 "connection": "default",
                 "connections": {
                     "default": {
-                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/1"
+                        "url": f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/1"
                     }
                 },
             },

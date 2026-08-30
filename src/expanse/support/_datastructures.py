@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from collections.abc import Iterator
 from collections.abc import Mapping
-from typing import Any
 from typing import TypeVar
 from typing import cast
 
@@ -46,7 +45,7 @@ class MultiMapping[KT, VT](Mapping[KT, VT]):
     def multi_items(self) -> list[tuple[KT, VT]]:
         return list(self._list)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return False
         return sorted(self._list) == sorted(other._list)

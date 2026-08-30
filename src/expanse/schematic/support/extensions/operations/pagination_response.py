@@ -50,7 +50,7 @@ class PaginationResponseExtension(OperationExtension):
 
     def handle_paginator(
         self,
-        annotation: type[Paginator] | type[CursorPaginator],
+        annotation: type[Paginator | CursorPaginator],
         adapter: Adapter,
         operation: Operation,
         route_info: RouteInfo,

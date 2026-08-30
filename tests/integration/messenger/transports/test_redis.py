@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.redis
 
-REDIS_URL = f"redis://localhost:{os.getenv('REDIS_TEST_PORT', 6379)}/15"
+REDIS_URL = f"redis://localhost:{os.getenv('REDIS_TEST_PORT', '6379')}/15"
 STREAM = "test_messages"
 
 

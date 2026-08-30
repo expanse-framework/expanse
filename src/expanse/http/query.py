@@ -13,9 +13,7 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel | msgspec.Struct)
 
 if TYPE_CHECKING:
-    from typing import Union
-
-    Query = Union[T, T]  # noqa: UP007
+    Query = T
 else:
 
     class Query:

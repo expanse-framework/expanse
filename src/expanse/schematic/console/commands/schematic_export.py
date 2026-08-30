@@ -2,6 +2,8 @@ import json
 
 from typing import ClassVar
 
+import anyio
+
 from cleo.helpers import option
 from cleo.io.inputs.option import Option
 
@@ -28,7 +30,6 @@ class SchematicExportCommand(Command):
 
         doc = generator.generate(generator_config, router)
 
-        with open(path, "w") as f:
-            json.dump(doc.to_dict(), f, indent=2)
+        await anyio.Path(path).write_text(json.dumps(doc.to_dict(), indent=2))
 
         self.info(f"OpenAPI document exported to {path}.")

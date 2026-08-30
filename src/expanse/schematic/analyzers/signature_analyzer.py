@@ -65,7 +65,7 @@ class SignatureAnalyzer:
         # Resolve string annotations to actual types
         try:
             type_hints = get_type_hints(func, include_extras=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort type hint resolution
             # If we can't resolve type hints, fall back to raw annotations
             type_hints = {}
 

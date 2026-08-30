@@ -176,7 +176,7 @@ class Worker:
     ) -> None:
         keep_alive_id = next(self._keep_alive_ids)
         dedup_key: tuple[str, Any] | None = None
-        log_messages: type[MessageLogMessage] | type[JobLogMessage]
+        log_messages: type[MessageLogMessage | JobLogMessage]
         message_id_stamp = envelope.stamp(TransportMessageIdStamp)
         log_extras: dict[str, Any] = {
             "transport": transport_name,
@@ -211,7 +211,7 @@ class Worker:
 
         try:
             envelope = await self._handle_envelope(envelope)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - a failing message must not kill the worker
             if isinstance(e, MessageHandlingFailedError):
                 envelope = e.envelope
 
@@ -336,7 +336,7 @@ class Worker:
             transport = await self._transport_manager.transport(transport_name)
 
             if not isinstance(transport, KeepAliveTransport):
-                raise RuntimeError(
+                raise TypeError(
                     f"Transport '{transport_name}' does not support keep-alive functionality."
                 )
 
@@ -392,7 +392,7 @@ class Worker:
                                 handler=f"{job_class.__module__}.{job_class.__qualname__}.execute"
                             )
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - collected per handler and reported together
                         errors[
                             f"{job_class.__module__}.{job_class.__qualname__}.execute"
                         ] = e
@@ -422,7 +422,7 @@ class Worker:
                                 handler=f"{handler.__module__}.{handler.__qualname__}"
                             )
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - collected per handler and reported together
                         errors[f"{handler.__module__}.{handler.__qualname__}"] = e
 
                 if errors:

@@ -13,9 +13,7 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel | msgspec.Struct)
 
 if TYPE_CHECKING:
-    from typing import Union
-
-    JSON = Union[T, T]  # noqa: UP007
+    JSON = T
 else:
 
     class JSON:

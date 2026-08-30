@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import Self
 
 
 if TYPE_CHECKING:
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class URLPath(str):
-    def __new__(cls, path: str, protocol: str = "", host: str = "") -> URLPath:
+    def __new__(cls, path: str, protocol: str = "", host: str = "") -> Self:
         assert protocol in ("http", "websocket", "")
         return str.__new__(cls, path)
 
