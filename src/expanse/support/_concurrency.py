@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 
 from collections import deque
 from collections.abc import AsyncGenerator
+from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Iterator
@@ -14,6 +16,7 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import ParamSpec
 from typing import TypeVar
+from typing import cast
 
 from asgiref.sync import async_to_sync
 from asgiref.sync import sync_to_async as _asgiref_sync_to_async
@@ -39,6 +42,17 @@ def _restore_context(context: Context) -> None:
         except LookupError:
             # the context variable was first set inside `context`
             cvar.set(new_val)
+
+
+async def run_async[**P, T](
+    func: Callable[P, T] | Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs
+) -> T:
+    if inspect.iscoroutinefunction(func):
+        return cast("T", await func(*args, **kwargs))
+    elif not should_run_as_async(func):
+        return cast("T", func(*args, **kwargs))
+    else:
+        return cast("T", await sync_to_async(func, *args, **kwargs))
 
 
 def should_run_as_async(func: Callable[..., Any]) -> bool:

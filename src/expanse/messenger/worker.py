@@ -9,6 +9,7 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache
+from expanse.contracts.events.event_dispatcher import EventDispatcher
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
@@ -22,6 +23,7 @@ from expanse.jobs.stamps.job import JobStamp
 from expanse.jobs.synchronous.job import Job as SyncJob
 from expanse.logging.context import Context
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.events.worker_looped import WorkerLooped
 from expanse.messenger.exceptions import MessageHandlingFailedError
 from expanse.messenger.exceptions import UnconfiguredRetryStrategyError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
@@ -80,6 +82,7 @@ class Worker:
         middleware_stack: MiddlewareStack,
         container: Container,
         registry: Registry,
+        events: EventDispatcher,
     ) -> None:
         self._transport_manager: TransportManager = transport_manager
         self._retry_strategy_manager: RetryStrategyManager = retry_strategy_manager
@@ -87,6 +90,7 @@ class Worker:
         self._middleware_stack: MiddlewareStack = middleware_stack
         self._container: Container = container
         self._registry: Registry = registry
+        self._events: EventDispatcher = events
         self._stop_event: asyncio.Event = asyncio.Event()
         self._keep_alives: dict[int, tuple[str, Envelope]] = {}
         self._keep_alive_ids: itertools.count[int] = itertools.count()
@@ -165,6 +169,8 @@ class Worker:
 
                 if not envelope_handled:
                     await asyncio.sleep(sleep / 1000)
+
+                await self._events.dispatch(WorkerLooped(transport_name))
 
         if concurrency <= 1:
             await consume(False)
