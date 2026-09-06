@@ -155,7 +155,7 @@ class Registrar(ABC):
         )
 
         if definition.middleware is not None:
-            route.middleware(definition.middleware)
+            route.middleware(*definition.middleware)
 
         return route
 
