@@ -42,29 +42,29 @@ class SlidingWindowRateLimiter(RateLimiter):
                     )
 
             now = time()
-            hit_count = window.hit_count
-            available_tokens = self._limit - hit_count
+            available_tokens = max(0, self._limit - window.hit_count)
 
             if tokens == 0:
-                reset_duration = window.calculate_time_for_tokens(
-                    self._limit, window.hit_count
+                # No token is consumed, so the request is always accepted and the
+                # retry time is the time at which the next token will be available.
+                retry_after = now + window.calculate_time_for_tokens(self._limit, 1)
+
+                return RateLimit(
+                    available_tokens,
+                    whenever.Instant.from_timestamp(retry_after),
+                    True,
+                    self._limit,
                 )
-                reset_time = whenever.Instant.from_timestamp(
-                    now if available_tokens else now + reset_duration
-                )
-                return RateLimit(available_tokens, reset_time, True, self._limit)
 
             if available_tokens >= tokens:
                 window.add(tokens)
 
-                retry_after = now
-                if available_tokens == tokens:
-                    retry_after += window.calculate_time_for_tokens(
-                        self._limit, window.hit_count
-                    )
+                # The retry time is the time at which the next token will be
+                # available, which is now as long as the limit is not reached.
+                retry_after = now + window.calculate_time_for_tokens(self._limit, 1)
 
                 rate_limit = RateLimit(
-                    self._limit - window.hit_count,
+                    max(0, self._limit - window.hit_count),
                     whenever.Instant.from_timestamp(retry_after),
                     True,
                     self._limit,
@@ -81,7 +81,7 @@ class SlidingWindowRateLimiter(RateLimiter):
                 wait_duration = window.calculate_time_for_tokens(self._limit, tokens)
 
                 return RateLimit(
-                    self._limit - window.hit_count,
+                    available_tokens,
                     whenever.Instant.from_timestamp(now + wait_duration),
                     False,
                     self._limit,
@@ -116,7 +116,17 @@ class Window:
 
     @property
     def hit_count(self) -> int:
-        return self._hit_count
+        """
+        The number of hits recorded in the window.
+
+        The hits of the previous window are accounted for, proportionally to the
+        part of it that still overlaps the current window, which is what makes
+        the window slide.
+        """
+        return floor(
+            self._hit_count_for_last_window * (1 - self._elapsed_window_ratio())
+            + self._hit_count
+        )
 
     def is_expired(self) -> bool:
         return time() > self._ends_at
@@ -126,22 +136,25 @@ class Window:
         if remaining >= tokens:
             return 0
 
-        now = time()
-        window_start = self._ends_at - self._interval
-        elapsed_time = now - window_start
-        elapsed_window = min(elapsed_time / self._interval, 1)
+        remaining_window = self._ends_at - time()
         releasable = max(
-            1, max_size - floor(self._hit_count_for_last_window * (1 - elapsed_window))
+            1,
+            max_size
+            - floor(
+                self._hit_count_for_last_window * (1 - self._elapsed_window_ratio())
+            ),
         )
-        remaining_window = self._interval - elapsed_time
         needed = tokens - remaining
 
         if releasable >= needed:
-            return needed * (remaining_window / max(1, releasable))
+            return needed * (remaining_window / releasable)
 
-        return (self._ends_at - now) + (needed - releasable) * (
-            self._interval / max_size
-        )
+        return remaining_window + (needed - releasable) * (self._interval / max_size)
+
+    def _elapsed_window_ratio(self) -> float:
+        window_start = self._ends_at - self._interval
+
+        return min((time() - window_start) / self._interval, 1)
 
     def add(self, hits: int = 0) -> None:
         self._hit_count += hits
@@ -152,7 +165,7 @@ class Window:
         ends_at = previous_window._ends_at + interval
 
         if time() < ends_at:
-            window._hit_count_for_last_window = window.hit_count
+            window._hit_count_for_last_window = previous_window._hit_count
             window._ends_at = ends_at
 
         return window
