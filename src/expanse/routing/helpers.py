@@ -12,35 +12,65 @@ class HandlerDefinition:
     method: str
     uri: str
     name: str | None
-    middleware: type[Middleware] | str | None
+    middleware: list[type[Middleware]] | list[str] | None
 
 
 def get(
-    uri: str, name: str | None = None, middleware: type[Middleware] | str | None = None
+    uri: str,
+    name: str | None = None,
+    middleware: list[type[Middleware]]
+    | list[str]
+    | type[Middleware]
+    | str
+    | None = None,
 ) -> Callable[[Endpoint], Endpoint]:
     return _create_decorator("GET", uri, name, middleware)
 
 
 def post(
-    uri: str, name: str | None = None, middleware: type[Middleware] | str | None = None
+    uri: str,
+    name: str | None = None,
+    middleware: list[type[Middleware]]
+    | list[str]
+    | type[Middleware]
+    | str
+    | None = None,
 ) -> Callable[[Endpoint], Endpoint]:
     return _create_decorator("POST", uri, name, middleware)
 
 
 def put(
-    uri: str, name: str | None = None, middleware: type[Middleware] | str | None = None
+    uri: str,
+    name: str | None = None,
+    middleware: list[type[Middleware]]
+    | list[str]
+    | type[Middleware]
+    | str
+    | None = None,
 ) -> Callable[[Endpoint], Endpoint]:
     return _create_decorator("PUT", uri, name, middleware)
 
 
 def patch(
-    uri: str, name: str | None = None, middleware: type[Middleware] | str | None = None
+    uri: str,
+    name: str | None = None,
+    middleware: list[type[Middleware]]
+    | list[str]
+    | type[Middleware]
+    | str
+    | None = None,
 ) -> Callable[[Endpoint], Endpoint]:
     return _create_decorator("PATCH", uri, name, middleware)
 
 
 def delete(
-    uri: str, name: str | None = None, middleware: type[Middleware] | str | None = None
+    uri: str,
+    name: str | None = None,
+    middleware: list[type[Middleware]]
+    | list[str]
+    | type[Middleware]
+    | str
+    | None = None,
 ) -> Callable[[Endpoint], Endpoint]:
     return _create_decorator("DELETE", uri, name, middleware)
 
@@ -61,10 +91,15 @@ def _create_decorator(
     method: str,
     uri: str,
     name: str | None,
-    middleware: type[Middleware] | str | None,
+    middleware: list[type[Middleware]] | list[str] | type[Middleware] | str | None,
 ) -> Callable[[Endpoint], Endpoint]:
     def decorator(handler: Endpoint) -> Endpoint:
-        definition = HandlerDefinition(method, uri, name, middleware)
+        definition = HandlerDefinition(
+            method,
+            uri,
+            name,
+            [middleware] if isinstance(middleware, (type, str)) else middleware,
+        )
         setattr(handler, "__route_definition__", definition)  # noqa: B010
 
         module = inspect.getmodule(handler)
