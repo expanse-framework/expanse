@@ -42,5 +42,6 @@ class ServiceProvidersList:
                 "expanse.messenger.messenger_service_provider.MessengerServiceProvider",
                 "expanse.jobs.jobs_service_provider.JobsServiceProvider",
                 "expanse.storage.storage_service_provider.StorageServiceProvider",
+                "expanse.rate_limiting.rate_limiting_service_provider.RateLimitingServiceProvider",
             ]
         )

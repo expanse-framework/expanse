@@ -1,3 +1,5 @@
+import hashlib
+
 from collections.abc import Awaitable
 from collections.abc import Callable
 from typing import ClassVar
@@ -25,6 +27,7 @@ def _default_key_resolver(request: Request) -> str:
 class ThrottleRequest:
     _limiter: str = ""
     _key_resolver: ClassVar[KeyResolver] = _default_key_resolver
+    _hash_keys: bool = True
 
     def __init__(self, rate_limiting_manager: RateLimitingManager) -> None:
         self._rate_limiting_manager: RateLimitingManager = rate_limiting_manager
@@ -33,6 +36,8 @@ class ThrottleRequest:
         limiter = await self._rate_limiting_manager.limiter(self._limiter)
 
         key = await run_async(self.__class__._key_resolver, request)
+        if self._hash_keys:
+            key = hashlib.sha256(key.encode("utf-8")).hexdigest()
 
         rate_limit = await limiter.consume(key)
 
