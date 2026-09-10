@@ -8,7 +8,7 @@ from expanse.contracts.rate_limiting.rate_limit import RateLimit
 from expanse.core.http.exceptions import HTTPException
 from expanse.http.request import Request
 from expanse.http.responses.response import Response
-from expanse.rate_limiting.rate_limiting_manager import RateLimitingManager
+from expanse.rate_limiting.rate_limiting import RateLimiting
 from expanse.support._concurrency import run_async
 from expanse.support.helpers import async_safe
 from expanse.types.http.middleware import RequestHandler
@@ -29,8 +29,8 @@ class ThrottleRequest:
     _key_resolver: ClassVar[KeyResolver] = _default_key_resolver
     _hash_keys: bool = True
 
-    def __init__(self, rate_limiting_manager: RateLimitingManager) -> None:
-        self._rate_limiting_manager: RateLimitingManager = rate_limiting_manager
+    def __init__(self, rate_limiting_manager: RateLimiting) -> None:
+        self._rate_limiting_manager: RateLimiting = rate_limiting_manager
 
     async def handle(self, request: Request, next_call: RequestHandler) -> Response:
         limiter = await self._rate_limiting_manager.limiter(self._limiter)

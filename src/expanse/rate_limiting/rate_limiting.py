@@ -5,9 +5,10 @@ from expanse.container.container import Container
 from expanse.contracts.rate_limiting.rate_limiter import RateLimiter
 from expanse.rate_limiting.exceptions import UnconfiguredRateLimiterError
 from expanse.rate_limiting.exceptions import UnsupportedRateLimiterPolicyError
+from expanse.rate_limiting.rate_limiter_builder import RateLimiterBuilder
 
 
-class RateLimitingManager:
+class RateLimiting:
     def __init__(self, config: Config, container: Container) -> None:
         self._config: Config = config
         self._container: Container = container
@@ -21,6 +22,9 @@ class RateLimitingManager:
         self._limiters[name] = limiter
 
         return limiter
+
+    def configure(self, name: str) -> RateLimiterBuilder:
+        return RateLimiterBuilder(self._config, self._container)
 
     async def add(self, name: str, limiter: RateLimiter) -> None:
         self._limiters[name] = limiter
