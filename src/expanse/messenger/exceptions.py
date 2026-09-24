@@ -144,3 +144,9 @@ class MessageBusError(Exception): ...
 
 
 class TransactionalMessageBusError(MessageBusError): ...
+
+
+class InvalidOutboxTransportError(MessageBusError):
+    """
+    Raised when the outbox transport is not a valid transport for an outbox.
+    """

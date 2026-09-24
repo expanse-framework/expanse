@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from expanse.configuration.config import Config
+from expanse.container.container import Container
 from expanse.core.application import Application
 from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.database.database_manager import AsyncDatabaseManager
@@ -73,11 +74,16 @@ class DatabaseServiceProvider(ServiceProvider):
 
     async def _create_async_session(
         self,
-        db: AsyncDatabaseManager,
+        container: Container,
         pagination_manager: PaginationManager,
         name: str | None = None,
     ) -> AsyncGenerator[AsyncSession]:
-        session = db.session(name).set_pagination_manager(pagination_manager)
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        connection = await container.get(AsyncConnection, name)
+        factory = async_sessionmaker(connection, class_=AsyncSession)
+
+        session = factory().set_pagination_manager(pagination_manager)
 
         yield session
 
@@ -103,13 +109,18 @@ class DatabaseServiceProvider(ServiceProvider):
 
         connection.close()
 
-    def _create_session(
+    async def _create_session(
         self,
-        db: DatabaseManager,
+        container: Container,
         pagination_manager: PaginationManager,
         name: str | None = None,
-    ) -> Generator[Session]:
-        session = db.session(name).set_pagination_manager(pagination_manager)
+    ) -> AsyncGenerator[Session]:
+        from sqlalchemy.orm import sessionmaker
+
+        connection = await container.get(Connection, name)
+        factory = sessionmaker(connection, class_=Session)
+
+        session = factory().set_pagination_manager(pagination_manager)
 
         yield session
 

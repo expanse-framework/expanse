@@ -8,7 +8,7 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport as KeepAliveTransportContract,
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
-from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
@@ -23,12 +23,12 @@ class DatabaseTransport(KeepAliveTransportContract):
     def __init__(
         self,
         config: DatabaseTransportConfig,
-        db: AsyncDatabaseManager,
+        connection: AsyncConnection,
         serializer: SerializerContract,
     ) -> None:
         self._config: DatabaseTransportConfig = config
-        self._db: AsyncDatabaseManager = db
-        self._connection: Connection = Connection(self._db, self._config)
+        self._db_connection: AsyncConnection = connection
+        self._connection: Connection = Connection(self._db_connection, self._config)
         self._serializer: SerializerContract = serializer
 
     async def send(self, envelope: Envelope) -> Envelope:

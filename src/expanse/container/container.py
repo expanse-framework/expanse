@@ -17,6 +17,7 @@ from typing import Any
 from typing import Self
 from typing import TypedDict
 from typing import TypeVar
+from typing import cast
 from typing import get_args
 from typing import get_origin
 from typing import overload
@@ -341,12 +342,12 @@ class Container:
         return await sync_to_async(concrete, *positional, **keywords), None
 
     @overload
-    async def get(self, abstract: type[T]) -> T: ...
+    async def get(self, abstract: type[T], *args: Any) -> T: ...
 
     @overload
-    async def get(self, abstract: str) -> Any: ...
+    async def get(self, abstract: str, *args: Any) -> Any: ...
 
-    async def get(self, abstract: str | type[T]) -> Any | T:
+    async def get(self, abstract: str | type[T], *args: Any) -> Any | T:
         return await self._resolve(abstract)
 
     async def call(
@@ -443,12 +444,12 @@ class Container:
         return closure
 
     @overload
-    async def _resolve(self, abstract: type[T]) -> T: ...
+    async def _resolve(self, abstract: type[T], *args: Any) -> T: ...
 
     @overload
-    async def _resolve(self, abstract: str) -> Any: ...
+    async def _resolve(self, abstract: str, *args: Any) -> Any: ...
 
-    async def _resolve(self, abstract: str | type[T]) -> Any | T:
+    async def _resolve(self, abstract: str | type[T], *args: Any) -> Any | T:
         alias = self._get_alias(abstract)
         if alias in self._instances:
             return self._instances[alias]
@@ -457,16 +458,19 @@ class Container:
             self._lock = AsyncRLock()
 
         async with self._lock:
-            return await self._do_resolve(abstract)
+            return await self._do_resolve(abstract, *args)
 
     @overload
-    async def _do_resolve(self, abstract: type[T]) -> T: ...
+    async def _do_resolve(self, abstract: type[T], *args: Any) -> T: ...
 
     @overload
-    async def _do_resolve(self, abstract: str) -> Any: ...
+    async def _do_resolve(self, abstract: str, *args: Any) -> Any: ...
 
-    async def _do_resolve(self, abstract: str | type[T]) -> Any | T:
-        abstract = self._get_alias(abstract)
+    async def _do_resolve(self, abstract: str | type[T], *args: Any) -> Any | T:
+        if args:
+            abstract = cast("type[T]", Annotated[abstract, *args])
+        else:
+            abstract = self._get_alias(abstract)
 
         if abstract in self._instances:
             return self._instances[abstract]

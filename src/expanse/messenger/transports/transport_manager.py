@@ -5,6 +5,7 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.transport import Transport
+from expanse.messenger.exceptions import InvalidOutboxTransportError
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
@@ -60,17 +61,42 @@ class TransportManager:
 
         match transport_config["driver"]:
             case "sync":
-                return self._create_sync_transport(transport_config)
+                transport = self._create_sync_transport(transport_config)
             case "memory":
-                return await self._create_memory_transport(transport_config)
+                transport = await self._create_memory_transport(transport_config)
             case "database":
-                return await self._create_database_transport(transport_config)
+                transport = await self._create_database_transport(transport_config)
             case "redis":
-                return await self._create_redis_transport(transport_config)
+                transport = await self._create_redis_transport(transport_config)
             case _:
                 raise UnsupportedTransportDriverError(
                     f"Transport '{name}' has an unsupported driver '{transport_config['driver']}'."
                 )
+
+        if "outbox" not in transport_config:
+            return transport
+
+        outbox_transport_name = transport_config["outbox"]
+
+        if not outbox_transport_name:
+            return transport
+
+        from expanse.messenger.transports.outbox.transport import OutboxTransport
+
+        outbox_transport = await self.transport(outbox_transport_name)
+
+        from expanse.messenger.transports.database.transport import DatabaseTransport
+
+        if not isinstance(outbox_transport, DatabaseTransport):
+            raise InvalidOutboxTransportError(
+                "The outbox transport must be a database transport."
+            )
+
+        return OutboxTransport(
+            target_transport=transport,
+            outbox_transport=outbox_transport,
+            target_transport_name=name,
+        )
 
     def _create_sync_transport(self, config: dict[str, Any]) -> Transport:
         return SyncTransport(self._container, self._registry)
@@ -88,7 +114,7 @@ class TransportManager:
         from expanse.contracts.messenger.serializer import (
             Serializer as SerializerContract,
         )
-        from expanse.database.database_manager import AsyncDatabaseManager
+        from expanse.database.asynchronous.connection import AsyncConnection
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
         from expanse.messenger.transports.database.transport import DatabaseTransport
 
@@ -96,7 +122,7 @@ class TransportManager:
 
         return DatabaseTransport(
             DatabaseTransportConfig.model_validate(config),
-            await self._container.get(AsyncDatabaseManager),
+            await self._container.get(AsyncConnection),
             serializer,
         )
 
