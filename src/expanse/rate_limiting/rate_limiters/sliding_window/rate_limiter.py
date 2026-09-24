@@ -12,10 +12,13 @@ from expanse.support.duration import SingleUnitDuration
 
 
 class SlidingWindowRateLimiter(RateLimiter):
-    _WINDOW_KEY_FORMAT: str = "__expanse__:rate-limit:{id}:sliding:{window}"
-    _LOCK_KEY_FORMAT: str = "__expanse__:rate-limit:lock:{id}"
+    _WINDOW_KEY_FORMAT: str = "__expanse__:rate-limit:{name}:{id}:{window}"
+    _LOCK_KEY_FORMAT: str = "__expanse__:rate-limit:{name}:{id}:__lock__"
 
-    def __init__(self, limit: int, interval: SingleUnitDuration, cache: Cache) -> None:
+    def __init__(
+        self, name: str, limit: int, interval: SingleUnitDuration, cache: Cache
+    ) -> None:
+        self._name: str = name
         self._limit: int = limit
         self._interval: int = interval.to_seconds()
         self._cache: Cache = cache
@@ -27,14 +30,20 @@ class SlidingWindowRateLimiter(RateLimiter):
                 f"The number of tokens consumed ({tokens}) cannot be greater than the limit {self._limit}"
             )
 
-        async with self._cache.lock(self._LOCK_KEY_FORMAT.format(id=id)):
+        async with self._cache.lock(
+            self._LOCK_KEY_FORMAT.format(name=self._name, id=id)
+        ):
             now = floor(time())
             current_window, previous_window = self._calculate_windows()
             elapsed = now - current_window
             weight = (self._interval - elapsed) / self._interval
 
-            previous_key = self._WINDOW_KEY_FORMAT.format(id=id, window=previous_window)
-            current_key = self._WINDOW_KEY_FORMAT.format(id=id, window=current_window)
+            previous_key = self._WINDOW_KEY_FORMAT.format(
+                name=self._name, id=id, window=previous_window
+            )
+            current_key = self._WINDOW_KEY_FORMAT.format(
+                name=self._name, id=id, window=current_window
+            )
 
             window_data = await self._cache.get_many([previous_key, current_key])
 
@@ -64,10 +73,12 @@ class SlidingWindowRateLimiter(RateLimiter):
 
     @override
     async def reset(self, id: str) -> None:
-        async with self._cache.lock(self._LOCK_KEY_FORMAT.format(id=id)):
+        async with self._cache.lock(
+            self._LOCK_KEY_FORMAT.format(name=self._name, id=id)
+        ):
             await self._cache.delete_many(
                 [
-                    self._WINDOW_KEY_FORMAT.format(id=id, window=w)
+                    self._WINDOW_KEY_FORMAT.format(name=self._name, id=id, window=w)
                     for w in self._calculate_windows()
                 ]
             )

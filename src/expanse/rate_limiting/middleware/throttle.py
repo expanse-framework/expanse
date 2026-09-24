@@ -24,7 +24,7 @@ def _default_key_resolver(request: Request) -> str:
     return "|".join(parts)
 
 
-class ThrottleRequest:
+class Throttle:
     _limiter: str = ""
     _key_resolver: ClassVar[KeyResolver] = _default_key_resolver
     _hash_keys: bool = True
@@ -59,11 +59,11 @@ class ThrottleRequest:
     @classmethod
     def using(
         cls, limiter: str, key_resolver: KeyResolver | None = None
-    ) -> type["ThrottleRequest"]:
+    ) -> type["Throttle"]:
         key_resolver = key_resolver or _default_key_resolver
 
         subcls = type(
-            f"ThrottleRequest[{limiter!r}, {key_resolver!r}]",
+            f"Throttle[{limiter!r}, {key_resolver!r}]",
             (cls,),
             {
                 "_limiter": limiter,
@@ -84,3 +84,10 @@ class ThrottleRequest:
                 "Retry-After": rate_limit.retry_after.format_rfc2822(),
             },
         )
+
+
+def throttle(limiter: str, by: KeyResolver | None = None) -> type["Throttle"]:
+    return Throttle.using(limiter, key_resolver=by)
+
+
+__all__ = ["Throttle", "throttle"]

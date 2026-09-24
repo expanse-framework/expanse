@@ -47,14 +47,14 @@ class RateLimiting:
 
         match limiter_config["policy"]:
             case "sliding_window":
-                return await self._create_sliding_window_limiter(limiter_config)
+                return await self._create_sliding_window_limiter(name, limiter_config)
             case _:
                 raise UnsupportedRateLimiterPolicyError(
                     f"Rate limiter '{name}' has an unsupported policy '{limiter_config['policy']}'."
                 )
 
     async def _create_sliding_window_limiter(
-        self, raw_config: dict[str, Any]
+        self, name: str, raw_config: dict[str, Any]
     ) -> RateLimiter:
         from expanse.cache.asynchronous.cache_manager import CacheManager
         from expanse.rate_limiting.rate_limiters.sliding_window.config import (
@@ -68,4 +68,4 @@ class RateLimiting:
         cache_manager = await self._container.get(CacheManager)
         cache = await cache_manager.cache(config.cache_store)
 
-        return SlidingWindowRateLimiter(config.limit, config.interval, cache)
+        return SlidingWindowRateLimiter(name, config.limit, config.interval, cache)
