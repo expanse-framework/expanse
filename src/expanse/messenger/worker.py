@@ -9,6 +9,7 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache
+from expanse.contracts.events.event_dispatcher import EventDispatcher
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
@@ -33,6 +34,7 @@ from expanse.messenger.retry.retry_strategy import RetryStrategy
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
+from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
@@ -40,6 +42,7 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
 )
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.stamps.unique import UniqueStamp
+from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support._utils import string_to_class
 from expanse.support.asynchronous.pipeline import Pipeline
@@ -80,6 +83,7 @@ class Worker:
         middleware_stack: MiddlewareStack,
         container: Container,
         registry: Registry,
+        events: EventDispatcher,
     ) -> None:
         self._transport_manager: TransportManager = transport_manager
         self._retry_strategy_manager: RetryStrategyManager = retry_strategy_manager
@@ -87,6 +91,7 @@ class Worker:
         self._middleware_stack: MiddlewareStack = middleware_stack
         self._container: Container = container
         self._registry: Registry = registry
+        self._events: EventDispatcher = events
         self._stop_event: asyncio.Event = asyncio.Event()
         self._keep_alives: dict[int, tuple[str, Envelope]] = {}
         self._keep_alive_ids: itertools.count[int] = itertools.count()
@@ -144,6 +149,12 @@ class Worker:
 
                 if isinstance(transport, WorkerAwareTransport):
                     worker_transport = transport.clone_for_worker(worker_id)
+                elif isinstance(transport, OutboxTransport) and isinstance(
+                    transport.target_transport, WorkerAwareTransport
+                ):
+                    worker_transport = transport.target_transport.clone_for_worker(
+                        worker_id
+                    )
 
             while not self._stop_event.is_set():
                 if limit is not None and handled_messages >= limit:
@@ -210,7 +221,7 @@ class Worker:
             self._keep_alives[keep_alive_id] = (transport_name, envelope)
 
         try:
-            envelope = await self._handle_envelope(envelope)
+            envelope = await self._handle_envelope(envelope, transport_name)
         except Exception as e:  # noqa: BLE001 - a failing message must not kill the worker
             if isinstance(e, MessageHandlingFailedError):
                 envelope = e.envelope
@@ -334,6 +345,8 @@ class Worker:
         # into `self._keep_alives` while we `await` below.
         for transport_name, envelope in list(self._keep_alives.values()):
             transport = await self._transport_manager.transport(transport_name)
+            if isinstance(transport, OutboxTransport):
+                transport = transport.target_transport
 
             if not isinstance(transport, KeepAliveTransport):
                 raise TypeError(
@@ -352,7 +365,9 @@ class Worker:
 
             await transport.keep_alive(envelope, duration)
 
-    async def _handle_envelope(self, envelope: Envelope) -> Envelope:
+    async def _handle_envelope(
+        self, envelope: Envelope, transport_name: str
+    ) -> Envelope:
         # Each envelope is handled with its own scoped container so that
         # concurrently-processed messages never share resolved instances.
         container = self._container.create_scoped_container()
@@ -430,6 +445,29 @@ class Worker:
 
                 return envelope
 
+            outbox_stamp = envelope.stamp(OutboxStamp)
+
+            if outbox_stamp is not None:
+                target_transport_name = outbox_stamp.target_transport_name
+
+                target_transport = await self._transport_manager.transport(
+                    target_transport_name
+                )
+
+                if target_transport_name != transport_name:
+                    logger.debug(
+                        "Relaying outbox message %s to target transport '%s' from transport '%s'",
+                        type(envelope.open()).__name__,
+                        target_transport_name,
+                        transport_name,
+                    )
+
+                    print(target_transport)
+
+                    await target_transport.send(envelope)
+
+                    return envelope
+
             # Build the middleware pipeline and process the envelope through it.
             # We need to reverse the middleware stack to ensure messages are properly
             # processed. For instance, if messages with a context to propagate have been
@@ -442,7 +480,9 @@ class Worker:
                         for m in self._middleware_stack.middleware[::-1]
                     ]
                 )
-                .send(envelope.with_stamps(ReceivedStamp()))
+                .send(
+                    envelope.with_stamps(ReceivedStamp(transport_name=transport_name))
+                )
                 .to(_handle)
                 .then(self._after_handling_envelope)
                 .run()

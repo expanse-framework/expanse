@@ -107,7 +107,9 @@ class MessengerServiceProvider(ServiceProvider):
             TransactionalMessageBus,
         )
 
-        bus = TransactionalMessageBus(MessageBus(transport_manager, container, stack))
+        bus = TransactionalMessageBus(
+            transport_manager, MessageBus(transport_manager, container, stack)
+        )
 
         yield bus
 

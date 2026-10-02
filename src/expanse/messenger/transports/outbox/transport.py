@@ -24,11 +24,15 @@ class OutboxTransport(TransportContract):
         self._outbox_transport: TransportContract = outbox_transport
         self._target_transport_name: str = target_transport_name
 
+    @property
+    def target_transport(self) -> TransportContract:
+        return self._target_transport
+
     @override
     async def send(self, envelope: Envelope) -> Envelope:
         if envelope.has_stamp(OutboxStamp):
-            # If the envelope has an OutboxStamp, send it to the outbox transport
-            return await self._outbox_transport.send(
+            # If the envelope has an OutboxStamp, send it to the target transport
+            return await self._target_transport.send(
                 envelope.without_stamps(
                     OutboxStamp,
                     RedeliveryStamp,
@@ -50,22 +54,16 @@ class OutboxTransport(TransportContract):
 
     @override
     def receive(self) -> AsyncIterator[Envelope]:
-        raise NotImplementedError(
-            "OutboxTransport does not support receiving messages."
-        )
+        return self._target_transport.receive()
 
     @override
     async def acknowledge(self, envelope: Envelope) -> None:
-        raise NotImplementedError(
-            "OutboxTransport does not support acknowledging messages."
-        )
+        return await self._target_transport.acknowledge(envelope)
 
     @override
     async def reject(self, envelope: Envelope) -> None:
-        raise NotImplementedError(
-            "OutboxTransport does not support rejecting messages."
-        )
+        return await self._target_transport.reject(envelope)
 
     @override
     async def close(self) -> None:
-        return
+        return await self._target_transport.close()

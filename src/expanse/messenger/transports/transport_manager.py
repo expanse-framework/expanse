@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from typing import Any
 
@@ -12,6 +13,9 @@ from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
+
+
+logger = logging.getLogger(__name__)
 
 
 class TransportManager:
@@ -91,6 +95,14 @@ class TransportManager:
             raise InvalidOutboxTransportError(
                 "The outbox transport must be a database transport."
             )
+
+        logger.debug(
+            "Creating outbox transport",
+            extra={
+                "target_transport": name,
+                "outbox_transport": outbox_transport_name,
+            },
+        )
 
         return OutboxTransport(
             target_transport=transport,

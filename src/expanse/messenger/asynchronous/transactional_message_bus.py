@@ -15,6 +15,9 @@ from expanse.contracts.messenger.asynchronous.message_bus import (
 from expanse.database.asynchronous.session import AsyncSession
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransactionalMessageBusError
+from expanse.messenger.stamps.transport import TransportStamp
+from expanse.messenger.transports.outbox.transport import OutboxTransport
+from expanse.messenger.transports.transport_manager import TransportManager
 
 
 if TYPE_CHECKING:
@@ -37,9 +40,11 @@ class TransactionalMessageBus(MessageBusContract):
 
     def __init__(
         self,
+        transport_manager: TransportManager,
         decorated_bus: MessageBusContract,
         session: Session | AsyncSession | None = None,
     ):
+        self._transport_manager: TransportManager = transport_manager
         self._decorated_bus: MessageBusContract = decorated_bus
         self._queued_messages: list[list[Envelope]] = []
         self._session: Session | None = None
@@ -95,6 +100,14 @@ class TransactionalMessageBus(MessageBusContract):
             return await self._decorated_bus.dispatch(message)
 
         envelope = Envelope.wrap(message)
+
+        transport_stamp = envelope.stamp(TransportStamp)
+        transport_name = transport_stamp.name if transport_stamp else None
+        transport = await self._transport_manager.transport(transport_name)
+
+        if isinstance(transport, OutboxTransport):
+            # If the transport is an OutboxTransport, dispatch the message directly through the decorated bus.
+            return await self._decorated_bus.dispatch(envelope)
 
         self._queued_messages[-1].append(envelope)
 
