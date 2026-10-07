@@ -81,7 +81,13 @@ class DatabaseServiceProvider(ServiceProvider):
         from sqlalchemy.ext.asyncio import async_sessionmaker
 
         connection = await container.get(AsyncConnection, name)
-        factory = async_sessionmaker(connection, class_=AsyncSession)
+        # Expiring on commit forces a refresh on the next attribute access, which is
+        # IO. Since attributes are commonly read back from synchronous code outside of
+        # any SQLAlchemy greenlet — when serializing the response, typically — that
+        # refresh would fail with a MissingGreenlet error.
+        factory = async_sessionmaker(
+            connection, class_=AsyncSession, expire_on_commit=False
+        )
 
         session = factory().set_pagination_manager(pagination_manager)
 
