@@ -9,7 +9,6 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache
-from expanse.contracts.events.event_dispatcher import EventDispatcher
 from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
@@ -83,7 +82,6 @@ class Worker:
         middleware_stack: MiddlewareStack,
         container: Container,
         registry: Registry,
-        events: EventDispatcher,
     ) -> None:
         self._transport_manager: TransportManager = transport_manager
         self._retry_strategy_manager: RetryStrategyManager = retry_strategy_manager
@@ -91,7 +89,6 @@ class Worker:
         self._middleware_stack: MiddlewareStack = middleware_stack
         self._container: Container = container
         self._registry: Registry = registry
-        self._events: EventDispatcher = events
         self._stop_event: asyncio.Event = asyncio.Event()
         self._keep_alives: dict[int, tuple[str, Envelope]] = {}
         self._keep_alive_ids: itertools.count[int] = itertools.count()
