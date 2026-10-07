@@ -9,6 +9,7 @@ from typing import ClassVar
 from typing import Protocol
 from typing import cast
 from typing import override
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,7 @@ from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
     KeepAliveTransport,
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor_factory import EncryptorFactory
 from expanse.encryption.key import Key
@@ -49,6 +51,7 @@ from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.context import ContextStamp
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
+from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
@@ -57,7 +60,9 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
 )
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.stamps.unique import UniqueStamp
+from expanse.messenger.transports.database.transport import DatabaseTransport
 from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
 from expanse.serialization.serialization_manager import SerializationManager
@@ -221,7 +226,12 @@ def logging_handler(message: WorkerMessage) -> None:
 
 
 @pytest.fixture()
-async def container() -> Container:
+def connection() -> MagicMock:
+    return MagicMock(spec=AsyncConnection)
+
+
+@pytest.fixture()
+async def container(connection: MagicMock) -> Container:
     from expanse.logging.logging_service_provider import LoggingServiceProvider
 
     container = Container()
@@ -233,6 +243,8 @@ async def container() -> Container:
         PickleSerializer().restrict({class_to_name(MessageDecodingFailedError)})
     )
     container.instance(SerializerContract, Serializer(serialization_manager))
+    # Database transports do not touch the connection until they are used
+    container.instance(AsyncConnection, connection)
 
     return container
 
@@ -273,6 +285,16 @@ def config() -> Config:
                     "failed": {
                         "driver": "memory",
                     },
+                    # A transport whose messages go through the outbox
+                    "target": {
+                        "driver": "memory",
+                        "outbox": "database",
+                        "retry_strategy": "default",
+                    },
+                    "database": {"driver": "database"},
+                    # Stands in for the database outbox when consuming,
+                    # since the outbox relay only depends on the OutboxStamp.
+                    "outbox": {"driver": "memory"},
                 },
                 "retry_strategies": {
                     "default": {
@@ -1590,3 +1612,143 @@ async def test_worker_processes_messages_through_a_reversed_middleware_stack(
     await worker.run(limit=1)
 
     assert foo == "bar"
+
+
+async def _outbox_target(transport_manager: TransportManager) -> MemoryTransport:
+    transport = await transport_manager.transport("target")
+    assert isinstance(transport, OutboxTransport)
+
+    target = transport.target_transport
+    assert isinstance(target, MemoryTransport)
+
+    return target
+
+
+async def test_worker_relays_outboxed_messages_to_their_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    outbox = await transport_manager.transport("outbox")
+    assert isinstance(outbox, MemoryTransport)
+
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+
+    # The message is not handled while relaying...
+    assert handled == []
+
+    # ...it is forwarded to the target transport without the outbox stamp...
+    target = await _outbox_target(transport_manager)
+    assert len(target.sent) == 1
+    relayed = target.sent[0]
+    assert relayed.open() == WorkerMessage(value="relay-me")
+    assert not relayed.has_stamp(OutboxStamp)
+    assert not relayed.has_stamp(HandledStamp)
+
+    # ...and removed from the outbox.
+    assert [e async for e in outbox.receive()] == []
+
+
+async def test_worker_does_not_send_relayed_messages_back_to_the_outbox(
+    worker: Worker, transport_manager: TransportManager, connection: MagicMock
+) -> None:
+    outbox = await transport_manager.transport("outbox")
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+
+    database = await transport_manager.transport("database")
+    assert isinstance(database, DatabaseTransport)
+    connection.begin_nested.assert_not_called()
+    connection.execute.assert_not_called()
+
+
+async def test_worker_handles_relayed_messages_from_the_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    outbox = await transport_manager.transport("outbox")
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+    await worker.run("target", limit=1)
+
+    assert handled == [WorkerMessage(value="relay-me")]
+
+    target = await _outbox_target(transport_manager)
+    assert [e async for e in target.receive()] == []
+
+
+async def test_worker_handles_outboxed_messages_received_from_their_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    transport = await transport_manager.transport("memory")
+    await transport.send(
+        Envelope.wrap(WorkerMessage(value="already-there")).with_stamps(
+            OutboxStamp(target_transport_name="memory")
+        )
+    )
+
+    await worker.run("memory", limit=1)
+
+    assert handled == [WorkerMessage(value="already-there")]
+
+
+async def test_worker_retries_outbox_target_messages_on_the_target_transport(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    connection: MagicMock,
+) -> None:
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("transient failure")
+
+    registry.register_handler(handler)
+
+    target = await _outbox_target(transport_manager)
+    await target.send(Envelope.wrap(WorkerMessage(value="retry-me")))
+
+    await worker.run("target", limit=1)
+
+    # The retry goes straight to the target transport, bypassing the outbox
+    connection.begin_nested.assert_not_called()
+    connection.execute.assert_not_called()
+    assert len(target.sent) == 2
+
+    retried = target.sent[1]
+    redelivery_stamp = retried.stamp(RedeliveryStamp)
+    assert redelivery_stamp is not None
+    assert redelivery_stamp.retry_count == 1
+    assert not retried.has_stamp(OutboxStamp)

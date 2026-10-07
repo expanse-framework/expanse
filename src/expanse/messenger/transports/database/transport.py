@@ -26,7 +26,6 @@ class DatabaseTransport(KeepAliveTransportContract):
         connection: AsyncConnection,
         serializer: SerializerContract,
     ) -> None:
-        print(connection)
         self._config: DatabaseTransportConfig = config
         self._db_connection: AsyncConnection = connection
         self._connection: Connection = Connection(self._db_connection, self._config)

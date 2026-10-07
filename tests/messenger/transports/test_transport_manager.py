@@ -3,18 +3,25 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
+from expanse.database.asynchronous.connection import AsyncConnection
+from expanse.messenger.envelope import Envelope
+from expanse.messenger.exceptions import InvalidOutboxTransportError
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.serializers.serializer import Serializer
+from expanse.messenger.stamps.outbox import OutboxStamp
+from expanse.messenger.transports.database.transport import DatabaseTransport
 from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.redis.transport import RedisTransport
 from expanse.messenger.transports.sync.transport import SyncTransport
 from expanse.messenger.transports.transport_manager import TransportManager
@@ -48,6 +55,8 @@ def make_manager(
         )
         container.instance(Config, config)
         container.instance(SerializerContract, serializer)
+        # Database transports do not touch the connection until they are used
+        container.instance(AsyncConnection, MagicMock(spec=AsyncConnection))
 
         return TransportManager(container, config, registry)
 
@@ -254,3 +263,104 @@ async def test_different_transports_are_cached_independently(
     assert isinstance(memory, MemoryTransport)
     assert isinstance(sync, SyncTransport)
     assert memory is not sync
+
+
+async def test_transport_wraps_transport_configured_with_an_outbox(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "memory": {"driver": "memory", "outbox": "outbox"},
+                "outbox": {"driver": "database"},
+            },
+        }
+    )
+
+    transport = await manager.transport("memory")
+
+    assert isinstance(transport, OutboxTransport)
+    assert isinstance(transport.target_transport, MemoryTransport)
+
+
+async def test_outbox_transport_stores_messages_in_the_configured_outbox(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "memory": {"driver": "memory", "outbox": "outbox"},
+                "outbox": {"driver": "database"},
+            },
+        }
+    )
+
+    transport = await manager.transport("memory")
+    outbox = await manager.transport("outbox")
+    assert isinstance(outbox, DatabaseTransport)
+
+    sent: list[Envelope] = []
+
+    async def send(envelope: Envelope) -> Envelope:
+        sent.append(envelope)
+
+        return envelope
+
+    outbox.send = send  # type: ignore[method-assign]
+
+    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+
+    assert len(sent) == 1
+    assert sent[0].stamp(OutboxStamp) == OutboxStamp(target_transport_name="memory")
+
+
+@pytest.mark.parametrize("outbox", [None, ""])
+async def test_transport_is_not_wrapped_when_outbox_is_empty(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+    outbox: str | None,
+) -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "memory": {"driver": "memory", "outbox": outbox},
+            },
+        }
+    )
+
+    transport = await manager.transport("memory")
+
+    assert isinstance(transport, MemoryTransport)
+
+
+async def test_transport_raises_when_outbox_is_not_a_database_transport(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "memory": {"driver": "memory", "outbox": "other"},
+                "other": {"driver": "memory"},
+            },
+        }
+    )
+
+    with pytest.raises(
+        InvalidOutboxTransportError,
+        match="must be a database transport",
+    ):
+        await manager.transport("memory")
+
+
+async def test_transport_raises_when_outbox_is_not_configured(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+) -> None:
+    manager = make_manager(
+        {
+            "transports": {
+                "memory": {"driver": "memory", "outbox": "missing"},
+            },
+        }
+    )
+
+    with pytest.raises(UnconfiguredTransportError, match="'missing' is not configured"):
+        await manager.transport("memory")

@@ -7,20 +7,26 @@ import pytest
 
 from sqlalchemy import create_engine
 
+from expanse.configuration.config import Config
+from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
+from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.synchronous.session import Session
 from expanse.messenger.asynchronous.transactional_message_bus import (
     TransactionalMessageBus,
 )
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.registry import Registry
 from expanse.messenger.synchronous.message_bus import MessageBus
+from expanse.messenger.transports.transport_manager import TransportManager
 
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from expanse.messenger.serializers.serializer import Serializer
     from expanse.types.messenger import Message
 
 
@@ -56,8 +62,26 @@ def fake_bus() -> FakeMessageBus:
 
 
 @pytest.fixture()
-def async_bus(fake_bus: FakeMessageBus) -> TransactionalMessageBus:
-    return TransactionalMessageBus(fake_bus)
+def transport_manager(serializer: Serializer) -> TransportManager:
+    container = Container()
+    container.instance(SerializerContract, serializer)
+    config = Config(
+        {
+            "messenger": {
+                "transport": "memory",
+                "transports": {"memory": {"driver": "memory"}},
+            }
+        }
+    )
+
+    return TransportManager(container, config, Registry())
+
+
+@pytest.fixture()
+def async_bus(
+    fake_bus: FakeMessageBus, transport_manager: TransportManager
+) -> TransactionalMessageBus:
+    return TransactionalMessageBus(transport_manager, fake_bus)
 
 
 def test_dispatch_without_session_dispatches_immediately(

@@ -66,7 +66,12 @@ class Connection:
             available_at=available_at,
         )
 
-        async with self._connection.begin_nested() as transaction:
+        if self._connection.in_transaction():
+            transaction = self._connection.begin_nested()
+        else:
+            transaction = self._connection.begin()
+
+        async with transaction as tx:
             if self._connection.dialect.insert_returning:
                 result = await self._connection.execute(
                     insert_stmt.returning(self._table.c.id)
@@ -76,7 +81,7 @@ class Connection:
                 result = await self._connection.execute(insert_stmt)
                 message_id = result.lastrowid
 
-            await transaction.commit()
+            await tx.commit()
 
             return message_id
 
