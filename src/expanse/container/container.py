@@ -348,7 +348,14 @@ class Container:
     async def get(self, abstract: str, *args: Any) -> Any: ...
 
     async def get(self, abstract: str | type[T], *args: Any) -> Any | T:
-        return await self._resolve(abstract)
+        """
+        Resolve the given abstract from the container.
+
+        Extra arguments are passed to the factory of the abstract, and the resolved
+        instance is cached separately for each set of arguments, i.e. resolving
+        `get(Abstract, "name")` is equivalent to resolving `get(Annotated[Abstract, "name"])`.
+        """
+        return await self._resolve(abstract, *args)
 
     async def call(
         self,
@@ -451,7 +458,7 @@ class Container:
 
     async def _resolve(self, abstract: str | type[T], *args: Any) -> Any | T:
         alias = self._get_alias(abstract)
-        if alias in self._instances:
+        if not args and alias in self._instances:
             return self._instances[alias]
 
         if self._lock is None:
@@ -467,10 +474,15 @@ class Container:
     async def _do_resolve(self, abstract: str, *args: Any) -> Any: ...
 
     async def _do_resolve(self, abstract: str | type[T], *args: Any) -> Any | T:
+        abstract = self._get_alias(abstract)
         if args:
+            if isinstance(abstract, str):
+                raise ContainerException(
+                    f"Unable to resolve [{abstract}] with arguments:"
+                    " only class abstracts can be resolved with arguments"
+                )
+
             abstract = cast("type[T]", Annotated[abstract, *args])
-        else:
-            abstract = self._get_alias(abstract)
 
         if abstract in self._instances:
             return self._instances[abstract]
@@ -836,7 +848,7 @@ class ScopedContainer(Container):
     def _directly_bound(self, abstract: str | type) -> bool:
         return super().bound(abstract)
 
-    async def _resolve(self, abstract: str | type[T]) -> Any | T:
+    async def _resolve(self, abstract: str | type[T], *args: Any) -> Any | T:
         actual_abstract: str | type[T] = abstract
         origin = get_origin(abstract)
         if origin is Annotated:
@@ -845,9 +857,9 @@ class ScopedContainer(Container):
         # If the abstract is neither bound in the container nor in its base container,
         # we will resolve it from the scoped container.
         if not self.bound(actual_abstract):
-            return await self._do_resolve(abstract)
+            return await self._do_resolve(abstract, *args)
 
         if not self._directly_bound(actual_abstract):
-            return await self._base_container._resolve(abstract)
+            return await self._base_container._resolve(abstract, *args)
 
-        return await self._do_resolve(abstract)
+        return await self._do_resolve(abstract, *args)

@@ -146,31 +146,15 @@ class TransportManager:
         serializer = await self._container.get(SerializerContract)
         transport_config = DatabaseTransportConfig.model_validate(config)
 
-        connection_name = transport_config.connection
-        if connection_name is not None:
-            from expanse.database.asynchronous.database_manager import (
-                AsyncDatabaseManager,
-            )
-
-            db = await self._container.get(AsyncDatabaseManager)
-
-            if connection_name != db.get_default_connection():
-                # The scoped connection is always the default one, so other
-                # connections need a dedicated connection owned by the transport.
-                connection = db.connection(connection_name)
-                await connection.start()
-
-                return DatabaseTransport(
-                    transport_config, connection, serializer, owns_connection=True
-                )
-
-        # Share the scoped connection, so that messages sent through this transport
+        # Use the scoped connection, so that messages sent through this transport
         # are part of the current transaction of the sessions using it.
-        return DatabaseTransport(
-            transport_config,
-            await self._container.get(AsyncConnection),
-            serializer,
+        connection = (
+            await self._container.get(AsyncConnection)
+            if transport_config.connection is None
+            else await self._container.get(AsyncConnection, transport_config.connection)
         )
+
+        return DatabaseTransport(transport_config, connection, serializer)
 
     async def _create_redis_transport(self, raw_config: dict[str, Any]) -> Transport:
         from expanse.contracts.messenger.serializer import (
