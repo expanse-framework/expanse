@@ -1752,3 +1752,30 @@ async def test_worker_retries_outbox_target_messages_on_the_target_transport(
     assert redelivery_stamp is not None
     assert redelivery_stamp.retry_count == 1
     assert not retried.has_stamp(OutboxStamp)
+
+
+async def test_worker_keeps_messages_of_outbox_keep_alive_targets_alive(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, transport_manager = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+    transport_manager._transports["keep_alive"] = OutboxTransport(
+        target_transport=fake_transport,
+        outbox_transport=FakeKeepAliveTransport(),
+        target_transport_name="keep_alive",
+    )
+
+    async def handler(message: WorkerMessage) -> None:
+        await worker.keep_alive()
+
+    envelope = fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="alive")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert [e for e, _ in fake_transport.keep_alive_calls] == [envelope]
+    assert fake_transport.acknowledged[0].open() == WorkerMessage(value="alive")

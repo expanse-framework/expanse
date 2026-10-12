@@ -26,6 +26,9 @@ class TransportManager:
         self._registry: Registry = registry
         self._config: Config = config
         self._transports: dict[str, Transport] = {}
+        # Names of the transports currently being created,
+        # used to detect circular outbox configurations.
+        self._creating: set[str] = set()
 
     async def transport(self, name: str | None = None) -> Transport:
         if name is None:
@@ -34,7 +37,17 @@ class TransportManager:
         if name in self._transports:
             return self._transports[name]
 
-        transport = await self._create_transport(name)
+        if name in self._creating:
+            raise InvalidOutboxTransportError(
+                f"Circular outbox configuration detected for transport '{name}'."
+            )
+
+        self._creating.add(name)
+        try:
+            transport = await self._create_transport(name)
+        finally:
+            self._creating.discard(name)
+
         self._transports[name] = transport
 
         return transport
@@ -131,9 +144,30 @@ class TransportManager:
         from expanse.messenger.transports.database.transport import DatabaseTransport
 
         serializer = await self._container.get(SerializerContract)
+        transport_config = DatabaseTransportConfig.model_validate(config)
 
+        connection_name = transport_config.connection
+        if connection_name is not None:
+            from expanse.database.asynchronous.database_manager import (
+                AsyncDatabaseManager,
+            )
+
+            db = await self._container.get(AsyncDatabaseManager)
+
+            if connection_name != db.get_default_connection():
+                # The scoped connection is always the default one, so other
+                # connections need a dedicated connection owned by the transport.
+                connection = db.connection(connection_name)
+                await connection.start()
+
+                return DatabaseTransport(
+                    transport_config, connection, serializer, owns_connection=True
+                )
+
+        # Share the scoped connection, so that messages sent through this transport
+        # are part of the current transaction of the sessions using it.
         return DatabaseTransport(
-            DatabaseTransportConfig.model_validate(config),
+            transport_config,
             await self._container.get(AsyncConnection),
             serializer,
         )

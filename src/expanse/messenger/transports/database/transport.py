@@ -25,11 +25,19 @@ class DatabaseTransport(KeepAliveTransportContract):
         config: DatabaseTransportConfig,
         connection: AsyncConnection,
         serializer: SerializerContract,
+        owns_connection: bool = False,
     ) -> None:
         self._config: DatabaseTransportConfig = config
         self._db_connection: AsyncConnection = connection
         self._connection: Connection = Connection(self._db_connection, self._config)
         self._serializer: SerializerContract = serializer
+        # Whether the database connection was created for this transport,
+        # and must therefore be closed along with it.
+        self._owns_connection: bool = owns_connection
+
+    @property
+    def connection(self) -> AsyncConnection:
+        return self._db_connection
 
     async def send(self, envelope: Envelope) -> Envelope:
         encoded_envelope = self._serializer.encode(envelope)
@@ -101,4 +109,5 @@ class DatabaseTransport(KeepAliveTransportContract):
         await self._connection.keep_alive(message_id_stamp.id, duration)
 
     async def close(self) -> None:
-        pass
+        if self._owns_connection:
+            await self._db_connection.close()

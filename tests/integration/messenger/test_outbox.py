@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from sqlalchemy import text
@@ -8,9 +10,12 @@ from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.database.asynchronous.session import AsyncSession
+from expanse.database.synchronous.session import Session
 from expanse.http.responses.response import Response
+from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
 from expanse.messenger.stamps.outbox import OutboxStamp
+from expanse.messenger.stamps.unique import UniqueStamp
 from expanse.messenger.transports.memory.transport import MemoryTransport
 from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.transport_manager import TransportManager
@@ -77,6 +82,49 @@ async def dispatch_first_route(session: AsyncSession, bus: MessageBus) -> Respon
     return Response("ok")
 
 
+@get("/outbox-dispatch-first-rollback")
+async def dispatch_first_rollback_route(
+    session: AsyncSession, bus: MessageBus
+) -> Response:
+    async with session.begin():
+        # Nothing has been executed by the session on its connection yet
+        await bus.dispatch(DatabaseMessage(value="hello"))
+        await session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-sync-session-rollback")
+async def sync_session_rollback_route(session: Session, bus: MessageBus) -> Response:
+    with session.begin():
+        session.execute(text("SELECT 1"))
+        await bus.dispatch(DatabaseMessage(value="hello"))
+        session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-unique-rollback")
+async def unique_rollback_route(session: AsyncSession, bus: MessageBus) -> Response:
+    async with session.begin():
+        await bus.dispatch(
+            Envelope.wrap(DatabaseMessage(value="hello")).with_stamps(UniqueStamp())
+        )
+        await session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-unique-commit")
+async def unique_commit_route(session: AsyncSession, bus: MessageBus) -> Response:
+    async with session.begin():
+        await bus.dispatch(
+            Envelope.wrap(DatabaseMessage(value="hello")).with_stamps(UniqueStamp())
+        )
+
+    return Response("ok")
+
+
 @pytest.fixture(params=["sqlite", "postgresql"])
 def connection_name(
     request: pytest.FixtureRequest,
@@ -104,6 +152,10 @@ def connection_name(
     router.handler(commit_route)
     router.handler(rollback_route)
     router.handler(dispatch_first_route)
+    router.handler(dispatch_first_rollback_route)
+    router.handler(sync_session_rollback_route)
+    router.handler(unique_rollback_route)
+    router.handler(unique_commit_route)
 
     return name
 
@@ -180,3 +232,66 @@ async def test_messages_are_stored_in_the_outbox_when_dispatching_first_in_a_tra
 
     assert response.status_code == 200
     assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_not_stored_in_the_outbox_when_dispatching_first_in_a_rolled_back_transaction(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-dispatch-first-rollback")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_messages_are_not_stored_in_the_outbox_when_a_sync_session_is_rolled_back(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-sync-session-rollback")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_unique_locks_are_released_when_outboxed_messages_are_rolled_back(
+    app: Application, client: TestClient, connection_name: str, tmp_path: Path
+) -> None:
+    app.config["cache"] = {
+        "store": "file",
+        "stores": {"file": {"driver": "file", "path": str(tmp_path / "cache")}},
+    }
+
+    client.get("/outbox-unique-rollback")
+
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+    # The lock of the rolled back message must not prevent dispatching it again
+    client.get("/outbox-unique-commit")
+
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_stored_in_the_configured_outbox_connection(
+    app: Application,
+    client: TestClient,
+    router: Router,
+    command_tester: CommandTester,
+    setup_databases: None,
+) -> None:
+    app.config["database"]["default"] = "postgresql"
+    command_tester.command("db migrate").run()
+    app.config["database"]["default"] = "sqlite"
+    command_tester.command("db migrate").run()
+    app.config["messenger"] = {
+        "transport": "memory",
+        "transports": {
+            "memory": {"driver": "memory", "outbox": "outbox"},
+            "outbox": {"driver": "database", "connection": "postgresql"},
+        },
+    }
+    router.handler(commit_route)
+
+    response = client.get("/outbox-commit")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, "postgresql") == 1
+    assert await _count_outbox_messages(app, "sqlite") == 0
