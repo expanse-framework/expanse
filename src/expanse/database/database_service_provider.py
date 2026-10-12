@@ -62,8 +62,14 @@ class DatabaseServiceProvider(ServiceProvider):
         await db.dispose()
 
     async def _create_async_connection(
-        self, db: AsyncDatabaseManager, name: str | None = None
+        self, container: Container, db: AsyncDatabaseManager, name: str | None = None
     ) -> AsyncGenerator[AsyncConnection]:
+        if name is not None and name == db.get_default_connection():
+            # The default connection is shared, whether it is requested by name or not.
+            yield await container.get(AsyncConnection)
+
+            return
+
         connection = db.connection(name)
 
         await connection.start()
@@ -75,12 +81,23 @@ class DatabaseServiceProvider(ServiceProvider):
     async def _create_async_session(
         self,
         container: Container,
+        db: AsyncDatabaseManager,
         pagination_manager: PaginationManager,
         name: str | None = None,
     ) -> AsyncGenerator[AsyncSession]:
         from sqlalchemy.ext.asyncio import async_sessionmaker
 
-        connection = await container.get(AsyncConnection, name)
+        if name is not None and name == db.get_default_connection():
+            # The default session is shared, whether it is requested by name or not.
+            yield await container.get(AsyncSession)
+
+            return
+
+        connection = (
+            await container.get(AsyncConnection)
+            if name is None
+            else await container.get(AsyncConnection, name)
+        )
         # Expiring on commit forces a refresh on the next attribute access, which is
         # IO. Since attributes are commonly read back from synchronous code outside of
         # any SQLAlchemy greenlet — when serializing the response, typically — that
@@ -106,9 +123,15 @@ class DatabaseServiceProvider(ServiceProvider):
 
         db.dispose()
 
-    def _create_connection(
-        self, db: DatabaseManager, name: str | None = None
-    ) -> Generator[Connection]:
+    async def _create_connection(
+        self, container: Container, db: DatabaseManager, name: str | None = None
+    ) -> AsyncGenerator[Connection]:
+        if name is not None and name == db.get_default_connection():
+            # The default connection is shared, whether it is requested by name or not.
+            yield await container.get(Connection)
+
+            return
+
         connection = db.connection(name)
 
         yield connection
@@ -118,12 +141,23 @@ class DatabaseServiceProvider(ServiceProvider):
     async def _create_session(
         self,
         container: Container,
+        db: DatabaseManager,
         pagination_manager: PaginationManager,
         name: str | None = None,
     ) -> AsyncGenerator[Session]:
         from sqlalchemy.orm import sessionmaker
 
-        connection = await container.get(Connection, name)
+        if name is not None and name == db.get_default_connection():
+            # The default session is shared, whether it is requested by name or not.
+            yield await container.get(Session)
+
+            return
+
+        connection = (
+            await container.get(Connection)
+            if name is None
+            else await container.get(Connection, name)
+        )
         factory = sessionmaker(connection, class_=Session)
 
         session = factory().set_pagination_manager(pagination_manager)

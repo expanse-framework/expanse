@@ -59,3 +59,30 @@ def test_a_named_session_can_be_injected(
     response = client.get("/named")
 
     assert response.json() == name
+
+
+def test_the_default_session_is_shared_when_requested_by_name(
+    router: Router, client: TestClient
+) -> None:
+    def sessions(
+        session: Session,
+        named: Annotated[Session, "sqlite"],
+        other: Annotated[Session, "sqlite2"],
+    ) -> Response:
+        return json(
+            {
+                "same": named is session,
+                "same_connection": named.bind is session.bind,
+                "other_connection": other.bind is not session.bind,
+            }
+        )
+
+    router.get("/sessions", sessions)
+
+    response = client.get("/sessions")
+
+    assert response.json() == {
+        "same": True,
+        "same_connection": True,
+        "other_connection": True,
+    }
