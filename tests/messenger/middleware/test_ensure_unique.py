@@ -14,6 +14,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.middleware.ensure_unique import EnsureUnique
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.unique import UniqueStamp
+from expanse.messenger.stamps.unique_lock_acquired import UniqueLockAcquiredStamp
 
 
 if TYPE_CHECKING:
@@ -84,7 +85,8 @@ async def test_calls_next_after_acquiring_the_lock(
 
     result = await middleware.handle(envelope, next_call)
 
-    assert result is envelope
+    assert result.open() is envelope.open()
+    assert result.has_stamp(UniqueLockAcquiredStamp)
     assert next_call.calls == [envelope]  # type: ignore[attr-defined]
 
 
@@ -104,4 +106,22 @@ async def test_skips_next_when_lock_cannot_be_acquired(
     result = await middleware.handle(other, second_next)
 
     assert result is other
+    assert not result.has_stamp(UniqueLockAcquiredStamp)
     assert second_next.calls == []  # type: ignore[attr-defined]
+
+
+async def test_releases_the_lock_when_next_fails(middleware: EnsureUnique) -> None:
+    envelope = Envelope(UniqueMessage("hello"), stamps=[UniqueStamp()])
+
+    async def failing_next(envelope: Envelope) -> Envelope:
+        raise RuntimeError("Transport failure")
+
+    with pytest.raises(RuntimeError, match="Transport failure"):
+        await middleware.handle(envelope, failing_next)
+
+    # The message was never sent, so the lock must be available again.
+    next_call = _pass_through()
+    result = await middleware.handle(envelope, next_call)
+
+    assert result.has_stamp(UniqueLockAcquiredStamp)
+    assert next_call.calls == [envelope]  # type: ignore[attr-defined]

@@ -137,21 +137,21 @@ class Worker:
                 return True
 
         async def consume(concurrent: bool = True) -> None:
-            worker_transport = transport
+            # Messages are consumed from, retried on, and kept alive by the target
+            # of an outbox transport: only new messages go through the outbox.
+            worker_transport = (
+                transport.target_transport
+                if isinstance(transport, OutboxTransport)
+                else transport
+            )
 
             if concurrent:
                 worker_id = generate_random_string(8, restricted=True)
                 context = await self._container.get(Context)
                 context["worker.id"] = worker_id
 
-                if isinstance(transport, WorkerAwareTransport):
-                    worker_transport = transport.clone_for_worker(worker_id)
-                elif isinstance(transport, OutboxTransport) and isinstance(
-                    transport.target_transport, WorkerAwareTransport
-                ):
-                    worker_transport = transport.target_transport.clone_for_worker(
-                        worker_id
-                    )
+                if isinstance(worker_transport, WorkerAwareTransport):
+                    worker_transport = worker_transport.clone_for_worker(worker_id)
 
             while not self._stop_event.is_set():
                 if limit is not None and handled_messages >= limit:
@@ -458,8 +458,6 @@ class Worker:
                         target_transport_name,
                         transport_name,
                     )
-
-                    print(target_transport)
 
                     await target_transport.send(envelope)
 

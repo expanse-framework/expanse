@@ -11,6 +11,7 @@ from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
 from expanse.database.asynchronous.connection import AsyncConnection
+from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import InvalidOutboxTransportError
 from expanse.messenger.exceptions import NoDefaultTransportError
@@ -349,6 +350,100 @@ async def test_transport_raises_when_outbox_is_not_a_database_transport(
         match="must be a database transport",
     ):
         await manager.transport("memory")
+
+
+@pytest.mark.parametrize(
+    "transports",
+    [
+        {"database": {"driver": "database", "outbox": "database"}},
+        {
+            "memory": {"driver": "memory", "outbox": "outbox"},
+            "outbox": {"driver": "database", "outbox": "memory"},
+        },
+    ],
+    ids=["self", "mutual"],
+)
+async def test_transport_raises_on_circular_outbox_configuration(
+    make_manager: Callable[[dict[str, Any] | None], TransportManager],
+    transports: dict[str, Any],
+) -> None:
+    manager = make_manager({"transports": transports})
+
+    with pytest.raises(InvalidOutboxTransportError, match="Circular outbox"):
+        await manager.transport(next(iter(transports)))
+
+
+def _make_database_manager() -> MagicMock:
+    db = MagicMock(spec=AsyncDatabaseManager)
+    db.get_default_connection.return_value = "default"
+    db.connection.side_effect = lambda name: MagicMock(spec=AsyncConnection)
+
+    return db
+
+
+@pytest.mark.parametrize("connection", [None, "default"])
+async def test_database_transport_uses_the_scoped_connection_for_the_default_connection(
+    serializer: Serializer, connection: str | None
+) -> None:
+    scoped_connection = MagicMock(spec=AsyncConnection)
+    db = _make_database_manager()
+    container = Container()
+    container.instance(SerializerContract, serializer)
+    container.instance(AsyncConnection, scoped_connection)
+    container.instance(AsyncDatabaseManager, db)
+    config = Config(
+        {
+            "messenger": {
+                "transports": {
+                    "database": {"driver": "database", "connection": connection}
+                }
+            }
+        }
+    )
+    manager = TransportManager(container, config, Registry())
+
+    transport = await manager.transport("database")
+
+    assert isinstance(transport, DatabaseTransport)
+    assert transport.connection is scoped_connection
+    db.connection.assert_not_called()
+
+    await manager.close()
+
+    scoped_connection.close.assert_not_called()
+
+
+async def test_database_transport_uses_a_dedicated_connection_for_other_connections(
+    serializer: Serializer,
+) -> None:
+    scoped_connection = MagicMock(spec=AsyncConnection)
+    db = _make_database_manager()
+    container = Container()
+    container.instance(SerializerContract, serializer)
+    container.instance(AsyncConnection, scoped_connection)
+    container.instance(AsyncDatabaseManager, db)
+    config = Config(
+        {
+            "messenger": {
+                "transports": {
+                    "database": {"driver": "database", "connection": "other"}
+                }
+            }
+        }
+    )
+    manager = TransportManager(container, config, Registry())
+
+    transport = await manager.transport("database")
+
+    assert isinstance(transport, DatabaseTransport)
+    assert transport.connection is not scoped_connection
+    db.connection.assert_called_once_with("other")
+    transport.connection.start.assert_awaited_once()  # type: ignore[attr-defined]
+
+    await manager.close()
+
+    # The transport owns its dedicated connection
+    transport.connection.close.assert_awaited_once()  # type: ignore[attr-defined]
 
 
 async def test_transport_raises_when_outbox_is_not_configured(

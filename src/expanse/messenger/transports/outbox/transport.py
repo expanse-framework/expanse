@@ -11,6 +11,7 @@ from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
+from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 
 
 class OutboxTransport(TransportContract):
@@ -28,16 +29,22 @@ class OutboxTransport(TransportContract):
     def target_transport(self) -> TransportContract:
         return self._target_transport
 
+    @property
+    def outbox_transport(self) -> TransportContract:
+        return self._outbox_transport
+
     @override
     async def send(self, envelope: Envelope) -> Envelope:
         if envelope.has_stamp(OutboxStamp):
             # If the envelope has an OutboxStamp, send it to the target transport
+            # without the stamps tied to its stay in the outbox.
             return await self._target_transport.send(
                 envelope.without_stamps(
                     OutboxStamp,
                     RedeliveryStamp,
                     DelayStamp,
                     SentToFailureTransportStamp,
+                    TransportMessageIdStamp,
                 )
             )
 

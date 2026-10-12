@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -13,12 +14,14 @@ from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.database.synchronous.session import Session
 from expanse.messenger.asynchronous.transactional_message_bus import (
     TransactionalMessageBus,
 )
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
+from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.synchronous.message_bus import MessageBus
 from expanse.messenger.transports.transport_manager import TransportManager
 
@@ -65,11 +68,17 @@ def fake_bus() -> FakeMessageBus:
 def transport_manager(serializer: Serializer) -> TransportManager:
     container = Container()
     container.instance(SerializerContract, serializer)
+    # Database transports do not touch the connection until they are used
+    container.instance(AsyncConnection, MagicMock(spec=AsyncConnection))
     config = Config(
         {
             "messenger": {
                 "transport": "memory",
-                "transports": {"memory": {"driver": "memory"}},
+                "transports": {
+                    "memory": {"driver": "memory"},
+                    "outboxed": {"driver": "memory", "outbox": "outbox"},
+                    "outbox": {"driver": "database"},
+                },
             }
         }
     )
@@ -232,3 +241,37 @@ def test_bus_keeps_track_of_transactions(
 
         session.commit()
         assert len(fake_bus.dispatched) == 2
+
+
+def test_messages_for_outbox_transports_are_queued_until_commit(
+    fake_bus: FakeMessageBus, session: Session, async_bus: TransactionalMessageBus
+) -> None:
+    """
+    Synchronous sessions never share their connection with the outbox,
+    so messages are only stored in the outbox once the transaction is committed.
+    """
+    bus = MessageBus(async_bus)
+    async_bus.attach_session(session)
+
+    message = MyMessage(foo="bar")
+    with session.begin():
+        bus.dispatch(Envelope.wrap(message).with_stamps(TransportStamp("outboxed")))
+
+        assert fake_bus.dispatched == []
+
+    assert [e.open() for e in fake_bus.dispatched] == [message]
+
+
+def test_messages_for_outbox_transports_are_discarded_on_rollback(
+    fake_bus: FakeMessageBus, session: Session, async_bus: TransactionalMessageBus
+) -> None:
+    bus = MessageBus(async_bus)
+    async_bus.attach_session(session)
+
+    with session.begin():
+        bus.dispatch(
+            Envelope.wrap(MyMessage(foo="bar")).with_stamps(TransportStamp("outboxed"))
+        )
+        session.rollback()
+
+    assert fake_bus.dispatched == []

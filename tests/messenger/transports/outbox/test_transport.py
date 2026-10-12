@@ -146,6 +146,7 @@ async def test_send_strips_outbox_delivery_stamps_when_relaying(
         RedeliveryStamp(retry_count=2),
         DelayStamp(delay=5000),
         SentToFailureTransportStamp(original_transport="outbox"),
+        TransportMessageIdStamp(42),
     )
 
     await transport.send(envelope)
@@ -155,6 +156,8 @@ async def test_send_strips_outbox_delivery_stamps_when_relaying(
     assert not relayed.has_stamp(RedeliveryStamp)
     assert not relayed.has_stamp(DelayStamp)
     assert not relayed.has_stamp(SentToFailureTransportStamp)
+    # Only the identifier of the message in the target transport remains
+    assert relayed.stamps(TransportMessageIdStamp) == [TransportMessageIdStamp(1)]
 
 
 async def test_send_sends_redelivered_messages_directly_to_the_target_transport(
