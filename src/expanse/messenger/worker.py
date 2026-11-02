@@ -33,9 +33,9 @@ from expanse.messenger.retry.retry_strategy import RetryStrategy
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
-from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
+from expanse.messenger.stamps.relayed import RelayedStamp
 from expanse.messenger.stamps.sent_to_failure_transport import (
     SentToFailureTransportStamp,
 )
@@ -372,6 +372,9 @@ class Worker:
         try:
             message = envelope.open()
             container.instance(message.__class__, message)
+            # Middleware (e.g. RelayMessages) must use the worker's transports
+            # rather than a fresh transport manager scoped to this envelope.
+            container.instance(TransportManager, self._transport_manager)
 
             async def _handle(envelope: Envelope) -> Envelope:
                 message = envelope.open()
@@ -442,27 +445,6 @@ class Worker:
 
                 return envelope
 
-            outbox_stamp = envelope.stamp(OutboxStamp)
-
-            if outbox_stamp is not None:
-                target_transport_name = outbox_stamp.target_transport_name
-
-                target_transport = await self._transport_manager.transport(
-                    target_transport_name
-                )
-
-                if target_transport_name != transport_name:
-                    logger.debug(
-                        "Relaying outbox message %s to target transport '%s' from transport '%s'",
-                        type(envelope.open()).__name__,
-                        target_transport_name,
-                        transport_name,
-                    )
-
-                    await target_transport.send(envelope)
-
-                    return envelope
-
             # Build the middleware pipeline and process the envelope through it.
             # We need to reverse the middleware stack to ensure messages are properly
             # processed. For instance, if messages with a context to propagate have been
@@ -498,6 +480,11 @@ class Worker:
                 )
 
     async def _after_handling_envelope(self, envelope: Envelope) -> None:
+        if envelope.has_stamp(RelayedStamp):
+            # The message has not been handled yet, only relayed
+            # to its target transport: the lock must be kept until it is.
+            return
+
         await self._release_unique_lock(envelope)
 
     async def _release_unique_lock(self, envelope: Envelope) -> None:
