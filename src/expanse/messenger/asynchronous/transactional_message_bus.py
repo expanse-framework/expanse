@@ -4,18 +4,14 @@ import logging
 
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import cast
 from typing import override
 
-from asgiref.sync import async_to_sync
 from sqlalchemy import event
 from sqlalchemy.util import await_only
-from sqlalchemy.util.concurrency import in_greenlet
 
 from expanse.contracts.messenger.asynchronous.message_bus import (
     MessageBus as MessageBusContract,
 )
-from expanse.database.asynchronous.session import AsyncSession
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransactionalMessageBusError
 from expanse.messenger.stamps.transport import TransportStamp
@@ -28,10 +24,11 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
     from collections.abc import Callable
 
+    from sqlalchemy.orm import Session
     from sqlalchemy.orm import SessionTransaction
 
     from expanse.container.container import Container
-    from expanse.database.synchronous.session import Session
+    from expanse.database.asynchronous.session import AsyncSession
     from expanse.messenger.transports.transport_manager import TransportManager
     from expanse.types.messenger import Message
 
@@ -41,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionalMessageBus(MessageBusContract):
     """
-    A specialized message bus that queues messages until attached sessions are committed.
+    A specialized message bus that queues messages until the attached session is committed.
     Upon dispatch of a message, if no session is currently attached, the message is dispatched immediately
     through the decorated bus.
 
@@ -58,7 +55,7 @@ class TransactionalMessageBus(MessageBusContract):
         self,
         transport_manager: TransportManager,
         decorated_bus: MessageBusContract,
-        session: Session | AsyncSession | None = None,
+        session: AsyncSession | None = None,
         container: Container | None = None,
     ):
         self._transport_manager: TransportManager = transport_manager
@@ -69,18 +66,12 @@ class TransactionalMessageBus(MessageBusContract):
         # whose unique lock was acquired upon dispatch. Their locks must be released
         # if the transaction is rolled back, since they will never be handled.
         self._locked_outboxed_messages: list[list[Envelope]] = []
-        self._session: Session | None = None
-        self._async_session: AsyncSession | None = None
+        self._session: AsyncSession | None = None
 
         if session is not None:
             self.attach_session(session)
 
-    def attach_session(self, session: Session | AsyncSession) -> None:
-        async_session: AsyncSession | None = None
-        if isinstance(session, AsyncSession):
-            async_session = session
-            session = cast("Session", session.sync_session)
-
+    def attach_session(self, session: AsyncSession) -> None:
         if self._session is not None and self._session is not session:
             raise TransactionalMessageBusError(
                 "A session is already attached to the transactional message bus."
@@ -92,33 +83,38 @@ class TransactionalMessageBus(MessageBusContract):
             return
 
         self._session = session
-        self._async_session = async_session
 
-        if session.in_transaction():
-            self._append_new_message_queue(session, None)
+        # Session events are only emitted by the underlying synchronous session.
+        sync_session = session.sync_session
+
+        if sync_session.in_transaction():
+            self._append_new_message_queue(sync_session, None)
 
         event.listen(
-            session, "after_transaction_create", self._append_new_message_queue
+            sync_session, "after_transaction_create", self._append_new_message_queue
         )
-        event.listen(session, "after_transaction_end", self._pop_last_message_queue)
+        event.listen(
+            sync_session, "after_transaction_end", self._pop_last_message_queue
+        )
 
         # Register an after commit hook to dispatch messages after the transaction is committed.
-        event.listen(session, "after_commit", self._dispatch_after_commit)
+        event.listen(sync_session, "after_commit", self._dispatch_after_commit)
 
     def detach_session(self) -> None:
         if self._session is None:
             return
 
+        sync_session = self._session.sync_session
+
         event.remove(
-            self._session, "after_transaction_create", self._append_new_message_queue
+            sync_session, "after_transaction_create", self._append_new_message_queue
         )
         event.remove(
-            self._session, "after_transaction_end", self._pop_last_message_queue
+            sync_session, "after_transaction_end", self._pop_last_message_queue
         )
-        event.remove(self._session, "after_commit", self._dispatch_after_commit)
+        event.remove(sync_session, "after_commit", self._dispatch_after_commit)
 
         self._session = None
-        self._async_session = None
 
     @override
     async def dispatch(self, message: Message | Envelope) -> Envelope:
@@ -153,21 +149,20 @@ class TransactionalMessageBus(MessageBusContract):
         Whether messages stored in the outbox of the given transport
         are part of the transaction of the attached session.
         """
-        if self._async_session is None:
-            # Synchronous sessions never share their connection with the outbox.
+        if self._session is None:
             return False
 
         outbox = transport.outbox_transport
         if not isinstance(outbox, DatabaseTransport):
             return False
 
-        if self._async_session.bind is not outbox.connection:
+        if self._session.bind is not outbox.connection:
             return False
 
         # Sessions only begin their transaction on the connection upon their first
         # database operation. Ensure it is begun, otherwise the outbox would commit
         # the message on its own, regardless of the outcome of the transaction.
-        await self._async_session.connection()
+        await self._session.connection()
 
         return True
 
@@ -245,9 +240,6 @@ class TransactionalMessageBus(MessageBusContract):
     def _run(
         self, function: Callable[[Envelope], Awaitable[Any]], envelope: Envelope
     ) -> None:
-        if in_greenlet():
-            await_only(function(envelope))
-        else:
-            # Not in a SQLAlchemy greenlet context (e.g., plain thread).
-            # Schedule the coroutine on the captured event loop.
-            async_to_sync(function)(envelope)
+        # Session events of asynchronous sessions are emitted from within
+        # the greenlet SQLAlchemy runs their synchronous session in.
+        await_only(function(envelope))

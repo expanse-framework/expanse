@@ -20,9 +20,9 @@ class EncryptedMessage:
     data: str
 
 
-class HandleEncryption:
+class BaseHandleEncryption:
     """
-    Middleware to encrypt/decrypt messages upon sending and reception.
+    Encryption logic shared by the asynchronous and synchronous middleware.
     """
 
     _purpose: str = "expanse/messenger/encryption"
@@ -30,20 +30,6 @@ class HandleEncryption:
     def __init__(self, encryption: EncryptionManager, serializer: Serializer) -> None:
         self._encryption: EncryptionManager = encryption
         self._serializer: Serializer = serializer
-
-    async def handle(
-        self, envelope: Envelope, next_call: Callable[[Envelope], Awaitable[Envelope]]
-    ) -> Envelope:
-        if envelope.has_stamp(ReceivedStamp):
-            if not envelope.has_stamp(EncryptedStamp):
-                return await next_call(envelope)
-
-            return await next_call(self._decrypt(envelope))
-
-        if not envelope.has_stamp(SensitiveStamp):
-            return await next_call(envelope)
-
-        return await next_call(self._encrypt(envelope))
 
     def _encrypt(self, envelope: Envelope) -> Envelope:
         # We need to serialize the message before encrypting it.
@@ -78,3 +64,23 @@ class HandleEncryption:
         return self._serializer.decode(decoded_envelope).with_stamps(
             *[s for s in all_stamps if not isinstance(s, EncryptedStamp)]
         )
+
+
+class HandleEncryption(BaseHandleEncryption):
+    """
+    Middleware to encrypt/decrypt messages upon sending and reception.
+    """
+
+    async def handle(
+        self, envelope: Envelope, next_call: Callable[[Envelope], Awaitable[Envelope]]
+    ) -> Envelope:
+        if envelope.has_stamp(ReceivedStamp):
+            if not envelope.has_stamp(EncryptedStamp):
+                return await next_call(envelope)
+
+            return await next_call(self._decrypt(envelope))
+
+        if not envelope.has_stamp(SensitiveStamp):
+            return await next_call(envelope)
+
+        return await next_call(self._encrypt(envelope))

@@ -5,12 +5,14 @@ from expanse.support.middleware.middleware_stack import (
 )
 
 
-class MiddlewareStack(BaseMiddlewareStack[Envelope, Envelope]):
+class MiddlewareStack(BaseMiddlewareStack[Middleware[Envelope, Envelope]]):
     """
     Middleware stack for the messenger.
     """
 
-    def get_default_middleware(self) -> list[type[Middleware[Envelope, Envelope]]]:
+    def get_default_middleware(
+        self,
+    ) -> list[type[Middleware[Envelope, Envelope]]]:
         from expanse.messenger.middleware.ensure_unique import EnsureUnique
         from expanse.messenger.middleware.handle_encryption import HandleEncryption
         from expanse.messenger.middleware.handle_failed_decoding import (

@@ -15,6 +15,12 @@ from expanse.contracts.messenger.synchronous.message_bus import (
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
+from expanse.messenger.synchronous.middleware.middleware_stack import (
+    MiddlewareStack as SyncMiddlewareStack,
+)
+from expanse.messenger.synchronous.transport_manager import (
+    TransportManager as SyncTransportManager,
+)
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.trusted_collection import TrustedCollection
 from expanse.serialization.serialization_manager import SerializationManager
@@ -41,7 +47,11 @@ class MessengerServiceProvider(ServiceProvider):
         self._container.singleton(SerializerContract, self._create_serializer)
         self._container.singleton(RetryStrategyManager)
         self._container.singleton(MiddlewareStack)
+        self._container.singleton(SyncMiddlewareStack)
         self._container.scoped(TransportManager, self._create_transport_manager)
+        self._container.scoped(
+            SyncTransportManager, self._create_sync_transport_manager
+        )
         self._container.scoped(MessageBusContract, self._create_message_bus)
         self._container.scoped(SyncMessageBusContract, self._create_sync_message_bus)
 
@@ -58,10 +68,13 @@ class MessengerServiceProvider(ServiceProvider):
             MessageBusContract, self._attach_session_to_transactional_bus
         )
         await self._container.on_resolved(
-            Session, self._attach_resolved_session_to_transactional_bus
+            SyncMessageBusContract, self._attach_session_to_sync_transactional_bus
         )
         await self._container.on_resolved(
             AsyncSession, self._attach_resolved_session_to_transactional_bus
+        )
+        await self._container.on_resolved(
+            Session, self._attach_resolved_session_to_sync_transactional_bus
         )
         await self._container.on_resolved(
             SerializationManager, self._register_serializers
@@ -96,6 +109,24 @@ class MessengerServiceProvider(ServiceProvider):
 
         await manager.close()
 
+    async def _create_sync_transport_manager(
+        self,
+        container: Container,
+        config: Config,
+        registry: Registry,
+    ) -> AsyncGenerator[SyncTransportManager, None]:
+        from expanse.contracts.messenger.serializer import (
+            Serializer as SerializerContract,
+        )
+
+        manager = SyncTransportManager(
+            container, config, registry, await container.get(SerializerContract)
+        )
+
+        yield manager
+
+        manager.close()
+
     async def _create_message_bus(
         self,
         transport_manager: TransportManager,
@@ -119,11 +150,28 @@ class MessengerServiceProvider(ServiceProvider):
 
     async def _create_sync_message_bus(
         self,
-        async_bus: MessageBusContract,
-    ) -> SyncMessageBusContract:
+        transport_manager: SyncTransportManager,
+        container: Container,
+        stack: SyncMiddlewareStack,
+    ) -> AsyncGenerator[SyncMessageBusContract]:
         from expanse.messenger.synchronous.message_bus import MessageBus
+        from expanse.messenger.synchronous.transactional_message_bus import (
+            TransactionalMessageBus,
+        )
 
-        return MessageBus(async_bus)
+        # The container can only resolve dependencies asynchronously,
+        # so the middleware are resolved upfront.
+        middleware = [await container.get(mw) for mw in stack.middleware]
+
+        bus = TransactionalMessageBus(
+            transport_manager,
+            MessageBus(transport_manager, middleware),
+            container=container,
+        )
+
+        yield bus
+
+        bus.close()
 
     async def _register_command_path(self, portal: "Portal") -> None:
         await portal.load_path(Path(__file__).parent.joinpath("console/commands"))
@@ -134,8 +182,23 @@ class MessengerServiceProvider(ServiceProvider):
         container: Container,
     ) -> None:
         from expanse.database.session import AsyncSession
-        from expanse.database.session import Session
         from expanse.messenger.asynchronous.transactional_message_bus import (
+            TransactionalMessageBus,
+        )
+
+        if not isinstance(bus, TransactionalMessageBus):
+            return
+
+        if container.resolved(AsyncSession):
+            bus.attach_session(await container.get(AsyncSession))
+
+    async def _attach_session_to_sync_transactional_bus(
+        self,
+        bus: SyncMessageBusContract,
+        container: Container,
+    ) -> None:
+        from expanse.database.session import Session
+        from expanse.messenger.synchronous.transactional_message_bus import (
             TransactionalMessageBus,
         )
 
@@ -145,11 +208,25 @@ class MessengerServiceProvider(ServiceProvider):
         if container.resolved(Session):
             bus.attach_session(await container.get(Session))
 
-        if container.resolved(AsyncSession):
-            bus.attach_session(await container.get(AsyncSession))
+    async def _attach_resolved_session_to_sync_transactional_bus(
+        self, session: "Session", container: Container
+    ) -> None:
+        from expanse.messenger.synchronous.transactional_message_bus import (
+            TransactionalMessageBus,
+        )
+
+        if not container.resolved(SyncMessageBusContract):
+            return
+
+        bus = await container.get(SyncMessageBusContract)
+
+        if not isinstance(bus, TransactionalMessageBus):
+            return
+
+        bus.attach_session(session)
 
     async def _attach_resolved_session_to_transactional_bus(
-        self, session: "Session | AsyncSession", container: Container
+        self, session: "AsyncSession", container: Container
     ) -> None:
         from expanse.messenger.asynchronous.transactional_message_bus import (
             TransactionalMessageBus,

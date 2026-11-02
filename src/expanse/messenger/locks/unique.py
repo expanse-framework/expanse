@@ -38,10 +38,19 @@ class UniqueLock:
         return await self._cache.lock(self.get_key(envelope)).release(force=True)
 
     def get_key(self, envelope: Envelope) -> str:
-        stamp = envelope.stamp(UniqueStamp)
-        key = class_to_name(envelope.open().__class__)
+        return get_unique_lock_key(envelope)
 
-        if stamp is None:
-            raise UniqueLockError("Envelope must have a UniqueStamp.")
 
-        return f"expanse:messenger:locks:unique:{key}"
+def get_unique_lock_key(envelope: Envelope) -> str:
+    """
+    Return the cache key of the unique lock of the given envelope.
+
+    :param envelope: the Envelope instance containing the UniqueStamp.
+    """
+    stamp = envelope.stamp(UniqueStamp)
+    key = class_to_name(envelope.open().__class__)
+
+    if stamp is None:
+        raise UniqueLockError("Envelope must have a UniqueStamp.")
+
+    return f"expanse:messenger:locks:unique:{key}"

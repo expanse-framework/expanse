@@ -6,6 +6,9 @@ from sqlalchemy import text
 
 from expanse.container.container import Container
 from expanse.contracts.messenger.asynchronous.message_bus import MessageBus
+from expanse.contracts.messenger.synchronous.message_bus import (
+    MessageBus as SyncMessageBus,
+)
 from expanse.contracts.routing.router import Router
 from expanse.core.application import Application
 from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
@@ -21,6 +24,7 @@ from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
 from expanse.routing.helpers import get
+from expanse.support.helpers import async_safe
 from expanse.testing.client import TestClient
 from expanse.testing.command_tester import CommandTester
 from tests.integration.messenger.fixtures.messages import DatabaseMessage
@@ -94,11 +98,22 @@ async def dispatch_first_rollback_route(
     return Response("ok")
 
 
-@get("/outbox-sync-session-rollback")
-async def sync_session_rollback_route(session: Session, bus: MessageBus) -> Response:
+@get("/outbox-sync-session-commit")
+@async_safe(False)
+def sync_session_commit_route(session: Session, bus: SyncMessageBus) -> Response:
     with session.begin():
         session.execute(text("SELECT 1"))
-        await bus.dispatch(DatabaseMessage(value="hello"))
+        bus.dispatch(DatabaseMessage(value="hello"))
+
+    return Response("ok")
+
+
+@get("/outbox-sync-session-rollback")
+@async_safe(False)
+def sync_session_rollback_route(session: Session, bus: SyncMessageBus) -> Response:
+    with session.begin():
+        session.execute(text("SELECT 1"))
+        bus.dispatch(DatabaseMessage(value="hello"))
         session.rollback()
 
     return Response("ok")
@@ -153,6 +168,7 @@ def connection_name(
     router.handler(rollback_route)
     router.handler(dispatch_first_route)
     router.handler(dispatch_first_rollback_route)
+    router.handler(sync_session_commit_route)
     router.handler(sync_session_rollback_route)
     router.handler(unique_rollback_route)
     router.handler(unique_commit_route)
@@ -241,6 +257,15 @@ async def test_messages_are_not_stored_in_the_outbox_when_dispatching_first_in_a
 
     assert response.status_code == 200
     assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_messages_are_stored_in_the_outbox_when_a_sync_session_is_committed(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-sync-session-commit")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 1
 
 
 async def test_messages_are_not_stored_in_the_outbox_when_a_sync_session_is_rolled_back(
