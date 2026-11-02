@@ -19,10 +19,14 @@ class MiddlewareStack(BaseMiddlewareStack[Middleware[Envelope, Envelope]]):
             HandleFailedDecoding,
         )
         from expanse.messenger.middleware.propagate_context import PropagateContext
+        from expanse.messenger.middleware.relay_messages import RelayMessages
 
+        # RelayMessages must stay last: the stack is executed in reverse
+        # upon reception, so that outboxed messages are relayed untouched.
         return [
             HandleFailedDecoding,
             EnsureUnique,
             PropagateContext,
             HandleEncryption,
+            RelayMessages,
         ]

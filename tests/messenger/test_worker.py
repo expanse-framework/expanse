@@ -45,6 +45,7 @@ from expanse.messenger.middleware.handle_encryption import HandleEncryption
 from expanse.messenger.middleware.handle_failed_decoding import HandleFailedDecoding
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.middleware.propagate_context import PropagateContext
+from expanse.messenger.middleware.relay_messages import RelayMessages
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.serializers.serializer import Serializer
@@ -251,7 +252,7 @@ async def container(connection: MagicMock) -> Container:
 
 @pytest.fixture()
 def middleware_stack() -> MiddlewareStack:
-    return MiddlewareStack().use([])
+    return MiddlewareStack().use([RelayMessages])
 
 
 @pytest.fixture()
@@ -1658,6 +1659,28 @@ async def test_worker_relays_outboxed_messages_to_their_target_transport(
 
     # ...and removed from the outbox.
     assert [e async for e in outbox.receive()] == []
+
+
+async def test_worker_does_not_release_unique_lock_when_relaying(
+    worker: Worker,
+    transport_manager: TransportManager,
+    container: Container,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    outbox = await transport_manager.transport("outbox")
+    await outbox.send(envelope.with_stamps(OutboxStamp(target_transport_name="target")))
+
+    await worker.run("outbox", limit=1)
+
+    # The message has only been relayed, not handled, so the lock must be kept.
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is False
 
 
 async def test_worker_does_not_send_relayed_messages_back_to_the_outbox(
