@@ -1,4 +1,3 @@
-from collections.abc import Awaitable
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -6,28 +5,28 @@ import pytest
 
 from expanse.configuration.config import Config
 from expanse.container.container import Container
-from expanse.contracts.messenger.serializer import Serializer as SerializerContract
-from expanse.messenger.asynchronous.message_bus import MessageBus as AsyncMessageBus
 from expanse.messenger.envelope import Envelope
-from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.synchronous.message_bus import MessageBus
-from expanse.messenger.transports.memory.transport import MemoryTransport
-from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.messenger.synchronous.middleware.middleware import Middleware
+from expanse.messenger.synchronous.transport_manager import TransportManager
+from expanse.messenger.synchronous.transports.memory import MemoryTransport
 from expanse.serialization.serialization_manager import SerializationManager
 from expanse.serialization.serializers.dataclass import DataclassSerializer
 
 
 @pytest.fixture()
 def container() -> Container:
-    container = Container()
+    return Container()
 
+
+@pytest.fixture()
+def serializer() -> Serializer:
     serialization_manager = SerializationManager()
     serialization_manager.register_serializer(DataclassSerializer())
-    container.instance(SerializerContract, Serializer(serialization_manager))
 
-    return container
+    return Serializer(serialization_manager)
 
 
 @pytest.fixture()
@@ -54,35 +53,26 @@ def registry() -> Registry:
 
 @pytest.fixture()
 def transport_manager(
-    container: Container, config: Config, registry: Registry
+    container: Container, config: Config, registry: Registry, serializer: Serializer
 ) -> TransportManager:
-    return TransportManager(container, config, registry)
+    return TransportManager(container, config, registry, serializer)
 
 
 @pytest.fixture()
-def middleware_stack() -> MiddlewareStack:
-    return MiddlewareStack().use([])
+def middleware() -> list[Middleware]:
+    return []
 
 
 @pytest.fixture()
-def async_bus(
-    container: Container,
-    transport_manager: TransportManager,
-    middleware_stack: MiddlewareStack,
-) -> AsyncMessageBus:
-    return AsyncMessageBus(transport_manager, container, middleware_stack)
+def bus(
+    transport_manager: TransportManager, middleware: list[Middleware]
+) -> MessageBus:
+    return MessageBus(transport_manager, middleware)
 
 
 @pytest.fixture()
-def bus(async_bus: AsyncMessageBus) -> MessageBus:
-    return MessageBus(async_bus)
-
-
-@pytest.fixture()
-async def transport(
-    transport_manager: TransportManager,
-) -> MemoryTransport:
-    transport = await transport_manager.transport("memory")
+def transport(transport_manager: TransportManager) -> MemoryTransport:
+    transport = transport_manager.transport("memory")
 
     assert isinstance(transport, MemoryTransport)
 
@@ -108,7 +98,7 @@ def test_dispatching_messages_calls_transport(
 
 
 def test_dispatching_messages_calls_middleware(
-    bus: MessageBus, middleware_stack: MiddlewareStack
+    bus: MessageBus, middleware: list[Middleware]
 ) -> None:
     @dataclass
     class BeforeStamp:
@@ -119,16 +109,16 @@ def test_dispatching_messages_calls_middleware(
         value: str
 
     class MyMiddleware:
-        async def handle(
+        def handle(
             self,
             envelope: Envelope,
-            next_call: Callable[[Envelope], Awaitable[Envelope]],
+            next_call: Callable[[Envelope], Envelope],
         ) -> Envelope:
-            result = await next_call(envelope.with_stamps(BeforeStamp(value="before")))
+            result = next_call(envelope.with_stamps(BeforeStamp(value="before")))
 
             return result.with_stamps(AfterStamp(value="after"))
 
-    middleware_stack.append(MyMiddleware)
+    middleware.append(MyMiddleware())
 
     message = MyMessage(foo="baz")
     envelope = bus.dispatch(message)

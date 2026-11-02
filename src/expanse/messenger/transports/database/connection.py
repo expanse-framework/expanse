@@ -8,6 +8,8 @@ from typing import cast
 
 import msgspec
 
+from sqlalchemy import Insert
+from sqlalchemy import TableClause
 from sqlalchemy import column
 from sqlalchemy import or_
 from sqlalchemy import table
@@ -28,22 +30,54 @@ class MessageRow(NamedTuple):
     delivered_at: datetime | None
 
 
+def messages_table(table_name: str) -> TableClause:
+    return table(
+        table_name,
+        column("id"),
+        column("body"),
+        column("headers"),
+        column("queue_name"),
+        column("created_at"),
+        column("available_at"),
+        column("delivered_at"),
+    )
+
+
+def insert_message(
+    messages: TableClause,
+    config: DatabaseTransportConfig,
+    body: bytes,
+    headers: EncodedEnvelopeHeaders,
+    delay: int = 0,
+) -> Insert:
+    """
+    Build the statement storing a message to the database.
+
+    :param messages: The table storing the messages.
+    :param config: The configuration of the transport.
+    :param body: The message body to be stored.
+    :param headers: The message headers to be stored.
+    :param delay: The number of milliseconds to delay the message before it becomes available for processing.
+    """
+    now = datetime.now(UTC)
+    available_at = now + timedelta(milliseconds=delay)
+
+    return messages.insert().values(
+        body=base64.b64encode(body).decode(),
+        headers=msgspec.json.encode(headers).decode(),
+        queue_name=config.queue_name,
+        created_at=now,
+        available_at=available_at,
+    )
+
+
 class Connection:
     def __init__(
         self, connection: AsyncConnection, config: DatabaseTransportConfig
     ) -> None:
         self._connection: AsyncConnection = connection
         self._config: DatabaseTransportConfig = config
-        self._table = table(
-            self._config.table_name,
-            column("id"),
-            column("body"),
-            column("headers"),
-            column("queue_name"),
-            column("created_at"),
-            column("available_at"),
-            column("delivered_at"),
-        )
+        self._table: TableClause = messages_table(self._config.table_name)
 
     async def send(
         self, body: bytes, headers: EncodedEnvelopeHeaders, delay: int = 0
@@ -55,16 +89,7 @@ class Connection:
         :param headers: The message headers to be stored.
         :param delay: The number of milliseconds to delay the message before it becomes available for processing.
         """
-        now = datetime.now(UTC)
-        available_at = now + timedelta(milliseconds=delay)
-
-        insert_stmt = self._table.insert().values(
-            body=base64.b64encode(body).decode(),
-            headers=msgspec.json.encode(headers).decode(),
-            queue_name=self._config.queue_name,
-            created_at=now,
-            available_at=available_at,
-        )
+        insert_stmt = insert_message(self._table, self._config, body, headers, delay)
 
         if self._connection.in_transaction():
             transaction = self._connection.begin_nested()

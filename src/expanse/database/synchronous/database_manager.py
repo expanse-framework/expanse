@@ -148,6 +148,16 @@ class DatabaseManager:
 
         engine = self.create_base_engine(url)
 
+        # The pysqlite driver does not emit BEGIN by itself, which breaks
+        # transactions, and especially SAVEPOINTs.
+        @event.listens_for(engine, "connect")
+        def do_connect(dbapi_connection, connection_record):
+            dbapi_connection.isolation_level = None
+
+        @event.listens_for(engine, "begin")
+        def do_begin(conn):
+            conn.exec_driver_sql("BEGIN")
+
         if config.foreign_key_constraints:
 
             @event.listens_for(engine, "connect")
