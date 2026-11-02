@@ -75,6 +75,8 @@ class Connection:
     def __init__(
         self, connection: AsyncConnection, config: DatabaseTransportConfig
     ) -> None:
+        # The scoped connection, used to send messages so that they are part of
+        # the current transaction, if any.
         self._connection: AsyncConnection = connection
         self._config: DatabaseTransportConfig = config
         self._table: TableClause = messages_table(self._config.table_name)
@@ -114,14 +116,13 @@ class Connection:
         """
         Retrieve messages from the database that are available for processing.
         """
-        supports_update_returning = self._connection.dialect.update_returning
+        async with self._worker_connection() as connection:
+            if not connection.dialect.update_returning:
+                # If the database does not support UPDATE ... RETURNING, we will need to execute the update and select in two steps.
+                # To ensure atomicity, we will execute both statements within the same transaction and use a SELECT ... FOR UPDATE SKIP LOCKED to claim the message.
+                return await self._get_with_select_for_update(connection)
 
-        if not supports_update_returning:
-            # If the database does not support UPDATE ... RETURNING, we will need to execute the update and select in two steps.
-            # To ensure atomicity, we will execute both statements within the same transaction and use a SELECT ... FOR UPDATE SKIP LOCKED to claim the message.
-            return await self._get_with_select_for_update()
-
-        return await self._get_with_update_returning()
+            return await self._get_with_update_returning(connection)
 
     async def acknowledge(self, message_id: int) -> None:
         """
@@ -129,11 +130,11 @@ class Connection:
 
         :param message_id: The ID of the message to acknowledge.
         """
-        async with self._connection.begin():
-            await self._connection.execute(
+        async with self._worker_connection() as connection, connection.begin():
+            await connection.execute(
                 self._table.delete().where(self._table.c.id == message_id)
             )
-            await self._connection.commit()
+            await connection.commit()
 
     async def reject(self, message_id: int) -> None:
         """
@@ -141,11 +142,11 @@ class Connection:
 
         :param message_id: The ID of the message to reject.
         """
-        async with self._connection.begin():
-            await self._connection.execute(
+        async with self._worker_connection() as connection, connection.begin():
+            await connection.execute(
                 self._table.delete().where(self._table.c.id == message_id)
             )
-            await self._connection.commit()
+            await connection.commit()
 
     async def keep_alive(self, message_id: int, duration: int | None = None) -> None:
         if duration is not None and self._config.redelivery_timeout < duration:
@@ -155,14 +156,27 @@ class Connection:
 
         now = datetime.now(UTC)
 
-        await self._connection.execute(
-            self._table.update()
-            .where(self._table.c.id == message_id)
-            .values(delivered_at=now)
-        )
-        await self._connection.commit()
+        async with self._worker_connection() as connection:
+            await connection.execute(
+                self._table.update()
+                .where(self._table.c.id == message_id)
+                .values(delivered_at=now)
+            )
+            await connection.commit()
 
-    async def _get_with_update_returning(self) -> MessageRow | None:
+    def _worker_connection(self) -> AsyncConnection:
+        """
+        Create a dedicated connection for worker operations.
+
+        Worker operations must not go through the scoped connection:
+        they would commit, or be rolled back with, the transaction
+        of the message being handled.
+        """
+        return self._connection.engine.connect()
+
+    async def _get_with_update_returning(
+        self, connection: AsyncConnection
+    ) -> MessageRow | None:
         now = datetime.now(UTC)
         redelivery_limit = now - timedelta(seconds=self._config.redelivery_timeout)
 
@@ -200,16 +214,18 @@ class Connection:
             )
         )
 
-        async with self._connection.begin():
+        async with connection.begin():
             result: MessageRow | None = cast(
                 "MessageRow | None",
-                (await self._connection.execute(update_query)).first(),
+                (await connection.execute(update_query)).first(),
             )
-            await self._connection.commit()
+            await connection.commit()
 
             return result
 
-    async def _get_with_select_for_update(self) -> MessageRow | None:
+    async def _get_with_select_for_update(
+        self, connection: AsyncConnection
+    ) -> MessageRow | None:
         now = datetime.now(UTC)
         redelivery_limit = now - timedelta(seconds=self._config.redelivery_timeout)
 
@@ -217,8 +233,8 @@ class Connection:
         # we will need to execute the update and select in two steps.
         # To ensure atomicity, we will execute both statements within the same transaction
         # and use a SELECT ... FOR UPDATE SKIP LOCKED to claim the message.
-        async with self._connection.begin():
-            row_id: int | None = await self._connection.scalar(
+        async with connection.begin():
+            row_id: int | None = await connection.scalar(
                 self._table.select()
                 .with_only_columns(self._table.c.id)
                 .where(self._table.c.queue_name == self._config.queue_name)
@@ -235,10 +251,10 @@ class Connection:
             )
 
             if row_id is None:
-                await self._connection.commit()
+                await connection.commit()
                 return None
 
-            await self._connection.execute(
+            await connection.execute(
                 self._table.update()
                 .where(self._table.c.id == row_id)
                 .values(delivered_at=now)
@@ -247,12 +263,12 @@ class Connection:
             result = cast(
                 "MessageRow | None",
                 (
-                    await self._connection.execute(
+                    await connection.execute(
                         self._table.select().where(self._table.c.id == row_id)
                     )
                 ).first(),
             )
 
-            await self._connection.commit()
+            await connection.commit()
 
             return result

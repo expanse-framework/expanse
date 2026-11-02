@@ -344,3 +344,160 @@ async def test_transport_keep_alive_is_noop_for_envelope_without_message_id_stam
         ).scalar()
 
     assert row_count == 1
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_transport_receive_does_not_use_the_given_connection(
+    app: Application, name: str, command_tester: CommandTester, serializer: Serializer
+) -> None:
+    app.config["database"]["default"] = name
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    config = DatabaseTransportConfig(connection=name)
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await transport.send(Envelope.wrap(DatabaseMessage(value="dedicated")))
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await connection.begin()
+        envelopes = [e async for e in transport.receive()]
+        await connection.rollback()
+
+    assert len(envelopes) == 1
+
+    # The message must have been claimed even though
+    # the transaction of the given connection was rolled back.
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+        redelivered = [e async for e in transport.receive()]
+
+    assert redelivered == []
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_transport_keep_alive_does_not_use_the_given_connection(
+    app: Application, name: str, command_tester: CommandTester, serializer: Serializer
+) -> None:
+    app.config["database"]["default"] = name
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    config = DatabaseTransportConfig(connection=name, redelivery_timeout=10)
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await transport.send(Envelope.wrap(DatabaseMessage(value="dedicated")))
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+        envelopes = [e async for e in transport.receive()]
+
+    assert len(envelopes) == 1
+
+    stamp = envelopes[0].stamp(TransportMessageIdStamp)
+    assert stamp is not None
+
+    expired_at = datetime.now(UTC) - timedelta(seconds=20)
+    async with db.connection(name) as connection:
+        await connection.execute(
+            text("UPDATE messages SET delivered_at = :dt WHERE id = :id"),
+            {"dt": expired_at, "id": stamp.id},
+        )
+        await connection.commit()
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await connection.begin()
+        await transport.keep_alive(envelopes[0])
+        await connection.rollback()
+
+    # The keep alive must have been committed even though
+    # the transaction of the given connection was rolled back.
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+        redelivered = [e async for e in transport.receive()]
+
+    assert redelivered == []
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_transport_acknowledge_does_not_use_the_given_connection(
+    app: Application, name: str, command_tester: CommandTester, serializer: Serializer
+) -> None:
+    app.config["database"]["default"] = name
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    config = DatabaseTransportConfig(connection=name)
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await transport.send(Envelope.wrap(DatabaseMessage(value="dedicated")))
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+        envelopes = [e async for e in transport.receive()]
+
+    assert len(envelopes) == 1
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await connection.begin()
+        await transport.acknowledge(envelopes[0])
+        await connection.rollback()
+
+    # The message must have been deleted even though
+    # the transaction of the given connection was rolled back.
+    async with db.connection(name) as connection:
+        row_count = (
+            await connection.execute(text("SELECT COUNT(*) FROM messages"))
+        ).scalar()
+
+    assert row_count == 0
+
+
+@pytest.mark.usefixtures("setup_databases")
+@pytest.mark.parametrize("name", ["sqlite", "postgresql", "mysql"])
+async def test_transport_reject_does_not_use_the_given_connection(
+    app: Application, name: str, command_tester: CommandTester, serializer: Serializer
+) -> None:
+    app.config["database"]["default"] = name
+    command_tester.command("db migrate").run()
+
+    db = await app.container.get(AsyncDatabaseManager)
+    config = DatabaseTransportConfig(connection=name)
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await transport.send(Envelope.wrap(DatabaseMessage(value="dedicated")))
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+        envelopes = [e async for e in transport.receive()]
+
+    assert len(envelopes) == 1
+
+    async with db.connection(name) as connection:
+        transport = DatabaseTransport(config, connection, serializer)
+
+        await connection.begin()
+        await transport.reject(envelopes[0])
+        await connection.rollback()
+
+    # The message must have been deleted even though
+    # the transaction of the given connection was rolled back.
+    async with db.connection(name) as connection:
+        row_count = (
+            await connection.execute(text("SELECT COUNT(*) FROM messages"))
+        ).scalar()
+
+    assert row_count == 0
