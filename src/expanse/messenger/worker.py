@@ -9,12 +9,12 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache
-from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
-    KeepAliveTransport,
+from expanse.contracts.messenger.asynchronous.keep_alive_receiver import (
+    KeepAliveReceiver,
 )
-from expanse.contracts.messenger.asynchronous.transport import Transport
-from expanse.contracts.messenger.asynchronous.worker_aware_transport import (
-    WorkerAwareTransport,
+from expanse.contracts.messenger.asynchronous.receiver import Receiver
+from expanse.contracts.messenger.asynchronous.worker_aware_receiver import (
+    WorkerAwareReceiver,
 )
 from expanse.encryption.utils import generate_random_string
 from expanse.jobs.asynchronous.job import Job as AsyncJob
@@ -41,7 +41,6 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
 )
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.stamps.unique import UniqueStamp
-from expanse.messenger.transports.outbox.transport import OutboxTransport
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.support._utils import string_to_class
 from expanse.support.asynchronous.pipeline import Pipeline
@@ -120,7 +119,9 @@ class Worker:
         if transport_name is None:
             transport_name = self._transport_manager.get_default_transport_name()
 
-        transport = await self._transport_manager.transport(transport_name)
+        # Transports with an outbox are consumed directly: messages are relayed
+        # from the outbox to them.
+        receiver = await self._transport_manager.receiver(transport_name)
 
         handled_messages = 0
         handled_lock = asyncio.Lock()
@@ -137,21 +138,15 @@ class Worker:
                 return True
 
         async def consume(concurrent: bool = True) -> None:
-            # Messages are consumed from, retried on, and kept alive by the target
-            # of an outbox transport: only new messages go through the outbox.
-            worker_transport = (
-                transport.target_transport
-                if isinstance(transport, OutboxTransport)
-                else transport
-            )
+            worker_receiver = receiver
 
             if concurrent:
                 worker_id = generate_random_string(8, restricted=True)
                 context = await self._container.get(Context)
                 context["worker.id"] = worker_id
 
-                if isinstance(worker_transport, WorkerAwareTransport):
-                    worker_transport = worker_transport.clone_for_worker(worker_id)
+                if isinstance(worker_receiver, WorkerAwareReceiver):
+                    worker_receiver = worker_receiver.clone_for_worker(worker_id)
 
             while not self._stop_event.is_set():
                 if limit is not None and handled_messages >= limit:
@@ -160,7 +155,7 @@ class Worker:
 
                 envelope_handled: bool = False
 
-                async for envelope in worker_transport.receive():
+                async for envelope in worker_receiver.receive():
                     envelope_handled = True
 
                     if not await reserve_slot():
@@ -168,7 +163,7 @@ class Worker:
                         break
 
                     await self._process_envelope(
-                        envelope, worker_transport, transport_name
+                        envelope, worker_receiver, transport_name
                     )
 
                 if not envelope_handled:
@@ -180,7 +175,7 @@ class Worker:
             await asyncio.gather(*(consume() for _ in range(concurrency)))
 
     async def _process_envelope(
-        self, envelope: Envelope, transport: Transport, transport_name: str
+        self, envelope: Envelope, receiver: Receiver, transport_name: str
     ) -> None:
         keep_alive_id = next(self._keep_alive_ids)
         dedup_key: tuple[str, Any] | None = None
@@ -199,7 +194,7 @@ class Worker:
             log_extras["message_type"] = envelope.open().__class__.__name__
             log_messages = MessageLogMessage
 
-        if isinstance(transport, KeepAliveTransport):
+        if isinstance(receiver, KeepAliveReceiver):
             message_id_stamp = envelope.stamp(TransportMessageIdStamp)
             if message_id_stamp is not None:
                 dedup_key = (transport_name, message_id_stamp.id)
@@ -239,7 +234,7 @@ class Worker:
                     await self._send_to_failure_transport(
                         e.envelope, transport_name=transport_name
                     )
-                    await transport.reject(e.envelope)
+                    await receiver.reject(e.envelope)
 
                     self._keep_alives.pop(keep_alive_id, None)
                     self._in_flight_message_ids.discard(dedup_key)
@@ -278,7 +273,7 @@ class Worker:
                 await self._send_to_failure_transport(
                     envelope, transport_name=transport_name
                 )
-                await transport.reject(envelope)
+                await receiver.reject(envelope)
 
                 self._keep_alives.pop(keep_alive_id, None)
                 self._in_flight_message_ids.discard(dedup_key)
@@ -302,13 +297,16 @@ class Worker:
                     "error": str(e),
                 },
             )
-            await transport.send(
+            # Messages are retried on the transport they were received from.
+            # For transports with an outbox, redelivered messages bypass it.
+            sender = await self._transport_manager.sender(transport_name)
+            await sender.send(
                 envelope.with_stamps(
                     DelayStamp(delay), RedeliveryStamp(retry_count=retry_count)
                 )
             )
 
-            await transport.reject(envelope)
+            await receiver.reject(envelope)
 
             self._keep_alives.pop(keep_alive_id, None)
             self._in_flight_message_ids.discard(dedup_key)
@@ -321,7 +319,7 @@ class Worker:
             extra=log_extras,
         )
 
-        await transport.acknowledge(envelope)
+        await receiver.acknowledge(envelope)
 
         self._keep_alives.pop(keep_alive_id, None)
         self._in_flight_message_ids.discard(dedup_key)
@@ -341,11 +339,9 @@ class Worker:
         # Snapshot before iterating: concurrent slots may insert/pop envelopes
         # into `self._keep_alives` while we `await` below.
         for transport_name, envelope in list(self._keep_alives.values()):
-            transport = await self._transport_manager.transport(transport_name)
-            if isinstance(transport, OutboxTransport):
-                transport = transport.target_transport
+            receiver = await self._transport_manager.receiver(transport_name)
 
-            if not isinstance(transport, KeepAliveTransport):
+            if not isinstance(receiver, KeepAliveReceiver):
                 raise TypeError(
                     f"Transport '{transport_name}' does not support keep-alive functionality."
                 )
@@ -360,7 +356,7 @@ class Worker:
                 },
             )
 
-            await transport.keep_alive(envelope, duration)
+            await receiver.keep_alive(envelope, duration)
 
     async def _handle_envelope(
         self, envelope: Envelope, transport_name: str
@@ -372,9 +368,6 @@ class Worker:
         try:
             message = envelope.open()
             container.instance(message.__class__, message)
-            # Middleware (e.g. RelayMessages) must use the worker's transports
-            # rather than a fresh transport manager scoped to this envelope.
-            container.instance(TransportManager, self._transport_manager)
 
             async def _handle(envelope: Envelope) -> Envelope:
                 message = envelope.open()
@@ -512,9 +505,7 @@ class Worker:
         if not failure_transport_name:
             return
 
-        failure_transport = await self._transport_manager.transport(
-            failure_transport_name
-        )
+        failure_sender = await self._transport_manager.sender(failure_transport_name)
         logger.info(
             "Sending rejected message to failure transport: %s",
             failure_transport_name,
@@ -523,7 +514,7 @@ class Worker:
                 "failure_transport": failure_transport_name,
             },
         )
-        await failure_transport.send(
+        await failure_sender.send(
             envelope.with_stamps(
                 SentToFailureTransportStamp(original_transport=transport_name),
                 DelayStamp(delay=0),

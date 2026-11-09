@@ -17,11 +17,11 @@ from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.synchronous.transport_manager import TransportManager
-from expanse.messenger.synchronous.transports.database import DatabaseTransport
-from expanse.messenger.synchronous.transports.memory import MemoryTransport
-from expanse.messenger.synchronous.transports.outbox import OutboxTransport
-from expanse.messenger.synchronous.transports.redis import RedisTransport
-from expanse.messenger.synchronous.transports.sync import SyncTransport
+from expanse.messenger.synchronous.transports.database import DatabaseSender
+from expanse.messenger.synchronous.transports.memory import MemorySender
+from expanse.messenger.synchronous.transports.outbox import OutboxSender
+from expanse.messenger.synchronous.transports.redis import RedisSender
+from expanse.messenger.synchronous.transports.sync import SyncSender
 
 
 @dataclass
@@ -70,7 +70,7 @@ def test_transport_returns_default_transport(
         {"transport": "memory", "transports": {"memory": {"driver": "memory"}}}
     )
 
-    assert isinstance(manager.transport(), MemoryTransport)
+    assert isinstance(manager.sender(), MemorySender)
 
 
 def test_transport_caches_transport_instance(
@@ -80,16 +80,16 @@ def test_transport_caches_transport_instance(
         {"transport": "memory", "transports": {"memory": {"driver": "memory"}}}
     )
 
-    assert manager.transport("memory") is manager.transport("memory")
+    assert manager.sender("memory") is manager.sender("memory")
 
 
 @pytest.mark.parametrize(
     ("driver", "transport_class"),
     [
-        ("sync", SyncTransport),
-        ("memory", MemoryTransport),
-        ("database", DatabaseTransport),
-        ("redis", RedisTransport),
+        ("sync", SyncSender),
+        ("memory", MemorySender),
+        ("database", DatabaseSender),
+        ("redis", RedisSender),
     ],
 )
 def test_transport_creates_transports_for_their_driver(
@@ -99,7 +99,7 @@ def test_transport_creates_transports_for_their_driver(
 ) -> None:
     manager = make_manager({"transports": {"transport": {"driver": driver}}})
 
-    assert isinstance(manager.transport("transport"), transport_class)
+    assert isinstance(manager.sender("transport"), transport_class)
 
 
 def test_database_transport_uses_the_scoped_connection(
@@ -107,9 +107,9 @@ def test_database_transport_uses_the_scoped_connection(
 ) -> None:
     manager = make_manager({"transports": {"database": {"driver": "database"}}})
 
-    transport = manager.transport("database")
+    transport = manager.sender("database")
 
-    assert isinstance(transport, DatabaseTransport)
+    assert isinstance(transport, DatabaseSender)
     assert transport.connection is connection
 
 
@@ -119,7 +119,7 @@ def test_get_default_transport_name_raises_when_not_configured(
     manager = make_manager({"transports": {"memory": {"driver": "memory"}}})
 
     with pytest.raises(NoDefaultTransportError):
-        manager.transport()
+        manager.sender()
 
 
 def test_transport_raises_for_unconfigured_transport(
@@ -128,7 +128,7 @@ def test_transport_raises_for_unconfigured_transport(
     manager = make_manager({"transports": {}})
 
     with pytest.raises(UnconfiguredTransportError):
-        manager.transport("unknown")
+        manager.sender("unknown")
 
 
 def test_transport_raises_when_driver_missing(
@@ -137,7 +137,7 @@ def test_transport_raises_when_driver_missing(
     manager = make_manager({"transports": {"broken": {}}})
 
     with pytest.raises(UnconfiguredTransportError):
-        manager.transport("broken")
+        manager.sender("broken")
 
 
 def test_transport_raises_for_unsupported_driver(
@@ -146,7 +146,7 @@ def test_transport_raises_for_unsupported_driver(
     manager = make_manager({"transports": {"broken": {"driver": "unknown"}}})
 
     with pytest.raises(UnsupportedTransportDriverError):
-        manager.transport("broken")
+        manager.sender("broken")
 
 
 def test_transport_wraps_transport_configured_with_an_outbox(
@@ -161,11 +161,11 @@ def test_transport_wraps_transport_configured_with_an_outbox(
         }
     )
 
-    transport = manager.transport("memory")
+    transport = manager.sender("memory")
 
-    assert isinstance(transport, OutboxTransport)
-    assert isinstance(transport.target_transport, MemoryTransport)
-    assert transport.outbox_transport is manager.transport("outbox")
+    assert isinstance(transport, OutboxSender)
+    assert isinstance(transport.target_sender, MemorySender)
+    assert transport.outbox_sender is manager.sender("outbox")
 
 
 def test_transport_is_not_wrapped_when_outbox_is_empty(
@@ -175,7 +175,7 @@ def test_transport_is_not_wrapped_when_outbox_is_empty(
         {"transports": {"memory": {"driver": "memory", "outbox": None}}}
     )
 
-    assert isinstance(manager.transport("memory"), MemoryTransport)
+    assert isinstance(manager.sender("memory"), MemorySender)
 
 
 def test_transport_raises_when_outbox_is_not_a_database_transport(
@@ -191,7 +191,7 @@ def test_transport_raises_when_outbox_is_not_a_database_transport(
     )
 
     with pytest.raises(InvalidOutboxTransportError):
-        manager.transport("memory")
+        manager.sender("memory")
 
 
 def test_transport_raises_on_circular_outbox_configuration(
@@ -202,4 +202,4 @@ def test_transport_raises_on_circular_outbox_configuration(
     )
 
     with pytest.raises(InvalidOutboxTransportError):
-        manager.transport("database")
+        manager.sender("database")

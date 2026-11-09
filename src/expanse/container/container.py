@@ -828,7 +828,15 @@ class ScopedContainer(Container):
         super().__init__()
 
         self._base_container = base_container
-        scoped = base_container._scoped
+        # Nested scopes need fresh instances of the original scoped bindings,
+        # rather than falling back to their parent's resolved services.
+        scope_owner = base_container
+        while (
+            isinstance(scope_owner, ScopedContainer)
+            and not scope_owner.has_scoped_bindings()
+        ):
+            scope_owner = scope_owner._base_container
+        scoped = scope_owner._scoped
 
         # Bind scoped bindings from the base container
         if scoped["bindings"]:

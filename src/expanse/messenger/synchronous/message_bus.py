@@ -30,9 +30,9 @@ class MessageBus(MessageBusContract):
         envelope = Envelope.wrap(message)
         transport_stamp = envelope.stamp(TransportStamp)
         transport_name = transport_stamp.name if transport_stamp else None
-        transport = self._transport_manager.transport(transport_name)
+        sender = self._transport_manager.sender(transport_name)
 
         pipeline = Pipeline[Envelope, Envelope]()
         pipeline.use([mw.handle for mw in self._middleware])
 
-        return pipeline.send(envelope).to(transport.send).run()
+        return pipeline.send(envelope).to(sender.send).run()

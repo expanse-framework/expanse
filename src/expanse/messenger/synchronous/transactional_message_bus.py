@@ -14,7 +14,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransactionalMessageBusError
 from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.stamps.unique_lock_acquired import UniqueLockAcquiredStamp
-from expanse.messenger.synchronous.transports.outbox import OutboxTransport
+from expanse.messenger.synchronous.transports.outbox import OutboxSender
 from expanse.support._concurrency import async_to_sync
 
 
@@ -113,11 +113,9 @@ class TransactionalMessageBus(MessageBusContract):
 
         transport_stamp = envelope.stamp(TransportStamp)
         transport_name = transport_stamp.name if transport_stamp else None
-        transport = self._transport_manager.transport(transport_name)
+        sender = self._transport_manager.sender(transport_name)
 
-        if isinstance(transport, OutboxTransport) and self._joins_session_transaction(
-            transport
-        ):
+        if isinstance(sender, OutboxSender) and self._joins_session_transaction(sender):
             # The outbox stores the message as part of the session's transaction,
             # so it can be dispatched right away.
             dispatched = self._decorated_bus.dispatch(envelope)
@@ -137,7 +135,7 @@ class TransactionalMessageBus(MessageBusContract):
     def close(self) -> None:
         self.detach_session()
 
-    def _joins_session_transaction(self, transport: OutboxTransport) -> bool:
+    def _joins_session_transaction(self, sender: OutboxSender) -> bool:
         """
         Whether messages stored in the outbox of the given transport
         are part of the transaction of the attached session.
@@ -145,7 +143,7 @@ class TransactionalMessageBus(MessageBusContract):
         if self._session is None:
             return False
 
-        if self._session.bind is not transport.outbox_transport.connection:
+        if self._session.bind is not sender.outbox_sender.connection:
             return False
 
         # Sessions only begin their transaction on the connection upon their first

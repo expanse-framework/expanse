@@ -5,15 +5,10 @@ from collections.abc import AsyncIterator
 from expanse.messenger.envelope import Envelope
 
 
-class Transport(ABC):
-    @abstractmethod
-    async def send(self, envelope: Envelope) -> Envelope:
-        """
-        Send the given envelope through the transport.
-        :param envelope: The envelope to send.
-        :return: The envelope, potentially modified or enriched by the transport.
-        """
-        ...
+class Receiver(ABC):
+    """
+    Receive messages from a transport.
+    """
 
     @abstractmethod
     def receive(self) -> AsyncIterator[Envelope]:
@@ -39,5 +34,5 @@ class Transport(ABC):
     @abstractmethod
     async def close(self) -> None:
         """
-        Close the transport and release any resources it holds.
+        Close the receiver and release any resources it holds.
         """

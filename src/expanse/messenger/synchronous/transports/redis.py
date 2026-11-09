@@ -9,9 +9,7 @@ import msgspec
 from redis.exceptions import ResponseError
 
 from expanse.contracts.messenger.serializer import Serializer
-from expanse.contracts.messenger.synchronous.transport import (
-    Transport as TransportContract,
-)
+from expanse.contracts.messenger.synchronous.sender import Sender as SenderContract
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
@@ -22,7 +20,7 @@ from expanse.redis.synchronous.connections.connection import (
 from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
-class RedisTransport(TransportContract):
+class RedisSender(SenderContract):
     def __init__(
         self,
         redis_connection: RedisConnection,

@@ -13,6 +13,7 @@ from sqlalchemy import TableClause
 from sqlalchemy import column
 from sqlalchemy import or_
 from sqlalchemy import table
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.messenger.exceptions import TransportError
@@ -72,51 +73,24 @@ def insert_message(
 
 
 class Connection:
-    def __init__(
-        self, connection: AsyncConnection, config: DatabaseTransportConfig
-    ) -> None:
-        # The scoped connection, used to send messages so that they are part of
-        # the current transaction, if any.
-        self._connection: AsyncConnection = connection
+    """
+    Retrieve and settle the messages stored in the database.
+
+    Each operation runs on its own connection, retrieved from the engine,
+    so that it never commits, or is rolled back with, the transaction
+    of the message being handled.
+    """
+
+    def __init__(self, engine: AsyncEngine, config: DatabaseTransportConfig) -> None:
+        self._engine: AsyncEngine = engine
         self._config: DatabaseTransportConfig = config
         self._table: TableClause = messages_table(self._config.table_name)
-
-    async def send(
-        self, body: bytes, headers: EncodedEnvelopeHeaders, delay: int = 0
-    ) -> int:
-        """
-        Store a message to the database.
-
-        :param body: The message body to be stored.
-        :param headers: The message headers to be stored.
-        :param delay: The number of milliseconds to delay the message before it becomes available for processing.
-        """
-        insert_stmt = insert_message(self._table, self._config, body, headers, delay)
-
-        if self._connection.in_transaction():
-            transaction = self._connection.begin_nested()
-        else:
-            transaction = self._connection.begin()
-
-        async with transaction as tx:
-            if self._connection.dialect.insert_returning:
-                result = await self._connection.execute(
-                    insert_stmt.returning(self._table.c.id)
-                )
-                message_id: int = result.scalar_one()
-            else:
-                result = await self._connection.execute(insert_stmt)
-                message_id = result.lastrowid
-
-            await tx.commit()
-
-            return message_id
 
     async def get(self) -> MessageRow | None:
         """
         Retrieve messages from the database that are available for processing.
         """
-        async with self._worker_connection() as connection:
+        async with self._new_connection() as connection:
             if not connection.dialect.update_returning:
                 # If the database does not support UPDATE ... RETURNING, we will need to execute the update and select in two steps.
                 # To ensure atomicity, we will execute both statements within the same transaction and use a SELECT ... FOR UPDATE SKIP LOCKED to claim the message.
@@ -130,7 +104,7 @@ class Connection:
 
         :param message_id: The ID of the message to acknowledge.
         """
-        async with self._worker_connection() as connection, connection.begin():
+        async with self._new_connection() as connection, connection.begin():
             await connection.execute(
                 self._table.delete().where(self._table.c.id == message_id)
             )
@@ -142,7 +116,7 @@ class Connection:
 
         :param message_id: The ID of the message to reject.
         """
-        async with self._worker_connection() as connection, connection.begin():
+        async with self._new_connection() as connection, connection.begin():
             await connection.execute(
                 self._table.delete().where(self._table.c.id == message_id)
             )
@@ -156,7 +130,7 @@ class Connection:
 
         now = datetime.now(UTC)
 
-        async with self._worker_connection() as connection:
+        async with self._new_connection() as connection:
             await connection.execute(
                 self._table.update()
                 .where(self._table.c.id == message_id)
@@ -164,15 +138,8 @@ class Connection:
             )
             await connection.commit()
 
-    def _worker_connection(self) -> AsyncConnection:
-        """
-        Create a dedicated connection for worker operations.
-
-        Worker operations must not go through the scoped connection:
-        they would commit, or be rolled back with, the transaction
-        of the message being handled.
-        """
-        return self._connection.engine.connect()
+    def _new_connection(self) -> AsyncConnection:
+        return self._engine.connect()
 
     async def _get_with_update_returning(
         self, connection: AsyncConnection

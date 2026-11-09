@@ -96,6 +96,13 @@ class UnsupportedTransportDriverError(Exception):
     """
 
 
+class UnsupportedTransportOperationError(Exception):
+    """
+    Raised when a transport is used for an operation its driver does not support,
+    like receiving messages from the sync transport.
+    """
+
+
 class UnconfiguredRetryStrategyError(Exception):
     """
     Raised when a retry strategy is requested that is not configured.

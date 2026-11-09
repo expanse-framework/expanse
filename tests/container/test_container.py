@@ -459,3 +459,34 @@ async def test_get_with_arguments_does_not_return_the_instance_without_arguments
     default = await container.get(MySomething)
 
     assert await container.get(MySomething, "foo") is not default
+
+
+async def test_nested_scopes_have_independent_instances_and_cleanup() -> None:
+    container = Container()
+    closed: list[object] = []
+    resolved: list[object] = []
+
+    def factory():
+        value = object()
+        yield value
+        closed.append(value)
+
+    async def after_resolving(value: object) -> None:
+        resolved.append(value)
+
+    container.scoped("resource", factory)
+    container.after_resolving("resource", after_resolving)
+    async with container.create_scoped_container() as parent:
+        parent_value = await parent.get("resource")
+        async with parent.create_scoped_container() as child:
+            child_value = await child.get("resource")
+            assert child_value is await child.get("resource")
+            assert child_value is not parent_value
+        assert closed == [child_value]
+        async with parent.create_scoped_container() as sibling:
+            sibling_value = await sibling.get("resource")
+            assert sibling_value is not parent_value
+            assert sibling_value is not child_value
+        assert await parent.get("resource") is parent_value
+    assert closed == [child_value, sibling_value, parent_value]
+    assert resolved == [parent_value, child_value, sibling_value]

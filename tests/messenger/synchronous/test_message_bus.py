@@ -11,7 +11,7 @@ from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.synchronous.message_bus import MessageBus
 from expanse.messenger.synchronous.middleware.middleware import Middleware
 from expanse.messenger.synchronous.transport_manager import TransportManager
-from expanse.messenger.synchronous.transports.memory import MemoryTransport
+from expanse.messenger.synchronous.transports.memory import MemorySender
 from expanse.serialization.serialization_manager import SerializationManager
 from expanse.serialization.serializers.dataclass import DataclassSerializer
 
@@ -71,10 +71,10 @@ def bus(
 
 
 @pytest.fixture()
-def transport(transport_manager: TransportManager) -> MemoryTransport:
-    transport = transport_manager.transport("memory")
+def transport(transport_manager: TransportManager) -> MemorySender:
+    transport = transport_manager.sender("memory")
 
-    assert isinstance(transport, MemoryTransport)
+    assert isinstance(transport, MemorySender)
 
     return transport
 
@@ -85,7 +85,7 @@ class MyMessage:
 
 
 def test_dispatching_messages_calls_transport(
-    bus: MessageBus, transport: MemoryTransport
+    bus: MessageBus, transport: MemorySender
 ) -> None:
     message = MyMessage(foo="bar")
     bus.dispatch(message)

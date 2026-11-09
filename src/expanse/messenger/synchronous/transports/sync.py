@@ -1,11 +1,11 @@
 from expanse.container.container import Container
-from expanse.contracts.messenger.synchronous.transport import Transport
+from expanse.contracts.messenger.synchronous.sender import Sender
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
 from expanse.support._concurrency import async_to_sync
 
 
-class SyncTransport(Transport):
+class SyncSender(Sender):
     def __init__(self, container: Container, registry: Registry) -> None:
         self._container: Container = container
         self._registry: Registry = registry
