@@ -5,14 +5,14 @@ from typing import Any
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
-from expanse.contracts.messenger.synchronous.transport import Transport
+from expanse.contracts.messenger.synchronous.sender import Sender
 from expanse.messenger.exceptions import InvalidOutboxTransportError
 from expanse.messenger.exceptions import NoDefaultTransportError
 from expanse.messenger.exceptions import UnconfiguredTransportError
 from expanse.messenger.exceptions import UnsupportedTransportDriverError
 from expanse.messenger.registry import Registry
-from expanse.messenger.synchronous.transports.memory import MemoryTransport
-from expanse.messenger.synchronous.transports.sync import SyncTransport
+from expanse.messenger.synchronous.transports.memory import MemorySender
+from expanse.messenger.synchronous.transports.sync import SyncSender
 from expanse.support._concurrency import async_to_sync
 
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class TransportManager:
     """
-    Manage the transports to which the synchronous message bus sends messages.
+    Manage the senders to which the synchronous message bus sends messages.
     """
 
     def __init__(
@@ -35,17 +35,17 @@ class TransportManager:
         self._registry: Registry = registry
         self._config: Config = config
         self._serializer: SerializerContract = serializer
-        self._transports: dict[str, Transport] = {}
+        self._senders: dict[str, Sender] = {}
         # Names of the transports currently being created,
         # used to detect circular outbox configurations.
         self._creating: set[str] = set()
 
-    def transport(self, name: str | None = None) -> Transport:
+    def sender(self, name: str | None = None) -> Sender:
         if name is None:
             name = self.get_default_transport_name()
 
-        if name in self._transports:
-            return self._transports[name]
+        if name in self._senders:
+            return self._senders[name]
 
         if name in self._creating:
             raise InvalidOutboxTransportError(
@@ -54,13 +54,13 @@ class TransportManager:
 
         self._creating.add(name)
         try:
-            transport = self._create_transport(name)
+            sender = self._create_sender(name)
         finally:
             self._creating.discard(name)
 
-        self._transports[name] = transport
+        self._senders[name] = sender
 
-        return transport
+        return sender
 
     def get_default_transport_name(self) -> str:
         default_transport: str | None = self._config.get("messenger.transport")
@@ -70,10 +70,10 @@ class TransportManager:
         return default_transport
 
     def close(self) -> None:
-        for transport in self._transports.values():
-            transport.close()
+        for sender in self._senders.values():
+            sender.close()
 
-    def _create_transport(self, name: str) -> Transport:
+    def _create_sender(self, name: str) -> Sender:
         transports: dict[str, Any] = self._config.get("messenger.transports", {})
         if name not in transports:
             raise UnconfiguredTransportError(f"Transport '{name}' is not configured.")
@@ -85,16 +85,16 @@ class TransportManager:
                 f"Transport '{name}' is missing a driver configuration."
             )
 
-        transport: Transport
+        sender: Sender
         match transport_config["driver"]:
             case "sync":
-                transport = SyncTransport(self._container, self._registry)
+                sender = SyncSender(self._container, self._registry)
             case "memory":
-                transport = MemoryTransport(self._serializer)
+                sender = MemorySender(self._serializer)
             case "database":
-                transport = self._create_database_transport(transport_config)
+                sender = self._create_database_sender(transport_config)
             case "redis":
-                transport = self._create_redis_transport(transport_config)
+                sender = self._create_redis_sender(transport_config)
             case _:
                 raise UnsupportedTransportDriverError(
                     f"Transport '{name}' has an unsupported driver '{transport_config['driver']}'."
@@ -102,35 +102,35 @@ class TransportManager:
 
         outbox_transport_name = transport_config.get("outbox")
         if not outbox_transport_name:
-            return transport
+            return sender
 
-        from expanse.messenger.synchronous.transports.database import DatabaseTransport
-        from expanse.messenger.synchronous.transports.outbox import OutboxTransport
+        from expanse.messenger.synchronous.transports.database import DatabaseSender
+        from expanse.messenger.synchronous.transports.outbox import OutboxSender
 
-        outbox_transport = self.transport(outbox_transport_name)
+        outbox_sender = self.sender(outbox_transport_name)
 
-        if not isinstance(outbox_transport, DatabaseTransport):
+        if not isinstance(outbox_sender, DatabaseSender):
             raise InvalidOutboxTransportError(
                 "The outbox transport must be a database transport."
             )
 
         logger.debug(
-            "Creating outbox transport",
+            "Creating outbox sender",
             extra={
                 "target_transport": name,
                 "outbox_transport": outbox_transport_name,
             },
         )
 
-        return OutboxTransport(
-            target_transport=transport,
-            outbox_transport=outbox_transport,
+        return OutboxSender(
+            target_sender=sender,
+            outbox_sender=outbox_sender,
             target_transport_name=name,
         )
 
-    def _create_database_transport(self, config: dict[str, Any]) -> Transport:
+    def _create_database_sender(self, config: dict[str, Any]) -> Sender:
         from expanse.database.synchronous.connection import Connection
-        from expanse.messenger.synchronous.transports.database import DatabaseTransport
+        from expanse.messenger.synchronous.transports.database import DatabaseSender
         from expanse.messenger.transports.database.config import DatabaseTransportConfig
 
         transport_config = DatabaseTransportConfig.model_validate(config)
@@ -144,16 +144,16 @@ class TransportManager:
             else get(Connection, transport_config.connection)
         )
 
-        return DatabaseTransport(transport_config, connection, self._serializer)
+        return DatabaseSender(transport_config, connection, self._serializer)
 
-    def _create_redis_transport(self, raw_config: dict[str, Any]) -> Transport:
-        from expanse.messenger.synchronous.transports.redis import RedisTransport
+    def _create_redis_sender(self, raw_config: dict[str, Any]) -> Sender:
+        from expanse.messenger.synchronous.transports.redis import RedisSender
         from expanse.messenger.transports.redis.config import RedisTransportConfig
         from expanse.redis.synchronous.redis_manager import RedisManager
 
         config = RedisTransportConfig.model_validate(raw_config)
         redis = async_to_sync(self._container.get)(RedisManager)
 
-        return RedisTransport(
+        return RedisSender(
             redis.connection(config.connection), config, self._serializer
         )

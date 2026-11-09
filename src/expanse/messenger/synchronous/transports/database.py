@@ -1,9 +1,7 @@
 from typing import TYPE_CHECKING
 
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
-from expanse.contracts.messenger.synchronous.transport import (
-    Transport as TransportContract,
-)
+from expanse.contracts.messenger.synchronous.sender import Sender as SenderContract
 from expanse.database.synchronous.connection import Connection
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.delay import DelayStamp
@@ -17,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Transaction
 
 
-class DatabaseTransport(TransportContract):
+class DatabaseSender(SenderContract):
     def __init__(
         self,
         config: DatabaseTransportConfig,

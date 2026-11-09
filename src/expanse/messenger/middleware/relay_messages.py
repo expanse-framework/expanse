@@ -47,11 +47,9 @@ class RelayMessages:
             received_stamp.transport_name,
         )
 
-        target_transport = await self._transport_manager.transport(
-            target_transport_name
-        )
+        target_sender = await self._transport_manager.sender(target_transport_name)
 
-        await target_transport.send(envelope.without_stamps(ReceivedStamp))
+        await target_sender.send(envelope.without_stamps(ReceivedStamp))
 
         return envelope.with_stamps(
             RelayedStamp(target_transport_name=target_transport_name)

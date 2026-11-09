@@ -1,14 +1,14 @@
 from abc import ABC
 from abc import abstractmethod
 
-from expanse.contracts.messenger.asynchronous.transport import Transport
+from expanse.contracts.messenger.asynchronous.receiver import Receiver
 from expanse.messenger.envelope import Envelope
 
 
-class KeepAliveTransport(Transport, ABC):
+class KeepAliveReceiver(Receiver, ABC):
     """
-    A transport that keeps the worker alive without actually sending or receiving messages.
-    This can be useful for testing or for keeping the worker running when there are no messages to process.
+    A receiver that can be told that a message is still being processed,
+    so that it is not redelivered in the meantime.
     """
 
     @abstractmethod

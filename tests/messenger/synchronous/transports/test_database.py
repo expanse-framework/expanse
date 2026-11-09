@@ -19,9 +19,9 @@ from sqlalchemy import select
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
-from expanse.messenger.synchronous.transports.database import DatabaseTransport
-from expanse.messenger.synchronous.transports.memory import MemoryTransport
-from expanse.messenger.synchronous.transports.outbox import OutboxTransport
+from expanse.messenger.synchronous.transports.database import DatabaseSender
+from expanse.messenger.synchronous.transports.memory import MemorySender
+from expanse.messenger.synchronous.transports.outbox import OutboxSender
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
 
 
@@ -73,8 +73,8 @@ def connection() -> Generator[Connection]:
 
 
 @pytest.fixture()
-def transport(connection: Connection, serializer: Serializer) -> DatabaseTransport:
-    return DatabaseTransport(DatabaseTransportConfig(), connection, serializer)
+def transport(connection: Connection, serializer: Serializer) -> DatabaseSender:
+    return DatabaseSender(DatabaseTransportConfig(), connection, serializer)
 
 
 def _count(connection: Connection) -> int:
@@ -82,7 +82,7 @@ def _count(connection: Connection) -> int:
 
 
 def test_send_stores_the_message(
-    transport: DatabaseTransport, connection: Connection, serializer: Serializer
+    transport: DatabaseSender, connection: Connection, serializer: Serializer
 ) -> None:
     envelope = transport.send(Envelope(MyMessage(foo="bar")))
 
@@ -98,7 +98,7 @@ def test_send_stores_the_message(
 
 
 def test_send_stores_the_message_as_part_of_the_current_transaction(
-    transport: DatabaseTransport, connection: Connection
+    transport: DatabaseSender, connection: Connection
 ) -> None:
     with connection.begin() as transaction:
         transport.send(Envelope(MyMessage(foo="bar")))
@@ -111,10 +111,10 @@ def test_send_stores_the_message_as_part_of_the_current_transaction(
 
 
 def test_outbox_stores_messages_in_the_outbox(
-    transport: DatabaseTransport, connection: Connection, serializer: Serializer
+    transport: DatabaseSender, connection: Connection, serializer: Serializer
 ) -> None:
-    target = MemoryTransport(serializer)
-    outbox = OutboxTransport(target, transport, "target")
+    target = MemorySender(serializer)
+    outbox = OutboxSender(target, transport, "target")
 
     envelope = outbox.send(Envelope(MyMessage(foo="bar")))
 

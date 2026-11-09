@@ -6,17 +6,16 @@ from typing import override
 
 import msgspec
 
-from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
-    KeepAliveTransport,
+from expanse.contracts.messenger.asynchronous.keep_alive_receiver import (
+    KeepAliveReceiver,
 )
-from expanse.contracts.messenger.asynchronous.worker_aware_transport import (
-    WorkerAwareTransport,
+from expanse.contracts.messenger.asynchronous.worker_aware_receiver import (
+    WorkerAwareReceiver,
 )
 from expanse.contracts.messenger.serializer import Serializer
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig
 from expanse.messenger.transports.redis.connection import Connection
@@ -29,7 +28,7 @@ from expanse.types.messenger import EncodedEnvelope
 logger = logging.getLogger(__name__)
 
 
-class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
+class RedisReceiver(KeepAliveReceiver, WorkerAwareReceiver):
     def __init__(
         self,
         redis_connection: RedisConnection,
@@ -42,7 +41,7 @@ class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
         self._serializer: Serializer = serializer
 
         logger.debug(
-            "Initializing Redis transport",
+            "Initializing Redis receiver",
             extra={"group": config.group, "consumer": config.consumer},
         )
 
@@ -57,17 +56,6 @@ class RedisTransport(KeepAliveTransport, WorkerAwareTransport):
             config=config,
             serializer=self._serializer,
         )
-
-    async def send(self, envelope: Envelope) -> Envelope:
-        encoded_envelope = self._serializer.encode(envelope)
-        delay_stamp = envelope.stamp(DelayStamp)
-        delay = delay_stamp.delay if delay_stamp is not None else 0
-
-        id = await self._connection.add(
-            encoded_envelope["body"], encoded_envelope["headers"], delay
-        )
-
-        return envelope.with_stamps(TransportMessageIdStamp(id))
 
     async def receive(self) -> AsyncIterator[Envelope]:
         async for message in self._connection.get():

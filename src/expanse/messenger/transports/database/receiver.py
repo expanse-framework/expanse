@@ -4,49 +4,44 @@ from collections.abc import AsyncIterator
 
 import msgspec
 
-from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
-    KeepAliveTransport as KeepAliveTransportContract,
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from expanse.contracts.messenger.asynchronous.keep_alive_receiver import (
+    KeepAliveReceiver as KeepAliveReceiverContract,
 )
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
-from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import MessageDecodingFailedError
 from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
-from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.database.config import DatabaseTransportConfig
 from expanse.messenger.transports.database.connection import Connection
 from expanse.types.messenger import EncodedEnvelopeHeaders
 
 
-class DatabaseTransport(KeepAliveTransportContract):
+class DatabaseReceiver(KeepAliveReceiverContract):
+    """
+    Receive messages stored in the database.
+
+    Messages are retrieved, acknowledged and rejected through connections
+    of their own, retrieved from the engine, so that they are not tied
+    to the transaction of the message being handled.
+    """
+
     def __init__(
         self,
         config: DatabaseTransportConfig,
-        connection: AsyncConnection,
+        engine: AsyncEngine,
         serializer: SerializerContract,
     ) -> None:
         self._config: DatabaseTransportConfig = config
-        self._db_connection: AsyncConnection = connection
-        self._connection: Connection = Connection(self._db_connection, self._config)
+        self._engine: AsyncEngine = engine
+        self._connection: Connection = Connection(self._engine, self._config)
         self._serializer: SerializerContract = serializer
 
     @property
-    def connection(self) -> AsyncConnection:
-        return self._db_connection
-
-    async def send(self, envelope: Envelope) -> Envelope:
-        encoded_envelope = self._serializer.encode(envelope)
-        delay_stamp = envelope.stamp(DelayStamp)
-        delay = delay_stamp.delay if delay_stamp is not None else 0
-
-        message_row_id = await self._connection.send(
-            body=encoded_envelope["body"],
-            headers=encoded_envelope["headers"],
-            delay=delay,
-        )
-
-        return envelope.with_stamps(TransportMessageIdStamp(message_row_id))
+    def engine(self) -> AsyncEngine:
+        return self._engine
 
     async def receive(self) -> AsyncIterator[Envelope]:
         message_row = await self._connection.get()

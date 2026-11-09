@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,13 +17,15 @@ from expanse.database.asynchronous.session import AsyncSession
 from expanse.database.synchronous.session import Session
 from expanse.http.responses.response import Response
 from expanse.messenger.envelope import Envelope
+from expanse.messenger.middleware.relay_messages import RelayMessages
 from expanse.messenger.registry import Registry
 from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.unique import UniqueStamp
-from expanse.messenger.transports.memory.transport import MemoryTransport
-from expanse.messenger.transports.outbox.transport import OutboxTransport
+from expanse.messenger.transports.memory.sender import MemorySender
+from expanse.messenger.transports.outbox.sender import OutboxSender
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
+from expanse.pagination.pagination_manager import PaginationManager
 from expanse.routing.helpers import get
 from expanse.support.helpers import async_safe
 from expanse.testing.client import TestClient
@@ -33,13 +36,13 @@ from tests.integration.messenger.fixtures.messages import DatabaseMessage
 pytestmark = pytest.mark.db
 
 
-async def _target_transport(container: Container) -> MemoryTransport:
+async def _target_transport(container: Container) -> MemorySender:
     transport_manager = await container.get(TransportManager)
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, OutboxTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, OutboxSender)
 
-    target = transport.target_transport
-    assert isinstance(target, MemoryTransport)
+    target = transport.target_sender
+    assert isinstance(target, MemorySender)
 
     return target
 
@@ -224,6 +227,10 @@ async def test_outboxed_messages_are_relayed_to_and_handled_from_the_target_tran
     async with app.container.create_scoped_container() as container:
         worker = await container.get(Worker)
 
+        # Wire the test-only memory destination to the transport consumed below.
+        manager = await container.get(TransportManager)
+        container.instance(RelayMessages, RelayMessages(manager))
+
         # Relay the message from the outbox to the target transport
         await worker.run("outbox", limit=1)
 
@@ -320,3 +327,61 @@ async def test_messages_are_stored_in_the_configured_outbox_connection(
     assert response.status_code == 200
     assert await _count_outbox_messages(app, "postgresql") == 1
     assert await _count_outbox_messages(app, "sqlite") == 0
+
+
+@pytest.mark.parametrize("rollback", [False, True])
+async def test_worker_dispatch_joins_the_handler_transaction(
+    app: Application, connection_name: str, rollback: bool
+) -> None:
+    # Pagination is irrelevant to this worker test and otherwise requires an HTTP request.
+    app.container.instance(PaginationManager, MagicMock(spec=PaginationManager))
+    app.config["messenger"]["transports"]["incoming"] = {"driver": "memory"}
+    db = await app.container.get(AsyncDatabaseManager)
+    async with db.connection(connection_name) as connection:
+        await connection.execute(
+            text("CREATE TABLE outbox_business_state (value INTEGER)")
+        )
+        await connection.commit()
+
+    errors: list[Exception] = []
+    observed: list[int] = []
+
+    async def handler(message: DatabaseMessage, container: Container) -> None:
+        try:
+            session = await container.get(AsyncSession)
+            bus = await container.get(MessageBus)
+        except Exception as error:
+            errors.append(error)
+            raise
+        async with session.begin():
+            await session.execute(text("INSERT INTO outbox_business_state VALUES (1)"))
+            await bus.dispatch(DatabaseMessage(value="outgoing"))
+            # The row must be written before commit, on this transaction's connection.
+            assert await session.scalar(text("SELECT COUNT(*) FROM messages")) == 1
+            observed.append(1)
+            if rollback:
+                await session.rollback()
+
+    registry = await app.container.get(Registry)
+    registry.register(DatabaseMessage, handler)
+    try:
+        async with app.container.create_scoped_container() as container:
+            manager = await container.get(TransportManager)
+            await (await manager.sender("incoming")).send(
+                Envelope(DatabaseMessage(value="incoming"))
+            )
+            await (await container.get(Worker)).run("incoming", limit=1)
+        if errors:
+            raise errors[0]
+        assert observed == [1]
+        assert await _count_outbox_messages(app, connection_name) == (
+            0 if rollback else 1
+        )
+        async with db.connection(connection_name) as connection:
+            assert await connection.scalar(
+                text("SELECT COUNT(*) FROM outbox_business_state")
+            ) == (0 if rollback else 1)
+    finally:
+        async with db.connection(connection_name) as connection:
+            await connection.execute(text("DROP TABLE outbox_business_state"))
+            await connection.commit()

@@ -16,8 +16,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.exceptions import TransactionalMessageBusError
 from expanse.messenger.stamps.transport import TransportStamp
 from expanse.messenger.stamps.unique_lock_acquired import UniqueLockAcquiredStamp
-from expanse.messenger.transports.database.transport import DatabaseTransport
-from expanse.messenger.transports.outbox.transport import OutboxTransport
+from expanse.messenger.transports.outbox.sender import OutboxSender
 
 
 if TYPE_CHECKING:
@@ -126,11 +125,11 @@ class TransactionalMessageBus(MessageBusContract):
 
         transport_stamp = envelope.stamp(TransportStamp)
         transport_name = transport_stamp.name if transport_stamp else None
-        transport = await self._transport_manager.transport(transport_name)
+        sender = await self._transport_manager.sender(transport_name)
 
-        if isinstance(
-            transport, OutboxTransport
-        ) and await self._joins_session_transaction(transport):
+        if isinstance(sender, OutboxSender) and await self._joins_session_transaction(
+            sender
+        ):
             # The outbox stores the message as part of the session's transaction,
             # so it can be dispatched right away.
             dispatched = await self._decorated_bus.dispatch(envelope)
@@ -144,7 +143,7 @@ class TransactionalMessageBus(MessageBusContract):
 
         return envelope
 
-    async def _joins_session_transaction(self, transport: OutboxTransport) -> bool:
+    async def _joins_session_transaction(self, sender: OutboxSender) -> bool:
         """
         Whether messages stored in the outbox of the given transport
         are part of the transaction of the attached session.
@@ -152,11 +151,7 @@ class TransactionalMessageBus(MessageBusContract):
         if self._session is None:
             return False
 
-        outbox = transport.outbox_transport
-        if not isinstance(outbox, DatabaseTransport):
-            return False
-
-        if self._session.bind is not outbox.connection:
+        if self._session.bind is not sender.outbox_sender.connection:
             return False
 
         # Sessions only begin their transaction on the connection upon their first

@@ -4,12 +4,11 @@ from abc import abstractmethod
 from expanse.messenger.envelope import Envelope
 
 
-class Transport(ABC):
+class Sender(ABC):
     """
-    A transport to which messages are sent synchronously.
+    Send messages to a transport synchronously.
 
-    Synchronous transports only send messages: receiving them
-    is the job of the asynchronous transports used by workers.
+    Receiving messages is the job of the asynchronous receivers used by workers.
     """
 
     @abstractmethod
@@ -24,5 +23,5 @@ class Transport(ABC):
     @abstractmethod
     def close(self) -> None:
         """
-        Close the transport and release any resources it holds.
+        Close the sender and release any resources it holds.
         """
