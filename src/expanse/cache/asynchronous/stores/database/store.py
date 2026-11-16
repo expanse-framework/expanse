@@ -99,7 +99,7 @@ class DatabaseStore(Store):
         expired: list[str] = []
         items: dict[str, CacheItem] = {key: CacheItem(key=key) for key in keys}
         async with self._db.connection(self._config.connection) as connection:
-            stmt: Select[tuple[str, bytes | None]] = (
+            stmt: Select[str, bytes | None] = (
                 select(
                     column("key"),
                     case(
@@ -111,9 +111,7 @@ class DatabaseStore(Store):
                 .select_from(self._table)
                 .where(column("key").in_(keys))
             )
-            results: CursorResult[tuple[str, bytes | None]] = await connection.execute(
-                stmt
-            )
+            results: CursorResult[str, bytes | None] = await connection.execute(stmt)
             rows = results.fetchall()
 
             for row in rows:
