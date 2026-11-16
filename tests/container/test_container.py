@@ -351,3 +351,142 @@ async def test_call_honors_annotated_metadata_on_parameters() -> None:
 
     assert await container.call(handler_with_tag) == "foo-bar"
     assert await container.call(handler_without_tag) == "default"
+
+
+async def test_get_passes_arguments_to_the_factory() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.register(MySomething, make_something)
+
+    assert (await container.get(MySomething, "foo-bar")).value == "foo-bar"
+    assert (await container.get(MySomething)).value == "default"
+
+
+async def test_get_with_arguments_is_equivalent_to_annotated_abstracts() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.singleton(MySomething, make_something)
+
+    something = await container.get(MySomething, "foo-bar")
+
+    def handler(something: Annotated[MySomething, "foo-bar"]) -> MySomething:
+        return something
+
+    assert await container.call(handler) is something
+
+
+async def test_get_caches_singletons_per_arguments() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.singleton(MySomething, make_something)
+
+    default = await container.get(MySomething)
+    foo = await container.get(MySomething, "foo")
+    bar = await container.get(MySomething, "bar")
+
+    assert {default.value, foo.value, bar.value} == {"default", "foo", "bar"}
+    assert await container.get(MySomething) is default
+    assert await container.get(MySomething, "foo") is foo
+    assert await container.get(MySomething, "bar") is bar
+
+
+async def test_get_passes_arguments_to_factories_of_dependencies() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    async def make_another_thing(
+        container: Container, project: str | None = None
+    ) -> AnotherThing:
+        something = await container.get(MySomething, project)
+
+        return AnotherThing(something.value)
+
+    container = Container()
+    container.register(MySomething, make_something)
+    container.register(AnotherThing, make_another_thing)
+
+    assert (await container.get(AnotherThing, "foo-bar")).value == "foo-bar"
+
+
+async def test_scoped_container_passes_arguments_to_scoped_factories() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.scoped(MySomething, make_something)
+
+    async with container.create_scoped_container() as scoped_container:
+        foo = await scoped_container.get(MySomething, "foo")
+
+        assert foo.value == "foo"
+        assert await scoped_container.get(MySomething, "foo") is foo
+        assert (await scoped_container.get(MySomething)).value == "default"
+
+    async with container.create_scoped_container() as scoped_container:
+        assert await scoped_container.get(MySomething, "foo") is not foo
+
+
+async def test_scoped_container_passes_arguments_to_base_container_factories() -> None:
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.singleton(MySomething, make_something)
+
+    async with container.create_scoped_container() as scoped_container:
+        foo = await scoped_container.get(MySomething, "foo")
+
+        assert foo.value == "foo"
+
+    assert await container.get(MySomething, "foo") is foo
+
+
+async def test_get_with_arguments_does_not_return_the_instance_without_arguments() -> (
+    None
+):
+    def make_something(project: str | None = None) -> MySomething:
+        return MySomething(value=project or "default")
+
+    container = Container()
+    container.singleton(MySomething, make_something)
+
+    default = await container.get(MySomething)
+
+    assert await container.get(MySomething, "foo") is not default
+
+
+async def test_nested_scopes_have_independent_instances_and_cleanup() -> None:
+    container = Container()
+    closed: list[object] = []
+    resolved: list[object] = []
+
+    def factory():
+        value = object()
+        yield value
+        closed.append(value)
+
+    async def after_resolving(value: object) -> None:
+        resolved.append(value)
+
+    container.scoped("resource", factory)
+    container.after_resolving("resource", after_resolving)
+    async with container.create_scoped_container() as parent:
+        parent_value = await parent.get("resource")
+        async with parent.create_scoped_container() as child:
+            child_value = await child.get("resource")
+            assert child_value is await child.get("resource")
+            assert child_value is not parent_value
+        assert closed == [child_value]
+        async with parent.create_scoped_container() as sibling:
+            sibling_value = await sibling.get("resource")
+            assert sibling_value is not parent_value
+            assert sibling_value is not child_value
+        assert await parent.get("resource") is parent_value
+    assert closed == [child_value, sibling_value, parent_value]
+    assert resolved == [parent_value, child_value, sibling_value]

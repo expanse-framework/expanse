@@ -15,7 +15,8 @@ from expanse.messenger.exceptions import UnrecoverableMessageHandlingError
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.transports.redis.config import RedisTransportConfig
-from expanse.messenger.transports.redis.transport import RedisTransport
+from expanse.messenger.transports.redis.receiver import RedisReceiver
+from expanse.messenger.transports.redis.sender import RedisSender
 from expanse.redis.asynchronous.redis_manager import RedisManager
 
 
@@ -59,39 +60,51 @@ async def redis_connection() -> AsyncGenerator[RedisConnection]:
 
 
 @pytest.fixture()
-async def redis_transport(
-    redis_connection: RedisConnection, serializer: Serializer
-) -> RedisTransport:
-    transport_config = RedisTransportConfig(
+def redis_config() -> RedisTransportConfig:
+    return RedisTransportConfig(
         stream=STREAM,
         group="test_group",
         consumer="test_consumer",
     )
-    return RedisTransport(
-        redis_connection,
-        transport_config,
-        serializer,
-    )
 
 
-async def test_transport_can_send_a_message(
-    redis_transport: RedisTransport,
+@pytest.fixture()
+async def redis_sender(
+    redis_connection: RedisConnection,
+    redis_config: RedisTransportConfig,
+    serializer: Serializer,
+) -> RedisSender:
+    return RedisSender(redis_connection, redis_config, serializer)
+
+
+@pytest.fixture()
+async def redis_receiver(
+    redis_connection: RedisConnection,
+    redis_config: RedisTransportConfig,
+    serializer: Serializer,
+) -> RedisReceiver:
+    return RedisReceiver(redis_connection, redis_config, serializer)
+
+
+async def test_sender_can_send_a_message(
+    redis_sender: RedisSender,
 ) -> None:
     envelope = Envelope.wrap(RedisMessage(value="hello"))
-    result = await redis_transport.send(envelope)
+    result = await redis_sender.send(envelope)
 
     stamp = result.stamp(TransportMessageIdStamp)
     assert stamp is not None
     assert stamp.id is not None
 
 
-async def test_transport_can_receive_a_message(
-    redis_transport: RedisTransport,
+async def test_receiver_can_receive_a_message(
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
     message = RedisMessage(value="receive-me")
-    await redis_transport.send(Envelope.wrap(message))
+    await redis_sender.send(Envelope.wrap(message))
 
-    envelopes = [e async for e in redis_transport.receive()]
+    envelopes = [e async for e in redis_receiver.receive()]
 
     assert len(envelopes) == 1
     received = envelopes[0]
@@ -102,71 +115,76 @@ async def test_transport_can_receive_a_message(
     assert stamp is not None
 
 
-async def test_transport_does_not_receive_delayed_messages(
-    redis_transport: RedisTransport,
+async def test_receiver_does_not_receive_delayed_messages(
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
     delayed_envelope = Envelope.wrap(RedisMessage(value="delayed")).with_stamps(
         DelayStamp(delay=60_000)
     )
-    await redis_transport.send(delayed_envelope)
+    await redis_sender.send(delayed_envelope)
 
-    received = [e async for e in redis_transport.receive()]
+    received = [e async for e in redis_receiver.receive()]
 
     assert received == []
 
 
-async def test_transport_can_acknowledge_a_message(
-    redis_transport: RedisTransport,
+async def test_receiver_can_acknowledge_a_message(
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
-    await redis_transport.send(Envelope.wrap(RedisMessage(value="ack-me")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="ack-me")))
 
-    envelopes = [e async for e in redis_transport.receive()]
+    envelopes = [e async for e in redis_receiver.receive()]
     assert len(envelopes) == 1
 
-    await redis_transport.acknowledge(envelopes[0])
+    await redis_receiver.acknowledge(envelopes[0])
 
     # After acknowledgment with delete_after_ack=True, the stream should be empty
-    envelopes_after = [e async for e in redis_transport.receive()]
+    envelopes_after = [e async for e in redis_receiver.receive()]
     assert envelopes_after == []
 
 
-async def test_transport_can_reject_a_message(
-    redis_transport: RedisTransport,
+async def test_receiver_can_reject_a_message(
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
-    await redis_transport.send(Envelope.wrap(RedisMessage(value="reject-me")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="reject-me")))
 
-    envelopes = [e async for e in redis_transport.receive()]
+    envelopes = [e async for e in redis_receiver.receive()]
     assert len(envelopes) == 1
 
-    await redis_transport.reject(envelopes[0])
+    await redis_receiver.reject(envelopes[0])
 
     # After rejection with delete_after_reject=True, the stream should be empty
-    envelopes_after = [e async for e in redis_transport.receive()]
+    envelopes_after = [e async for e in redis_receiver.receive()]
     assert envelopes_after == []
 
 
 async def test_acknowledge_raises_without_transport_message_id_stamp(
-    redis_transport: RedisTransport,
+    redis_receiver: RedisReceiver,
 ) -> None:
     envelope = Envelope.wrap(RedisMessage(value="no-stamp"))
 
     with pytest.raises(UnrecoverableMessageHandlingError):
-        await redis_transport.acknowledge(envelope)
+        await redis_receiver.acknowledge(envelope)
 
 
 async def test_reject_raises_without_transport_message_id_stamp(
-    redis_transport: RedisTransport,
+    redis_receiver: RedisReceiver,
 ) -> None:
     envelope = Envelope.wrap(RedisMessage(value="no-stamp"))
 
     with pytest.raises(UnrecoverableMessageHandlingError):
-        await redis_transport.reject(envelope)
+        await redis_receiver.reject(envelope)
 
 
 async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
-    redis_connection: RedisConnection, serializer: Serializer
+    redis_connection: RedisConnection,
+    redis_sender: RedisSender,
+    serializer: Serializer,
 ) -> None:
-    transport = RedisTransport(
+    transport = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -176,14 +194,14 @@ async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
         serializer,
     )
 
-    await transport.send(Envelope.wrap(RedisMessage(value="pending")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="pending")))
 
     # First receive: message is delivered but NOT acknowledged — it stays pending
     first_batch = [e async for e in transport.receive()]
     assert len(first_batch) == 1
     assert first_batch[0].open().value == "pending"
 
-    await transport.send(Envelope.wrap(RedisMessage(value="new")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="new")))
 
     # Second receive: consumer_a's own pending message is skipped
     # (the implementation treats it as currently in-flight by this consumer);
@@ -194,9 +212,11 @@ async def test_consumer_skips_its_own_pending_messages_and_receives_new_ones(
 
 
 async def test_unacknowledged_message_is_claimed_by_another_consumer(
-    redis_connection: RedisConnection, serializer: Serializer
+    redis_connection: RedisConnection,
+    redis_sender: RedisSender,
+    serializer: Serializer,
 ) -> None:
-    consumer_a = RedisTransport(
+    consumer_a = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -206,7 +226,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
         serializer,
     )
     # Consumer B uses idle_time=0 so it can immediately claim consumer A's pending messages
-    consumer_b = RedisTransport(
+    consumer_b = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -217,7 +237,7 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
         serializer,
     )
 
-    await consumer_a.send(Envelope.wrap(RedisMessage(value="pending")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="pending")))
 
     # Consumer A receives but does NOT acknowledge
     first_batch = [e async for e in consumer_a.receive()]
@@ -230,46 +250,50 @@ async def test_unacknowledged_message_is_claimed_by_another_consumer(
 
 
 async def test_delayed_message_is_received_after_its_delay_expires(
-    redis_transport: RedisTransport,
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
     delayed_envelope = Envelope.wrap(RedisMessage(value="delayed")).with_stamps(
         DelayStamp(delay=200)  # 200ms
     )
-    await redis_transport.send(delayed_envelope)
+    await redis_sender.send(delayed_envelope)
 
     # Message is not yet available
-    before = [e async for e in redis_transport.receive()]
+    before = [e async for e in redis_receiver.receive()]
     assert before == []
 
     await asyncio.sleep(0.3)  # wait for the 200ms delay to expire
 
-    after = [e async for e in redis_transport.receive()]
+    after = [e async for e in redis_receiver.receive()]
     assert len(after) == 1
     assert after[0].open().value == "delayed"
 
 
 async def test_only_expired_delayed_messages_are_moved_to_the_stream(
-    redis_transport: RedisTransport,
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
-    await redis_transport.send(
+    await redis_sender.send(
         Envelope.wrap(RedisMessage(value="soon")).with_stamps(DelayStamp(delay=200))
     )
-    await redis_transport.send(
+    await redis_sender.send(
         Envelope.wrap(RedisMessage(value="later")).with_stamps(DelayStamp(delay=60_000))
     )
 
     await asyncio.sleep(0.3)  # only the 200ms message is due
 
-    received = [e async for e in redis_transport.receive()]
+    received = [e async for e in redis_receiver.receive()]
     assert len(received) == 1
     assert received[0].open().value == "soon"
 
 
-async def test_transport_keep_alive_prevents_message_from_being_claimed(
-    redis_connection: RedisConnection, serializer: Serializer
+async def test_receiver_keep_alive_prevents_message_from_being_claimed(
+    redis_connection: RedisConnection,
+    redis_sender: RedisSender,
+    serializer: Serializer,
 ) -> None:
     """keep_alive resets the idle clock so another consumer cannot steal the message."""
-    consumer_a = RedisTransport(
+    consumer_a = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -279,7 +303,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
         serializer,
     )
     # consumer_b claims messages idle for ≥100 ms; claim_interval=0 so it always tries
-    consumer_b = RedisTransport(
+    consumer_b = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -291,7 +315,7 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
         serializer,
     )
 
-    await consumer_a.send(Envelope.wrap(RedisMessage(value="alive")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="alive")))
 
     # consumer_a receives but does NOT acknowledge — message stays pending
     first_batch = [e async for e in consumer_a.receive()]
@@ -308,10 +332,12 @@ async def test_transport_keep_alive_prevents_message_from_being_claimed(
     assert second_batch == []
 
 
-async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
-    redis_connection: RedisConnection, serializer: Serializer
+async def test_receiver_keep_alive_raises_when_duration_exceeds_idle_time(
+    redis_connection: RedisConnection,
+    redis_sender: RedisSender,
+    serializer: Serializer,
 ) -> None:
-    transport = RedisTransport(
+    transport = RedisReceiver(
         redis_connection,
         RedisTransportConfig(
             stream=STREAM,
@@ -322,7 +348,7 @@ async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
         serializer,
     )
 
-    await transport.send(Envelope.wrap(RedisMessage(value="too-long")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="too-long")))
     envelopes = [e async for e in transport.receive()]
     assert len(envelopes) == 1
 
@@ -330,21 +356,22 @@ async def test_transport_keep_alive_raises_when_duration_exceeds_idle_time(
         await transport.keep_alive(envelopes[0], duration=120)
 
 
-async def test_transport_keep_alive_is_noop_for_envelope_without_message_id_stamp(
-    redis_transport: RedisTransport,
+async def test_receiver_keep_alive_is_noop_for_envelope_without_message_id_stamp(
+    redis_sender: RedisSender,
+    redis_receiver: RedisReceiver,
 ) -> None:
-    await redis_transport.send(Envelope.wrap(RedisMessage(value="present")))
+    await redis_sender.send(Envelope.wrap(RedisMessage(value="present")))
 
     bare_envelope = Envelope.wrap(RedisMessage(value="no-stamp"))
-    await redis_transport.keep_alive(bare_envelope)  # must not raise
+    await redis_receiver.keep_alive(bare_envelope)  # must not raise
 
     # The message sent earlier is still in the stream — keep_alive had no side-effect
-    received = [e async for e in redis_transport.receive()]
+    received = [e async for e in redis_receiver.receive()]
     assert len(received) == 1
 
 
-async def test_transport_can_be_closed(
-    redis_transport: RedisTransport, redis_connection: RedisConnection, mockery: Mockery
+async def test_receiver_can_be_closed(
+    redis_receiver: RedisReceiver, redis_connection: RedisConnection, mockery: Mockery
 ) -> None:
     mockery.mock(redis_connection).should_receive("close").and_return(None)
-    await redis_transport.close()
+    await redis_receiver.close()

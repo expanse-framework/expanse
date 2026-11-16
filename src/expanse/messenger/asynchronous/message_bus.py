@@ -33,7 +33,7 @@ class MessageBus(MessageBusContract):
         envelope = Envelope.wrap(message)
         transport_stamp = envelope.stamp(TransportStamp)
         transport_name = transport_stamp.name if transport_stamp else None
-        transport = await self._transport_manager.transport(transport_name)
+        sender = await self._transport_manager.sender(transport_name)
 
         pipeline = Pipeline[Envelope, Envelope]()
 
@@ -44,4 +44,4 @@ class MessageBus(MessageBusContract):
             ]
         )
 
-        return await pipeline.send(envelope).to(transport.send).run()
+        return await pipeline.send(envelope).to(sender.send).run()

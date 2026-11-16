@@ -3,11 +3,11 @@ from abc import abstractmethod
 from typing import Self
 
 
-class WorkerAwareTransport(ABC):
+class WorkerAwareReceiver(ABC):
     """
-    Transport that is aware of the worker's running it, especially its ID.
+    Receiver that is aware of the worker running it, especially its ID.
 
-    This is useful for transports that are not safe to share when a worker
+    This is useful for receivers that are not safe to share when a worker
     is running concurrently.
     """
 

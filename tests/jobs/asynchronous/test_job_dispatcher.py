@@ -17,7 +17,7 @@ from expanse.messenger.registry import Registry
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.transport import TransportStamp
-from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.memory.sender import MemorySender
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.serialization.serialization_manager import SerializationManager
 from expanse.serialization.serializers.dataclass import DataclassSerializer
@@ -63,9 +63,9 @@ def dispatcher(bus: MessageBus) -> JobDispatcher:
 
 
 @pytest.fixture()
-async def transport(transport_manager: TransportManager) -> MemoryTransport:
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+async def transport(transport_manager: TransportManager) -> MemorySender:
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
     return transport
 
 
@@ -81,7 +81,7 @@ class MyJob(Job[Payload]):
 
 
 async def test_dispatch_sends_payload_through_bus(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     job = MyJob(Payload("hello"))
     await dispatcher.dispatch(job)
@@ -92,7 +92,7 @@ async def test_dispatch_sends_payload_through_bus(
 
 
 async def test_dispatch_sends_envelope_with_job_stamp(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     job = MyJob(Payload("hello"))
     await dispatcher.dispatch(job)
@@ -103,7 +103,7 @@ async def test_dispatch_sends_envelope_with_job_stamp(
 
 
 async def test_dispatch_job_stamp_identifies_job_class(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     job = MyJob(Payload("hello"))
     await dispatcher.dispatch(job)
@@ -114,7 +114,7 @@ async def test_dispatch_job_stamp_identifies_job_class(
 
 
 async def test_dispatch_with_delay_adds_delay_stamp(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     job = MyJob(Payload("delayed"))
     job.delay(30)
@@ -129,7 +129,7 @@ async def test_dispatch_with_delay_adds_delay_stamp(
 
 
 async def test_dispatch_without_delay_sends_no_delay_stamp(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     job = MyJob(Payload("immediate"))
     await dispatcher.dispatch(job)
@@ -152,7 +152,7 @@ def test_prepare_with_via_includes_transport_stamp(
 
 
 async def test_multiple_dispatches_send_separate_envelopes(
-    dispatcher: JobDispatcher, transport: MemoryTransport
+    dispatcher: JobDispatcher, transport: MemorySender
 ) -> None:
     await dispatcher.dispatch(MyJob(Payload("first")))
     await dispatcher.dispatch(MyJob(Payload("second")))

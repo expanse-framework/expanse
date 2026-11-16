@@ -1,17 +1,15 @@
 from typing import Self
 
-from expanse.support.middleware.middleware import Middleware
 
-
-class MiddlewareGroup[I, O]:
-    def __init__(self, middlewares: list[type[Middleware[I, O]]] | None = None) -> None:
+class MiddlewareGroup[M]:
+    def __init__(self, middlewares: list[type[M]] | None = None) -> None:
         self._middlewares = middlewares or []
 
     @property
-    def middleware(self) -> list[type[Middleware[I, O]]]:
+    def middleware(self) -> list[type[M]]:
         return self._middlewares
 
-    def append(self, *middleware: type[Middleware[I, O]]) -> Self:
+    def append(self, *middleware: type[M]) -> Self:
         """
         Append middleware to the middleware stack.
         """
@@ -19,7 +17,7 @@ class MiddlewareGroup[I, O]:
 
         return self
 
-    def prepend(self, *middleware: type[Middleware[I, O]]) -> Self:
+    def prepend(self, *middleware: type[M]) -> Self:
         """
         Prepend middleware to the middleware stack.
         """
@@ -27,7 +25,7 @@ class MiddlewareGroup[I, O]:
 
         return self
 
-    def use(self, middleware: list[type[Middleware[I, O]]]) -> Self:
+    def use(self, middleware: list[type[M]]) -> Self:
         """
         Replace the current middleware with the given middleware.
         """
@@ -35,9 +33,7 @@ class MiddlewareGroup[I, O]:
 
         return self
 
-    def replace(
-        self, middleware: type[Middleware[I, O]], replacement: type[Middleware[I, O]]
-    ) -> Self:
+    def replace(self, middleware: type[M], replacement: type[M]) -> Self:
         """
         Replace a middleware with another middleware.
         """
@@ -47,7 +43,7 @@ class MiddlewareGroup[I, O]:
 
         return self
 
-    def remove(self, middleware: type[Middleware[I, O]]) -> Self:
+    def remove(self, middleware: type[M]) -> Self:
         """
         Remove a middleware from the middleware group.
         """

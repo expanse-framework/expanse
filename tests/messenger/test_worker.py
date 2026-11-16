@@ -9,6 +9,7 @@ from typing import ClassVar
 from typing import Protocol
 from typing import cast
 from typing import override
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
@@ -22,10 +23,12 @@ from expanse.cache.synchronous.stores.memory import MemoryStore as SyncMemorySto
 from expanse.configuration.config import Config
 from expanse.container.container import Container
 from expanse.contracts.cache.asynchronous.cache import Cache as CacheContract
-from expanse.contracts.messenger.asynchronous.keep_alive_transport import (
-    KeepAliveTransport,
+from expanse.contracts.messenger.asynchronous.keep_alive_receiver import (
+    KeepAliveReceiver,
 )
+from expanse.contracts.messenger.asynchronous.sender import Sender
 from expanse.contracts.messenger.serializer import Serializer as SerializerContract
+from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.encryption.encryption_manager import EncryptionManager
 from expanse.encryption.encryptor_factory import EncryptorFactory
 from expanse.encryption.key import Key
@@ -43,12 +46,14 @@ from expanse.messenger.middleware.handle_encryption import HandleEncryption
 from expanse.messenger.middleware.handle_failed_decoding import HandleFailedDecoding
 from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.middleware.propagate_context import PropagateContext
+from expanse.messenger.middleware.relay_messages import RelayMessages
 from expanse.messenger.registry import Registry
 from expanse.messenger.retry.retry_strategy_manager import RetryStrategyManager
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.context import ContextStamp
 from expanse.messenger.stamps.delay import DelayStamp
 from expanse.messenger.stamps.handled import HandledStamp
+from expanse.messenger.stamps.outbox import OutboxStamp
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.redelivery import RedeliveryStamp
 from expanse.messenger.stamps.sensitive import SensitiveStamp
@@ -57,7 +62,9 @@ from expanse.messenger.stamps.sent_to_failure_transport import (
 )
 from expanse.messenger.stamps.transport_message_id import TransportMessageIdStamp
 from expanse.messenger.stamps.unique import UniqueStamp
-from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.database.sender import DatabaseSender
+from expanse.messenger.transports.memory.sender import MemorySender
+from expanse.messenger.transports.outbox.sender import OutboxSender
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.messenger.worker import Worker
 from expanse.serialization.serialization_manager import SerializationManager
@@ -76,7 +83,7 @@ logger.setLevel(logging.INFO)
 logger.addFilter(ContextFilter())
 
 
-class FakeKeepAliveTransport(KeepAliveTransport):
+class FakeKeepAliveTransport(Sender, KeepAliveReceiver):
     def __init__(self) -> None:
         self._queue: list[Envelope] = []
         self.sent: list[Envelope] = []
@@ -115,7 +122,7 @@ class FakeKeepAliveTransport(KeepAliveTransport):
         self.closed = True
 
 
-class FlappingLeaseTransport(KeepAliveTransport):
+class FlappingLeaseTransport(Sender, KeepAliveReceiver):
     """A transport whose single message can become available again while
     still in flight, simulating a lease/redelivery-timeout expiring before
     a sibling consumer slot has finished handling it."""
@@ -221,7 +228,12 @@ def logging_handler(message: WorkerMessage) -> None:
 
 
 @pytest.fixture()
-async def container() -> Container:
+def connection() -> MagicMock:
+    return MagicMock(spec=AsyncConnection)
+
+
+@pytest.fixture()
+async def container(connection: MagicMock) -> Container:
     from expanse.logging.logging_service_provider import LoggingServiceProvider
 
     container = Container()
@@ -233,13 +245,15 @@ async def container() -> Container:
         PickleSerializer().restrict({class_to_name(MessageDecodingFailedError)})
     )
     container.instance(SerializerContract, Serializer(serialization_manager))
+    # Database transports do not touch the connection until they are used
+    container.instance(AsyncConnection, connection)
 
     return container
 
 
 @pytest.fixture()
 def middleware_stack() -> MiddlewareStack:
-    return MiddlewareStack().use([])
+    return MiddlewareStack().use([RelayMessages])
 
 
 @pytest.fixture()
@@ -273,6 +287,16 @@ def config() -> Config:
                     "failed": {
                         "driver": "memory",
                     },
+                    # A transport whose messages go through the outbox
+                    "target": {
+                        "driver": "memory",
+                        "outbox": "database",
+                        "retry_strategy": "default",
+                    },
+                    "database": {"driver": "database"},
+                    # Stands in for the database outbox when consuming,
+                    # since the outbox relay only depends on the OutboxStamp.
+                    "outbox": {"driver": "memory"},
                 },
                 "retry_strategies": {
                     "default": {
@@ -294,7 +318,13 @@ def transport_manager(
     config: Config,
     registry: Registry,
 ) -> TransportManager:
-    return TransportManager(container, config, registry)
+    container.instance(Config, config)
+    container.instance(Registry, registry)
+    container.scoped(TransportManager)
+    manager = TransportManager(container, config, registry)
+    # These tests consume relayed messages from the same in-memory transport.
+    container.singleton(RelayMessages, lambda _: RelayMessages(manager))
+    return manager
 
 
 @pytest.fixture()
@@ -335,8 +365,8 @@ async def test_worker_handles_messages(
         assert isinstance(value, str)
         called_values.append(value)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     message = WorkerMessage(value="ok")
     await transport.send(Envelope.wrap(message))
@@ -345,7 +375,7 @@ async def test_worker_handles_messages(
     await worker.run(limit=1)
 
     assert called_values == [message.value]
-    assert [e async for e in transport.receive()] == []
+    assert list(transport.queue.pull()) == []
     assert caplog.messages[0] == "Message WorkerMessage handled successfully."
 
 
@@ -360,10 +390,10 @@ async def test_worker_sends_unrecoverable_failures_to_failure_transport(
     async def handler(_message: WorkerMessage) -> None:
         raise UnrecoverableMessageHandlingError("bad payload")
 
-    transport = await transport_manager.transport("memory")
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(transport, MemoryTransport)
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(transport, MemorySender)
+    assert isinstance(failure_transport, MemorySender)
 
     message = WorkerMessage(value="boom")
     await transport.send(Envelope.wrap(message))
@@ -392,8 +422,8 @@ async def test_worker_retries_message_when_retry_strategy_allows_it(
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("transient failure")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="retry")))
     registry.register_handler(handler)
@@ -427,10 +457,10 @@ async def test_worker_routes_to_failure_transport_when_retries_are_exhausted(
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("permanent failure")
 
-    transport = await transport_manager.transport("memory")
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(transport, MemoryTransport)
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(transport, MemorySender)
+    assert isinstance(failure_transport, MemorySender)
 
     redelivered = Envelope.wrap(WorkerMessage(value="done")).with_stamps(
         RedeliveryStamp(retry_count=3)
@@ -457,8 +487,8 @@ async def test_worker_handles_job_messages(
 ) -> None:
     ProcessJob.call_log.clear()
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     payload = WorkerMessage(value="processed")
     await transport.send(
@@ -468,7 +498,7 @@ async def test_worker_handles_job_messages(
     await worker.run(limit=1)
 
     assert ProcessJob.call_log == ["processed"]
-    assert [e async for e in transport.receive()] == []
+    assert list(transport.queue.pull()) == []
 
 
 async def test_worker_job_receives_injected_dependencies(
@@ -478,8 +508,8 @@ async def test_worker_job_receives_injected_dependencies(
     service = MyService()
     container.instance(MyService, service)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     payload = WorkerMessage(value="di")
     await transport.send(
@@ -506,8 +536,8 @@ async def test_worker_does_not_retry_job_when_only_scope_teardown_fails(
     ProcessJobWithScopedSession.call_log.clear()
     container.scoped(FakeScopedSession, _create_fake_scoped_session)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(
         Envelope.wrap(
@@ -519,8 +549,8 @@ async def test_worker_does_not_retry_job_when_only_scope_teardown_fails(
     await worker.run(limit=1)
 
     assert ProcessJobWithScopedSession.call_log == ["once"]
-    assert len(transport._acknowledged) == 1
-    assert transport._rejected == []
+    assert len(transport.queue.acknowledged) == 1
+    assert transport.queue.rejected == []
     assert "Error while terminating the scoped container" in caplog.text
 
 
@@ -556,10 +586,10 @@ async def test_worker_routes_invalid_job_class_to_failure_transport(
         registry,
     )
 
-    transport = await transport_manager.transport("memory")
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(transport, MemoryTransport)
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(transport, MemorySender)
+    assert isinstance(failure_transport, MemorySender)
 
     payload = WorkerMessage(value="x")
     await transport.send(
@@ -593,8 +623,8 @@ async def test_worker_adds_received_stamp_when_processing(
             received_envelopes.append(envelope)
             return await next_call(envelope)  # type: ignore[operator]
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="stamped")))
     registry.register_handler(handler)
@@ -638,10 +668,10 @@ async def test_worker_routes_to_failure_transport_when_no_retry_strategy_configu
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("unexpected failure")
 
-    transport = await transport_manager.transport("memory")
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(transport, MemoryTransport)
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(transport, MemorySender)
+    assert isinstance(failure_transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="no-retry")))
     registry.register_handler(handler)
@@ -662,19 +692,20 @@ async def test_worker_adds_handled_stamp_after_successful_handling(
     async def handler(message: WorkerMessage) -> None:
         pass
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="stamped")))
     registry.register_handler(handler)
 
-    original_acknowledge = transport.acknowledge
+    receiver = await transport_manager.receiver("memory")
+    original_acknowledge = receiver.acknowledge
 
     async def capturing_acknowledge(envelope: Envelope) -> None:
         handled_envelopes.append(envelope)
         await original_acknowledge(envelope)
 
-    transport.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
+    receiver.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
 
     await worker.run(limit=1)
 
@@ -690,21 +721,22 @@ async def test_worker_adds_handled_stamp_for_job_messages(
     ProcessJob.call_log.clear()
     handled_envelopes: list[Envelope] = []
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     payload = WorkerMessage(value="stamped")
     await transport.send(
         Envelope.wrap(payload, stamps=[JobStamp(class_to_name(ProcessJob))])
     )
 
-    original_acknowledge = transport.acknowledge
+    receiver = await transport_manager.receiver("memory")
+    original_acknowledge = receiver.acknowledge
 
     async def capturing_acknowledge(envelope: Envelope) -> None:
         handled_envelopes.append(envelope)
         await original_acknowledge(envelope)
 
-    transport.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
+    receiver.acknowledge = capturing_acknowledge  # type: ignore[method-assign]
 
     await worker.run(limit=1)
 
@@ -724,8 +756,8 @@ async def test_worker_skips_already_handled_handlers(
         nonlocal call_count
         call_count += 1
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     # Pre-stamp the envelope as already handled by this handler
     envelope = Envelope.wrap(WorkerMessage(value="already-handled")).with_stamps(
@@ -745,10 +777,10 @@ async def test_worker_raises_message_handling_failed_error_with_errors(
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("transient failure")
 
-    transport = await transport_manager.transport("memory")
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(transport, MemoryTransport)
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(transport, MemorySender)
+    assert isinstance(failure_transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="fail")))
     registry.register_handler(handler)
@@ -774,8 +806,8 @@ async def test_worker_multiple_handlers_partial_failure(
     async def bad_handler(_message: WorkerMessage) -> None:
         raise RuntimeError("handler failed")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="partial")))
     registry.register_handler(good_handler)
@@ -800,8 +832,8 @@ async def test_worker_uses_custom_sleep_interval(
         # Stop the worker after the first sleep to avoid infinite polling
         worker.stop()
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
     # Don't send any message so the worker will sleep
 
     with patch.object(asyncio, "sleep", side_effect=capturing_sleep):
@@ -820,8 +852,8 @@ async def test_worker_uses_default_sleep_interval(
         sleep_calls.append(seconds)
         worker.stop()
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     with patch.object(asyncio, "sleep", side_effect=capturing_sleep):
         await worker.run()
@@ -871,8 +903,12 @@ def _make_keep_alive_worker(
             }
         }
     )
+    container.instance(Config, cfg)
+    container.instance(Registry, registry)
+    container.scoped(TransportManager)
     tm = TransportManager(container, cfg, registry)
-    tm._transports["keep_alive"] = fake_transport
+    tm._senders["keep_alive"] = fake_transport
+    tm._receivers["keep_alive"] = fake_transport
     worker = Worker(
         tm,
         RetryStrategyManager(cfg),
@@ -1001,9 +1037,9 @@ async def test_worker_does_not_track_keep_alives_for_regular_transport(
     async def handler(_message: WorkerMessage) -> None:
         pass
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
-    assert not isinstance(transport, KeepAliveTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
+    assert not isinstance(await transport_manager.receiver("memory"), KeepAliveReceiver)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="plain")))
     registry.register_handler(handler)
@@ -1017,7 +1053,8 @@ async def test_worker_keep_alive_calls_transport_keep_alive(
     worker: Worker, transport_manager: TransportManager
 ) -> None:
     fake_transport = FakeKeepAliveTransport()
-    transport_manager._transports["keep_alive"] = fake_transport
+    transport_manager._senders["keep_alive"] = fake_transport
+    transport_manager._receivers["keep_alive"] = fake_transport
 
     envelope = Envelope.wrap(WorkerMessage(value="alive")).with_stamps(
         TransportMessageIdStamp(id=42)
@@ -1034,7 +1071,8 @@ async def test_worker_keep_alive_passes_duration_to_transport(
     worker: Worker, transport_manager: TransportManager
 ) -> None:
     fake_transport = FakeKeepAliveTransport()
-    transport_manager._transports["keep_alive"] = fake_transport
+    transport_manager._senders["keep_alive"] = fake_transport
+    transport_manager._receivers["keep_alive"] = fake_transport
 
     envelope = Envelope.wrap(WorkerMessage(value="duration")).with_stamps(
         TransportMessageIdStamp(id=7)
@@ -1057,8 +1095,8 @@ async def test_log_context_is_not_shared_between_handlers(
     message1 = WorkerMessage(value="message1")
     message2 = WorkerMessage(value="message2")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     registry.register_handler(context_setter_handler)
     registry.register_handler(logging_handler)
@@ -1104,8 +1142,8 @@ async def test_log_context_is_not_shared_between_messages(
     message2 = WorkerMessage(value="message2")
     message3 = WorkerMessage(value="message3")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     registry.register_handler(logging_handler)
 
@@ -1149,8 +1187,8 @@ async def test_worker_releases_unique_lock_after_successful_handling(
     async def handler(_message: WorkerMessage) -> None:
         pass
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
     lock = UniqueLock(cache)
@@ -1178,8 +1216,8 @@ async def test_worker_releases_unique_lock_on_unrecoverable_failure(
     async def handler(_message: WorkerMessage) -> None:
         raise UnrecoverableMessageHandlingError("permanent failure")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
     lock = UniqueLock(cache)
@@ -1208,8 +1246,8 @@ async def test_worker_does_not_release_unique_lock_on_retry(
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("transient")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
     lock = UniqueLock(cache)
@@ -1260,8 +1298,8 @@ async def test_worker_releases_unique_lock_when_retries_are_exhausted(
     async def handler(_message: WorkerMessage) -> None:
         raise RuntimeError("no retry configured")
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
     lock = UniqueLock(cache)
@@ -1294,8 +1332,8 @@ async def test_worker_processes_messages_concurrently(
         # `concurrency` handlers concurrently rather than one at a time.
         await asyncio.wait_for(all_active.wait(), timeout=5)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     for i in range(concurrency):
         await transport.send(Envelope.wrap(WorkerMessage(value=str(i))))
@@ -1315,8 +1353,8 @@ async def test_worker_concurrency_respects_limit(
     async def handler(message: WorkerMessage) -> None:
         handled.append(message.value)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     for i in range(5):
         await transport.send(Envelope.wrap(WorkerMessage(value=str(i))))
@@ -1394,8 +1432,8 @@ async def test_worker_scoped_container_does_not_leak_between_concurrent_messages
         resolved_values.append(resolved.value)
         assert resolved.value == message.value
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="a")))
     await transport.send(Envelope.wrap(WorkerMessage(value="b")))
@@ -1429,8 +1467,12 @@ async def test_worker_does_not_reprocess_message_reclaimed_by_own_slot(
             }
         }
     )
+    container.instance(Config, cfg)
+    container.instance(Registry, registry)
+    container.scoped(TransportManager)
     tm = TransportManager(container, cfg, registry)
-    tm._transports["flapping"] = fake_transport
+    tm._senders["flapping"] = fake_transport
+    tm._receivers["flapping"] = fake_transport
     worker = Worker(
         tm, RetryStrategyManager(cfg), cfg, middleware_stack, container, registry
     )
@@ -1479,8 +1521,8 @@ async def test_worker_does_not_release_when_envelope_has_no_unique_stamp(
     async def handler(_message: WorkerMessage) -> None:
         pass
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
 
     await transport.send(Envelope.wrap(WorkerMessage(value="no-unique")))
     registry.register_handler(handler)
@@ -1515,10 +1557,10 @@ async def test_worker_can_handle_message_decoding_errors(
         ],
     )
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport)
-    failure_transport = await transport_manager.transport("failed")
-    assert isinstance(failure_transport, MemoryTransport)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender)
+    failure_transport = await transport_manager.sender("failed")
+    assert isinstance(failure_transport, MemorySender)
 
     _ = await transport.send(Envelope.wrap(WorkerMessage(value="foo")))
 
@@ -1532,7 +1574,7 @@ async def test_worker_can_handle_message_decoding_errors(
     await worker.run(limit=3, sleep=0)
 
     # The message has been discarded
-    assert await anext(transport.receive(), None) is None
+    assert next(transport.queue.pull(), None) is None
     # and send to the failure transport
     assert len(failure_transport.sent) == 1
 
@@ -1561,8 +1603,8 @@ async def test_worker_processes_messages_through_a_reversed_middleware_stack(
     container.instance(EncryptionManager, encryption)
     middleware_stack.use([PropagateContext, HandleEncryption])
 
-    transport = await transport_manager.transport()
-    assert isinstance(transport, MemoryTransport)
+    transport = await transport_manager.sender()
+    assert isinstance(transport, MemorySender)
     await (
         Pipeline[Envelope, Envelope]()
         .use(
@@ -1590,3 +1632,230 @@ async def test_worker_processes_messages_through_a_reversed_middleware_stack(
     await worker.run(limit=1)
 
     assert foo == "bar"
+
+
+async def _outbox_target(transport_manager: TransportManager) -> MemorySender:
+    sender = await transport_manager.sender("target")
+    assert isinstance(sender, OutboxSender)
+
+    target = sender.target_sender
+    assert isinstance(target, MemorySender)
+
+    return target
+
+
+async def test_worker_relays_outboxed_messages_to_their_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    outbox = await transport_manager.sender("outbox")
+    assert isinstance(outbox, MemorySender)
+
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+
+    # The message is not handled while relaying...
+    assert handled == []
+
+    # ...it is forwarded to the target transport without the outbox stamp...
+    target = await _outbox_target(transport_manager)
+    assert len(target.sent) == 1
+    relayed = target.sent[0]
+    assert relayed.open() == WorkerMessage(value="relay-me")
+    assert not relayed.has_stamp(OutboxStamp)
+    assert not relayed.has_stamp(HandledStamp)
+
+    # ...and removed from the outbox.
+    outbox_receiver = await transport_manager.receiver("outbox")
+    assert [e async for e in outbox_receiver.receive()] == []
+
+
+async def test_worker_does_not_release_unique_lock_when_relaying(
+    worker: Worker,
+    transport_manager: TransportManager,
+    container: Container,
+    cache: Cache,
+) -> None:
+    container.instance(CacheContract, cache)
+
+    envelope = Envelope.wrap(WorkerMessage(value="unique"), stamps=[UniqueStamp()])
+    lock = UniqueLock(cache)
+    assert await lock.acquire(envelope) is True
+
+    outbox = await transport_manager.sender("outbox")
+    await outbox.send(envelope.with_stamps(OutboxStamp(target_transport_name="target")))
+
+    await worker.run("outbox", limit=1)
+
+    # The message has only been relayed, not handled, so the lock must be kept.
+    other = UniqueLock(cache)
+    assert await other.acquire(envelope) is False
+
+
+async def test_worker_does_not_send_relayed_messages_back_to_the_outbox(
+    worker: Worker, transport_manager: TransportManager, connection: MagicMock
+) -> None:
+    outbox = await transport_manager.sender("outbox")
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+
+    database = await transport_manager.sender("database")
+    assert isinstance(database, DatabaseSender)
+    connection.begin_nested.assert_not_called()
+    connection.execute.assert_not_called()
+
+
+async def test_worker_handles_relayed_messages_from_the_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    outbox = await transport_manager.sender("outbox")
+    await outbox.send(
+        Envelope.wrap(WorkerMessage(value="relay-me")).with_stamps(
+            OutboxStamp(target_transport_name="target")
+        )
+    )
+
+    await worker.run("outbox", limit=1)
+    await worker.run("target", limit=1)
+
+    assert handled == [WorkerMessage(value="relay-me")]
+
+    target = await _outbox_target(transport_manager)
+    assert list(target.queue.pull()) == []
+
+
+async def test_worker_handles_outboxed_messages_received_from_their_target_transport(
+    worker: Worker, registry: Registry, transport_manager: TransportManager
+) -> None:
+    handled: list[WorkerMessage] = []
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+
+    transport = await transport_manager.sender("memory")
+    await transport.send(
+        Envelope.wrap(WorkerMessage(value="already-there")).with_stamps(
+            OutboxStamp(target_transport_name="memory")
+        )
+    )
+
+    await worker.run("memory", limit=1)
+
+    assert handled == [WorkerMessage(value="already-there")]
+
+
+async def test_worker_retries_outbox_target_messages_on_the_target_transport(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    connection: MagicMock,
+) -> None:
+    async def handler(_message: WorkerMessage) -> None:
+        raise RuntimeError("transient failure")
+
+    registry.register_handler(handler)
+
+    target = await _outbox_target(transport_manager)
+    await target.send(Envelope.wrap(WorkerMessage(value="retry-me")))
+
+    await worker.run("target", limit=1)
+
+    # The retry goes straight to the target transport, bypassing the outbox
+    connection.begin_nested.assert_not_called()
+    connection.execute.assert_not_called()
+    assert len(target.sent) == 2
+
+    retried = target.sent[1]
+    redelivery_stamp = retried.stamp(RedeliveryStamp)
+    assert redelivery_stamp is not None
+    assert redelivery_stamp.retry_count == 1
+    assert not retried.has_stamp(OutboxStamp)
+
+
+async def test_worker_keeps_messages_of_outbox_keep_alive_targets_alive(
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    registry: Registry,
+) -> None:
+    fake_transport = FakeKeepAliveTransport()
+    worker, transport_manager = _make_keep_alive_worker(
+        container, middleware_stack, registry, fake_transport
+    )
+    transport_manager._senders["keep_alive"] = OutboxSender(
+        target_sender=fake_transport,
+        outbox_sender=cast("DatabaseSender", FakeKeepAliveTransport()),
+        target_transport_name="keep_alive",
+    )
+
+    async def handler(message: WorkerMessage) -> None:
+        await worker.keep_alive()
+
+    envelope = fake_transport.enqueue(Envelope.wrap(WorkerMessage(value="alive")))
+    registry.register_handler(handler)
+
+    await worker.run(limit=1)
+
+    assert [e for e, _ in fake_transport.keep_alive_calls] == [envelope]
+    assert fake_transport.acknowledged[0].open() == WorkerMessage(value="alive")
+
+
+@pytest.mark.parametrize("relay_enabled", [False, True])
+async def test_worker_resolves_only_configured_middleware(
+    worker: Worker,
+    registry: Registry,
+    transport_manager: TransportManager,
+    container: Container,
+    middleware_stack: MiddlewareStack,
+    relay_enabled: bool,
+) -> None:
+    created: list[RelayMessages] = []
+    handled: list[WorkerMessage] = []
+
+    def create_relay() -> RelayMessages:
+        relay = RelayMessages(transport_manager)
+        created.append(relay)
+        return relay
+
+    container.singleton(RelayMessages, create_relay)
+    middleware_stack.use([RelayMessages] if relay_enabled else [])
+
+    async def handler(message: WorkerMessage) -> None:
+        handled.append(message)
+
+    registry.register_handler(handler)
+    outbox = await transport_manager.sender("outbox")
+    message = WorkerMessage(value="configured")
+    await outbox.send(
+        Envelope.wrap(message).with_stamps(OutboxStamp(target_transport_name="target"))
+    )
+    await worker.run("outbox", limit=1)
+
+    assert len(created) == (1 if relay_enabled else 0)
+    assert handled == ([] if relay_enabled else [message])
+    target = await _outbox_target(transport_manager)
+    assert len(target.sent) == (1 if relay_enabled else 0)

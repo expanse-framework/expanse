@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from expanse.configuration.config import Config
+from expanse.container.container import Container
 from expanse.core.application import Application
 from expanse.database.asynchronous.connection import AsyncConnection
 from expanse.database.database_manager import AsyncDatabaseManager
@@ -61,8 +62,14 @@ class DatabaseServiceProvider(ServiceProvider):
         await db.dispose()
 
     async def _create_async_connection(
-        self, db: AsyncDatabaseManager, name: str | None = None
+        self, container: Container, db: AsyncDatabaseManager, name: str | None = None
     ) -> AsyncGenerator[AsyncConnection]:
+        if name is not None and name == db.get_default_connection():
+            # The default connection is shared, whether it is requested by name or not.
+            yield await container.get(AsyncConnection)
+
+            return
+
         connection = db.connection(name)
 
         await connection.start()
@@ -73,11 +80,33 @@ class DatabaseServiceProvider(ServiceProvider):
 
     async def _create_async_session(
         self,
+        container: Container,
         db: AsyncDatabaseManager,
         pagination_manager: PaginationManager,
         name: str | None = None,
     ) -> AsyncGenerator[AsyncSession]:
-        session = db.session(name).set_pagination_manager(pagination_manager)
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        if name is not None and name == db.get_default_connection():
+            # The default session is shared, whether it is requested by name or not.
+            yield await container.get(AsyncSession)
+
+            return
+
+        connection = (
+            await container.get(AsyncConnection)
+            if name is None
+            else await container.get(AsyncConnection, name)
+        )
+        # Expiring on commit forces a refresh on the next attribute access, which is
+        # IO. Since attributes are commonly read back from synchronous code outside of
+        # any SQLAlchemy greenlet — when serializing the response, typically — that
+        # refresh would fail with a MissingGreenlet error.
+        factory = async_sessionmaker(
+            connection, class_=AsyncSession, expire_on_commit=False
+        )
+
+        session = factory().set_pagination_manager(pagination_manager)
 
         yield session
 
@@ -94,22 +123,44 @@ class DatabaseServiceProvider(ServiceProvider):
 
         db.dispose()
 
-    def _create_connection(
-        self, db: DatabaseManager, name: str | None = None
-    ) -> Generator[Connection]:
+    async def _create_connection(
+        self, container: Container, db: DatabaseManager, name: str | None = None
+    ) -> AsyncGenerator[Connection]:
+        if name is not None and name == db.get_default_connection():
+            # The default connection is shared, whether it is requested by name or not.
+            yield await container.get(Connection)
+
+            return
+
         connection = db.connection(name)
 
         yield connection
 
         connection.close()
 
-    def _create_session(
+    async def _create_session(
         self,
+        container: Container,
         db: DatabaseManager,
         pagination_manager: PaginationManager,
         name: str | None = None,
-    ) -> Generator[Session]:
-        session = db.session(name).set_pagination_manager(pagination_manager)
+    ) -> AsyncGenerator[Session]:
+        from sqlalchemy.orm import sessionmaker
+
+        if name is not None and name == db.get_default_connection():
+            # The default session is shared, whether it is requested by name or not.
+            yield await container.get(Session)
+
+            return
+
+        connection = (
+            await container.get(Connection)
+            if name is None
+            else await container.get(Connection, name)
+        )
+        factory = sessionmaker(connection, class_=Session)
+
+        session = factory().set_pagination_manager(pagination_manager)
 
         yield session
 

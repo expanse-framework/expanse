@@ -7,6 +7,7 @@ from expanse.messenger.envelope import Envelope
 from expanse.messenger.locks.unique import UniqueLock
 from expanse.messenger.stamps.received import ReceivedStamp
 from expanse.messenger.stamps.unique import UniqueStamp
+from expanse.messenger.stamps.unique_lock_acquired import UniqueLockAcquiredStamp
 
 
 class EnsureUnique:
@@ -31,4 +32,12 @@ class EnsureUnique:
         if not await lock.acquire(envelope):
             return envelope
 
-        return await next_call(envelope)
+        try:
+            sent_envelope = await next_call(envelope)
+        except BaseException:
+            # The message was not sent, so nothing will ever release the lock.
+            await lock.release(envelope)
+
+            raise
+
+        return sent_envelope.with_stamps(UniqueLockAcquiredStamp())

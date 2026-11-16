@@ -13,7 +13,7 @@ from expanse.messenger.middleware.middleware_stack import MiddlewareStack
 from expanse.messenger.registry import Registry
 from expanse.messenger.serializers.serializer import Serializer
 from expanse.messenger.stamps.transport import TransportStamp
-from expanse.messenger.transports.memory.transport import MemoryTransport
+from expanse.messenger.transports.memory.sender import MemorySender
 from expanse.messenger.transports.transport_manager import TransportManager
 from expanse.serialization.serialization_manager import SerializationManager
 from expanse.serialization.serializers.dataclass import DataclassSerializer
@@ -83,9 +83,9 @@ async def test_dispatching_messages_calls_transport(
     message = MyMessage(foo="bar")
     await bus.dispatch(message)
 
-    transport = await transport_manager.transport("memory")
-    assert isinstance(transport, MemoryTransport), (
-        "Expected transport to be a MemoryTransport"
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, MemorySender), (
+        "Expected transport to be a MemorySender"
     )
 
     sent_envelopes = transport.sent
@@ -136,16 +136,16 @@ async def test_adding_transport_stamp_routes_message_to_correct_transport(
     message = Envelope.wrap(MyMessage(foo="qux"), stamps=[TransportStamp("memory2")])
     await bus.dispatch(message)
 
-    transport = await transport_manager.transport("memory2")
-    assert isinstance(transport, MemoryTransport), (
-        "Expected transport to be a MemoryTransport"
+    transport = await transport_manager.sender("memory2")
+    assert isinstance(transport, MemorySender), (
+        "Expected transport to be a MemorySender"
     )
 
     sent_envelopes = transport.sent
     assert len(sent_envelopes) == 1, "Expected exactly one envelope to be sent"
 
-    other_transport = await transport_manager.transport("memory")
-    assert isinstance(other_transport, MemoryTransport)
+    other_transport = await transport_manager.sender("memory")
+    assert isinstance(other_transport, MemorySender)
     assert len(other_transport.sent) == 0, (
         "Expected no envelopes to be sent to the default memory transport"
     )

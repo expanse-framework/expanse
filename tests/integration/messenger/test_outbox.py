@@ -1,0 +1,387 @@
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from sqlalchemy import text
+
+from expanse.container.container import Container
+from expanse.contracts.messenger.asynchronous.message_bus import MessageBus
+from expanse.contracts.messenger.synchronous.message_bus import (
+    MessageBus as SyncMessageBus,
+)
+from expanse.contracts.routing.router import Router
+from expanse.core.application import Application
+from expanse.database.asynchronous.database_manager import AsyncDatabaseManager
+from expanse.database.asynchronous.session import AsyncSession
+from expanse.database.synchronous.session import Session
+from expanse.http.responses.response import Response
+from expanse.messenger.envelope import Envelope
+from expanse.messenger.middleware.relay_messages import RelayMessages
+from expanse.messenger.registry import Registry
+from expanse.messenger.stamps.outbox import OutboxStamp
+from expanse.messenger.stamps.unique import UniqueStamp
+from expanse.messenger.transports.memory.sender import MemorySender
+from expanse.messenger.transports.outbox.sender import OutboxSender
+from expanse.messenger.transports.transport_manager import TransportManager
+from expanse.messenger.worker import Worker
+from expanse.pagination.pagination_manager import PaginationManager
+from expanse.routing.helpers import get
+from expanse.support.helpers import async_safe
+from expanse.testing.client import TestClient
+from expanse.testing.command_tester import CommandTester
+from tests.integration.messenger.fixtures.messages import DatabaseMessage
+
+
+pytestmark = pytest.mark.db
+
+
+async def _target_transport(container: Container) -> MemorySender:
+    transport_manager = await container.get(TransportManager)
+    transport = await transport_manager.sender("memory")
+    assert isinstance(transport, OutboxSender)
+
+    target = transport.target_sender
+    assert isinstance(target, MemorySender)
+
+    return target
+
+
+async def _begin(session: AsyncSession) -> None:
+    # Make the session start its transaction on the underlying connection,
+    # as it would when loading or flushing models, so that the outbox
+    # insert joins it.
+    await session.execute(text("SELECT 1"))
+
+
+@get("/outbox-commit")
+async def commit_route(
+    session: AsyncSession, bus: MessageBus, container: Container
+) -> Response:
+    async with session.begin():
+        await _begin(session)
+        await bus.dispatch(DatabaseMessage(value="hello"))
+
+    target = await _target_transport(container)
+
+    return Response(str(len(target.sent)))
+
+
+@get("/outbox-rollback")
+async def rollback_route(
+    session: AsyncSession, bus: MessageBus, container: Container
+) -> Response:
+    async with session.begin():
+        await _begin(session)
+        await bus.dispatch(DatabaseMessage(value="hello"))
+        await session.rollback()
+
+    target = await _target_transport(container)
+
+    return Response(str(len(target.sent)))
+
+
+@get("/outbox-dispatch-first")
+async def dispatch_first_route(session: AsyncSession, bus: MessageBus) -> Response:
+    async with session.begin():
+        await bus.dispatch(DatabaseMessage(value="hello"))
+
+    return Response("ok")
+
+
+@get("/outbox-dispatch-first-rollback")
+async def dispatch_first_rollback_route(
+    session: AsyncSession, bus: MessageBus
+) -> Response:
+    async with session.begin():
+        # Nothing has been executed by the session on its connection yet
+        await bus.dispatch(DatabaseMessage(value="hello"))
+        await session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-sync-session-commit")
+@async_safe(False)
+def sync_session_commit_route(session: Session, bus: SyncMessageBus) -> Response:
+    with session.begin():
+        session.execute(text("SELECT 1"))
+        bus.dispatch(DatabaseMessage(value="hello"))
+
+    return Response("ok")
+
+
+@get("/outbox-sync-session-rollback")
+@async_safe(False)
+def sync_session_rollback_route(session: Session, bus: SyncMessageBus) -> Response:
+    with session.begin():
+        session.execute(text("SELECT 1"))
+        bus.dispatch(DatabaseMessage(value="hello"))
+        session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-unique-rollback")
+async def unique_rollback_route(session: AsyncSession, bus: MessageBus) -> Response:
+    async with session.begin():
+        await bus.dispatch(
+            Envelope.wrap(DatabaseMessage(value="hello")).with_stamps(UniqueStamp())
+        )
+        await session.rollback()
+
+    return Response("ok")
+
+
+@get("/outbox-unique-commit")
+async def unique_commit_route(session: AsyncSession, bus: MessageBus) -> Response:
+    async with session.begin():
+        await bus.dispatch(
+            Envelope.wrap(DatabaseMessage(value="hello")).with_stamps(UniqueStamp())
+        )
+
+    return Response("ok")
+
+
+@pytest.fixture(params=["sqlite", "postgresql"])
+def connection_name(
+    request: pytest.FixtureRequest,
+    setup_databases: None,
+    app: Application,
+    router: Router,
+    command_tester: CommandTester,
+) -> str:
+    name: str = request.param
+    app.config["database"]["default"] = name
+    app.config["messenger"] = {
+        "transport": "memory",
+        "transports": {
+            "memory": {"driver": "memory", "outbox": "outbox"},
+            "outbox": {
+                "driver": "database",
+                "connection": name,
+                "table_name": "messages",
+            },
+        },
+    }
+
+    command_tester.command("db migrate").run()
+
+    router.handler(commit_route)
+    router.handler(rollback_route)
+    router.handler(dispatch_first_route)
+    router.handler(dispatch_first_rollback_route)
+    router.handler(sync_session_commit_route)
+    router.handler(sync_session_rollback_route)
+    router.handler(unique_rollback_route)
+    router.handler(unique_commit_route)
+
+    return name
+
+
+async def _count_outbox_messages(app: Application, connection_name: str) -> int:
+    db = await app.container.get(AsyncDatabaseManager)
+
+    async with db.connection(connection_name) as connection:
+        result = await connection.execute(text("SELECT COUNT(*) FROM messages"))
+
+        return int(result.scalar_one())
+
+
+async def test_messages_are_stored_in_the_outbox_when_the_transaction_is_committed(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-commit")
+
+    assert response.status_code == 200
+    # Nothing is sent to the target transport directly
+    assert response.text == "0"
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_not_stored_in_the_outbox_when_the_transaction_is_rolled_back(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-rollback")
+
+    assert response.status_code == 200
+    assert response.text == "0"
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_outboxed_messages_are_relayed_to_and_handled_from_the_target_transport(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    handled: list[DatabaseMessage] = []
+
+    def handler(message: DatabaseMessage) -> None:
+        handled.append(message)
+
+    registry = await app.container.get(Registry)
+    registry.register(DatabaseMessage, handler)
+
+    client.get("/outbox-commit")
+
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+    async with app.container.create_scoped_container() as container:
+        worker = await container.get(Worker)
+
+        # Wire the test-only memory destination to the transport consumed below.
+        manager = await container.get(TransportManager)
+        container.instance(RelayMessages, RelayMessages(manager))
+
+        # Relay the message from the outbox to the target transport
+        await worker.run("outbox", limit=1)
+
+        assert handled == []
+        assert await _count_outbox_messages(app, connection_name) == 0
+
+        target = await _target_transport(container)
+        assert len(target.sent) == 1
+        assert target.sent[0].open() == DatabaseMessage(value="hello")
+        assert not target.sent[0].has_stamp(OutboxStamp)
+
+        # Handle the message from the target transport
+        await worker.run("memory", limit=1)
+
+        assert handled == [DatabaseMessage(value="hello")]
+
+
+async def test_messages_are_stored_in_the_outbox_when_dispatching_first_in_a_transaction(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-dispatch-first")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_not_stored_in_the_outbox_when_dispatching_first_in_a_rolled_back_transaction(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-dispatch-first-rollback")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_messages_are_stored_in_the_outbox_when_a_sync_session_is_committed(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-sync-session-commit")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_not_stored_in_the_outbox_when_a_sync_session_is_rolled_back(
+    app: Application, client: TestClient, connection_name: str
+) -> None:
+    response = client.get("/outbox-sync-session-rollback")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+
+async def test_unique_locks_are_released_when_outboxed_messages_are_rolled_back(
+    app: Application, client: TestClient, connection_name: str, tmp_path: Path
+) -> None:
+    app.config["cache"] = {
+        "store": "file",
+        "stores": {"file": {"driver": "file", "path": str(tmp_path / "cache")}},
+    }
+
+    client.get("/outbox-unique-rollback")
+
+    assert await _count_outbox_messages(app, connection_name) == 0
+
+    # The lock of the rolled back message must not prevent dispatching it again
+    client.get("/outbox-unique-commit")
+
+    assert await _count_outbox_messages(app, connection_name) == 1
+
+
+async def test_messages_are_stored_in_the_configured_outbox_connection(
+    app: Application,
+    client: TestClient,
+    router: Router,
+    command_tester: CommandTester,
+    setup_databases: None,
+) -> None:
+    app.config["database"]["default"] = "postgresql"
+    command_tester.command("db migrate").run()
+    app.config["database"]["default"] = "sqlite"
+    command_tester.command("db migrate").run()
+    app.config["messenger"] = {
+        "transport": "memory",
+        "transports": {
+            "memory": {"driver": "memory", "outbox": "outbox"},
+            "outbox": {"driver": "database", "connection": "postgresql"},
+        },
+    }
+    router.handler(commit_route)
+
+    response = client.get("/outbox-commit")
+
+    assert response.status_code == 200
+    assert await _count_outbox_messages(app, "postgresql") == 1
+    assert await _count_outbox_messages(app, "sqlite") == 0
+
+
+@pytest.mark.parametrize("rollback", [False, True])
+async def test_worker_dispatch_joins_the_handler_transaction(
+    app: Application, connection_name: str, rollback: bool
+) -> None:
+    # Pagination is irrelevant to this worker test and otherwise requires an HTTP request.
+    app.container.instance(PaginationManager, MagicMock(spec=PaginationManager))
+    app.config["messenger"]["transports"]["incoming"] = {"driver": "memory"}
+    db = await app.container.get(AsyncDatabaseManager)
+    async with db.connection(connection_name) as connection:
+        await connection.execute(
+            text("CREATE TABLE outbox_business_state (value INTEGER)")
+        )
+        await connection.commit()
+
+    errors: list[Exception] = []
+    observed: list[int] = []
+
+    async def handler(message: DatabaseMessage, container: Container) -> None:
+        try:
+            session = await container.get(AsyncSession)
+            bus = await container.get(MessageBus)
+        except Exception as error:
+            errors.append(error)
+            raise
+        async with session.begin():
+            await session.execute(text("INSERT INTO outbox_business_state VALUES (1)"))
+            await bus.dispatch(DatabaseMessage(value="outgoing"))
+            # The row must be written before commit, on this transaction's connection.
+            assert await session.scalar(text("SELECT COUNT(*) FROM messages")) == 1
+            observed.append(1)
+            if rollback:
+                await session.rollback()
+
+    registry = await app.container.get(Registry)
+    registry.register(DatabaseMessage, handler)
+    try:
+        async with app.container.create_scoped_container() as container:
+            manager = await container.get(TransportManager)
+            await (await manager.sender("incoming")).send(
+                Envelope(DatabaseMessage(value="incoming"))
+            )
+            await (await container.get(Worker)).run("incoming", limit=1)
+        if errors:
+            raise errors[0]
+        assert observed == [1]
+        assert await _count_outbox_messages(app, connection_name) == (
+            0 if rollback else 1
+        )
+        async with db.connection(connection_name) as connection:
+            assert await connection.scalar(
+                text("SELECT COUNT(*) FROM outbox_business_state")
+            ) == (0 if rollback else 1)
+    finally:
+        async with db.connection(connection_name) as connection:
+            await connection.execute(text("DROP TABLE outbox_business_state"))
+            await connection.commit()

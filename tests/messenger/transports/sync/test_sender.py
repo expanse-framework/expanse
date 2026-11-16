@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 
-import pytest
-
 from expanse.container.container import Container
 from expanse.messenger.envelope import Envelope
 from expanse.messenger.registry import Registry
-from expanse.messenger.transports.sync.transport import SyncTransport
+from expanse.messenger.transports.sync.sender import SyncSender
 
 
 @dataclass
@@ -13,26 +11,26 @@ class FooMessage:
     value: str
 
 
-def make_transport(
+def make_sender(
     registry: Registry | None = None,
-) -> tuple[SyncTransport, Registry]:
+) -> tuple[SyncSender, Registry]:
     container = Container()
     reg = registry or Registry()
-    return SyncTransport(container, reg), reg
+    return SyncSender(container, reg), reg
 
 
 async def test_send_returns_envelope() -> None:
-    transport, _ = make_transport()
+    sender, _ = make_sender()
     envelope = Envelope.wrap(FooMessage(value="hello"))
 
-    result = await transport.send(envelope)
+    result = await sender.send(envelope)
 
     assert result is envelope
 
 
 async def test_send_calls_registered_handler() -> None:
     registry = Registry()
-    transport, _ = make_transport(registry)
+    sender, _ = make_sender(registry)
     received: list[FooMessage] = []
 
     def handler(message: FooMessage) -> None:
@@ -41,7 +39,7 @@ async def test_send_calls_registered_handler() -> None:
     registry.register_handler(handler)
     envelope = Envelope.wrap(FooMessage(value="hello"))
 
-    await transport.send(envelope)
+    await sender.send(envelope)
 
     assert len(received) == 1
     assert received[0].value == "hello"
@@ -49,7 +47,7 @@ async def test_send_calls_registered_handler() -> None:
 
 async def test_send_calls_multiple_handlers() -> None:
     registry = Registry()
-    transport, _ = make_transport(registry)
+    sender, _ = make_sender(registry)
     call_order: list[str] = []
 
     def first(message: FooMessage) -> None:
@@ -60,39 +58,15 @@ async def test_send_calls_multiple_handlers() -> None:
 
     registry.register_handler(first)
     registry.register_handler(second)
-    await transport.send(Envelope.wrap(FooMessage(value="hello")))
+    await sender.send(Envelope.wrap(FooMessage(value="hello")))
 
     assert call_order == ["first", "second"]
 
 
 async def test_send_with_no_handlers_returns_envelope() -> None:
-    transport, _ = make_transport()
+    sender, _ = make_sender()
     envelope = Envelope.wrap(FooMessage(value="hello"))
 
-    result = await transport.send(envelope)
+    result = await sender.send(envelope)
 
     assert result is envelope
-
-
-async def test_receive_raises_not_implemented() -> None:
-    transport, _ = make_transport()
-
-    with pytest.raises(NotImplementedError):
-        async for _ in transport.receive():
-            pass
-
-
-async def test_acknowledge_raises_not_implemented() -> None:
-    transport, _ = make_transport()
-    envelope = Envelope.wrap(FooMessage(value="hello"))
-
-    with pytest.raises(NotImplementedError):
-        await transport.acknowledge(envelope)
-
-
-async def test_reject_raises_not_implemented() -> None:
-    transport, _ = make_transport()
-    envelope = Envelope.wrap(FooMessage(value="hello"))
-
-    with pytest.raises(NotImplementedError):
-        await transport.reject(envelope)

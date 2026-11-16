@@ -50,7 +50,13 @@ class AsyncDatabaseManager:
             return self._factories[name]()
 
         engine = self.configure_engine(name)
-        factory = async_sessionmaker(engine, class_=AsyncSession)
+        # Expiring on commit forces a refresh on the next attribute access, which is
+        # IO. Since attributes are commonly read back from synchronous code outside of
+        # any SQLAlchemy greenlet (serialization, for instance), that refresh would
+        # fail with a MissingGreenlet error.
+        factory = async_sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
 
         self._factories[name] = factory
 
@@ -157,6 +163,14 @@ class AsyncDatabaseManager:
             )
 
         engine = self.create_base_engine(url)
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def do_connect(dbapi_connection, connection_record):
+            dbapi_connection.isolation_level = None
+
+        @event.listens_for(engine.sync_engine, "begin")
+        def do_begin(conn):
+            conn.exec_driver_sql("BEGIN")
 
         if config.foreign_key_constraints:
 
